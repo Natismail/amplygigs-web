@@ -1,26 +1,57 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ====== Global Reset & Base ====== */
+html, body {
+  @apply h-full bg-white text-gray-900 transition-colors duration-300;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+body.dark {
+  @apply bg-gray-900 text-gray-100;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ====== Scrollbar Styling ====== */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-md;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ====== Reusable Utility Classes ====== */
+.btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
 }
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ============================================================
+   Tailwind v4 base imports
+============================================================ */
+/* @import "tailwindcss/preflight";
+@import "tailwindcss/utilities"; */
+

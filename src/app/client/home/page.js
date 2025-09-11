@@ -1,0 +1,263 @@
+// src/app/client/page.js
+"use client";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
+import MusicianCard from "@/components/MusicianCard";
+import PostEventForm from "@/components/PostEventForm";
+import Layout from "@/components/Layout";
+import { useRouter } from "next/navigation";
+
+export default function ClientHome() {
+  const { user, loading } = useAuth();
+  const [musicians, setMusicians] = useState([]);
+  const [clientEvents, setClientEvents] = useState([]);
+  const [showPostForm, setShowPostForm] = useState(false);
+  const router = useRouter();
+
+  // Fetch all available musicians
+  useEffect(() => {
+    async function fetchMusicians() {
+      if (!loading && user) {
+        const { data, error } = await supabase
+          .from("user_profiles")
+          .select("id, name, bio, youtube, socials, available")
+          .eq("role", "MUSICIAN");
+
+        if (error) {
+          console.error("Error fetching musicians:", error.message);
+        } else {
+          setMusicians(data);
+        }
+      }
+    }
+    fetchMusicians();
+  }, [loading, user]);
+
+  // Fetch the current client's events
+  useEffect(() => {
+    async function fetchClientEvents() {
+      if (user) {
+        const { data, error } = await supabase
+          .from("events")
+          .select("*, event_interests(musician_id)")
+          .eq("client_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching client events:", error.message);
+        } else {
+          setClientEvents(data);
+        }
+      }
+    }
+    fetchClientEvents();
+  }, [user]);
+
+  if (loading) {
+    return <div className="text-center p-6">Loading...</div>;
+  }
+
+  return (
+    <Layout>
+      <div className="p-6 dark:text-white -mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl font-bold">🎵 Your Posted Events</h1>
+          <button
+            onClick={() => setShowPostForm(true)}
+            disabled={loading} // This is the key change
+            className="bg-purple-800 text-white px-4 py-2 rounded hover:bg-purple-900 disabled:opacity-50"
+          >
+            ➕ Post Event
+          </button>
+        </div>
+
+        {/* Display client's events */}
+        {clientEvents.length === 0 ? (
+          <p className="text-gray-500 mb-8">You have not posted any events yet.</p>
+        ) : (
+          <div className="mb-8 space-y-4 space-x-4 grid sm:grid-cols-1 md:grid-cols-4 lg:grid-cols-4 px-4">
+            {clientEvents.map((event) => (
+              <div key={event.id} className="p-4 border rounded-lg shadow-sm">
+                <h3 className="text-lg font-bold">{event.title}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{event.description}</p>
+                <p className="text-sm">Location: {event.location}</p>
+                <p className="text-sm">Proposed Amount: ${event.proposed_amount}</p>
+                {event.media_url && (
+                  <img src={event.media_url} alt="Event Media" className="mt-2 rounded-md max-h-64 object-cover" />
+                )}
+                <div className="mt-2 text-sm text-gray-500">
+                  {event.event_interests.length > 0
+                    ? `Interested Musicians: ${event.event_interests.length}`
+                    : "No musicians have shown interest yet."}
+                </div>
+                <a href={`/events/${event.id}`} className="text-blue-500 hover:underline mt-2 inline-block">
+                  View Details
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h1 className="text-xl font-bold mb-4">🎵 Find Musicians</h1>
+        {musicians.length === 0 ? (
+          <p className="text-gray-500">No musicians found.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {musicians.map((m) => (
+              <MusicianCard key={m.id} musician={m} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showPostForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="relative w-full max-w-xl mx-4">
+            <PostEventForm
+              onSuccess={() => {
+                alert("✅ Event posted successfully!");
+                setShowPostForm(false);
+                router.refresh();
+              }}
+              onCancel={() => setShowPostForm(false)}
+            />
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+}
+
+
+
+// // src/app/client/page.js
+// "use client";
+// import { useState, useEffect } from "react";
+// import { supabase } from "@/lib/supabaseClient";
+// import { useAuth } from "@/context/AuthContext";
+// import MusicianCard from "@/components/MusicianCard";
+// import PostEventForm from "@/components/PostEventForm";
+// import Layout from "@/components/Layout";
+// import { useRouter } from "next/navigation"; // New Import
+
+// export default function ClientHome() {
+//   const { user, loading } = useAuth();
+//   const [musicians, setMusicians] = useState([]);
+//   const [clientEvents, setClientEvents] = useState([]);
+//   const [showPostForm, setShowPostForm] = useState(false);
+//   const router = useRouter(); // Initialize router
+
+//   // Fetch all available musicians
+//   useEffect(() => {
+//     async function fetchMusicians() {
+//       if (!loading && user) {
+//         const { data, error } = await supabase
+//           .from("user_profiles")
+//           .select("id, name, bio, youtube, socials, available")
+//           .eq("role", "MUSICIAN");
+
+//         if (error) {
+//           console.error("Error fetching musicians:", error.message);
+//         } else {
+//           setMusicians(data);
+//         }
+//       }
+//     }
+//     fetchMusicians();
+//   }, [loading, user]);
+
+//   // Fetch the current client's events
+//   useEffect(() => {
+//     async function fetchClientEvents() {
+//       if (user) {
+//         const { data, error } = await supabase
+//           .from("events")
+//           .select("*, event_interests(musician_id)")
+//           .eq("client_id", user.id)
+//           .order("created_at", { ascending: false });
+
+//         if (error) {
+//           console.error("Error fetching client events:", error.message);
+//         } else {
+//           setClientEvents(data);
+//         }
+//       }
+//     }
+//     fetchClientEvents();
+//   }, [user]);
+
+//   if (loading) {
+//     return <div className="text-center p-6">Loading...</div>;
+//   }
+
+//   return (
+//     <Layout>
+//       <div className="p-6 dark:text-white">
+//         <div className="flex justify-between items-center mb-6">
+//           <h1 className="text-xl font-bold">🎵 Your Posted Events</h1>
+//           <button
+//             onClick={() => setShowPostForm(true)}
+//             className="bg-purple-800 text-white px-4 py-2 rounded hover:bg-purple-900"
+//           >
+//             ➕ Post Event
+//           </button>
+//         </div>
+
+//         {/* Display client's events */}
+//         {clientEvents.length === 0 ? (
+//           <p className="text-gray-500 mb-8">You have not posted any events yet.</p>
+//         ) : (
+//           <div className="mb-8 space-y-4">
+//             {clientEvents.map((event) => (
+//               <div key={event.id} className="p-4 border rounded-lg shadow-sm">
+//                 <h3 className="text-lg font-bold">{event.title}</h3>
+//                 <p className="text-sm text-gray-600 dark:text-gray-400">{event.description}</p>
+//                 <p className="text-sm">Location: {event.location}</p>
+//                 <p className="text-sm">Proposed Amount: ${event.proposed_amount}</p>
+//                 {event.media_url && (
+//                   <img src={event.media_url} alt="Event Media" className="mt-2 rounded-md max-h-64 object-cover" />
+//                 )}
+//                 <div className="mt-2 text-sm text-gray-500">
+//                   {event.event_interests.length > 0
+//                     ? `Interested Musicians: ${event.event_interests.length}`
+//                     : "No musicians have shown interest yet."}
+//                 </div>
+//                 {/* When a client clicks on their events, they will be redirected to the event page */}
+//                 <a href={`/events/${event.id}`} className="text-blue-500 hover:underline mt-2 inline-block">
+//                   View Details
+//                 </a>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+
+//         <h1 className="text-xl font-bold mb-4">🎵 Find Musicians</h1>
+//         {musicians.length === 0 ? (
+//           <p className="text-gray-500">No musicians found.</p>
+//         ) : (
+//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+//             {musicians.map((m) => (
+//               <MusicianCard key={m.id} musician={m} />
+//             ))}
+//           </div>
+//         )}
+//       </div>
+
+//       {showPostForm && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+//           <div className="relative w-full max-w-xl mx-4">
+//             <PostEventForm
+//               onSuccess={() => {
+//                 alert("✅ Event posted successfully!");
+//                 setShowPostForm(false);
+//                 router.refresh(); // Now refreshes the page the Next.js way
+//               }}
+//               onCancel={() => setShowPostForm(false)}
+//             />
+//           </div>
+//         </div>
+//       )}
+//     </Layout>
+//   );
+// }

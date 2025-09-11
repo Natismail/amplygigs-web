@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AmplyGigs Icon Generator</title>
+</head>
+<body style="font-family: Arial, sans-serif; padding: 20px;">
+    <h2>🎵 AmplyGigs Icon Generator</h2>
+    <p>Right-click each canvas and "Save image as..." to create your icons:</p>
+    
+    <!-- 192x192 Icon -->
+    <div style="margin: 20px 0;">
+        <h3>icon-192.png (192x192)</h3>
+        <canvas id="icon192" width="192" height="192" style="border: 1px solid #ccc;"></canvas>
+    </div>
+    
+    <!-- 512x512 Icon -->
+    <div style="margin: 20px 0;">
+        <h3>icon-512.png (512x512)</h3>
+        <canvas id="icon512" width="512" height="512" style="border: 1px solid #ccc;"></canvas>
+    </div>
+    
+    <!-- 72x72 Badge -->
+    <div style="margin: 20px 0;">
+        <h3>badge-72.png (72x72)</h3>
+        <canvas id="badge72" width="72" height="72" style="border: 1px solid #ccc;"></canvas>
+    </div>
+
+    <script>
+        // Create 192px icon
+        const canvas192 = document.getElementById('icon192');
+        const ctx192 = canvas192.getContext('2d');
+        
+        // Gradient background
+        const gradient192 = ctx192.createLinearGradient(0, 0, 192, 192);
+        gradient192.addColorStop(0, '#6366f1');
+        gradient192.addColorStop(1, '#8b5cf6');
+        
+        ctx192.fillStyle = gradient192;
+        ctx192.roundRect(0, 0, 192, 192, 24);
+        ctx192.fill();
+        
+        // Music note icon
+        ctx192.fillStyle = 'white';
+        ctx192.beginPath();
+        ctx192.arc(96, 70, 25, 0, Math.PI * 2);
+        ctx192.fill();
+        
+        // Location pin
+        ctx192.beginPath();
+        ctx192.moveTo(70, 110);
+        ctx192.lineTo(96, 130);
+        ctx192.lineTo(122, 110);
+        ctx192.lineTo(110, 140);
+        ctx192.lineTo(82, 140);
+        ctx192.closePath();
+        ctx192.fill();
+        
+        // Text
+        ctx192.font = 'bold 20px Arial';
+        ctx192.textAlign = 'center';
+        ctx192.fillText('AG', 96, 170);
+
+        // Create 512px icon
+        const canvas512 = document.getElementById('icon512');
+        const ctx512 = canvas512.getContext('2d');
+        
+        const gradient512 = ctx512.createLinearGradient(0, 0, 512, 512);
+        gradient512.addColorStop(0, '#6366f1');
+        gradient512.addColorStop(1, '#8b5cf6');
+        
+        ctx512.fillStyle = gradient512;
+        ctx512.roundRect(0, 0, 512, 512, 64);
+        ctx512.fill();
+        
+        // Music note (scaled up)
+        ctx512.fillStyle = 'white';
+        ctx512.beginPath();
+        ctx512.arc(256, 180, 60, 0, Math.PI * 2);
+        ctx512.fill();
+        
+        // Location pin (scaled up)
+        ctx512.beginPath();
+        ctx512.moveTo(180, 280);
+        ctx512.lineTo(256, 320);
+        ctx512.lineTo(332, 280);
+        ctx512.lineTo(300, 380);
+        ctx512.lineTo(212, 380);
+        ctx512.closePath();
+        ctx512.fill();
+        
+        // Text (scaled up)
+        ctx512.font = 'bold 48px Arial';
+        ctx512.textAlign = 'center';
+        ctx512.fillText('AG', 256, 460);
+
+        // Create 72px badge
+        const canvas72 = document.getElementById('badge72');
+        const ctx72 = canvas72.getContext('2d');
+        
+        ctx72.fillStyle = '#6366f1';
+        ctx72.beginPath();
+        ctx72.arc(36, 36, 36, 0, Math.PI * 2);
+        ctx72.fill();
+        
+        // Small music note
+        ctx72.fillStyle = 'white';
+        ctx72.beginPath();
+        ctx72.arc(36, 25, 8, 0, Math.PI * 2);
+        ctx72.fill();
+        
+        // Small pin
+        ctx72.beginPath();
+        ctx72.moveTo(25, 40);
+        ctx72.lineTo(36, 45);
+        ctx72.lineTo(47, 40);
+        ctx72.lineTo(43, 55);
+        ctx72.lineTo(29, 55);
+        ctx72.closePath();
+        ctx72.fill();
+
+        // Add roundRect polyfill for older browsers
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radius) {
+                this.beginPath();
+                this.moveTo(x + radius, y);
+                this.lineTo(x + width - radius, y);
+                this.quadraticCurveTo(x + width, y, x + width, y + radius);
+                this.lineTo(x + width, y + height - radius);
+                this.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                this.lineTo(x + radius, y + height);
+                this.quadraticCurveTo(x, y + height, x, y + height - radius);
+                this.lineTo(x, y + radius);
+                this.quadraticCurveTo(x, y, x + radius, y);
+                this.closePath();
+            };
+        }
+    </script>
+    
+    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 30px;">
+        <h4>📁 Save Instructions:</h4>
+        <ol>
+            <li>Right-click on each canvas above</li>
+            <li>Select "Save image as..."</li>
+            <li>Save as PNG files in your <code>public/icons/</code> folder:
+                <ul>
+                    <li><code>icon-192.png</code></li>
+                    <li><code>icon-512.png</code></li>
+                    <li><code>badge-72.png</code></li>
+                </ul>
+            </li>
+            <li>Refresh your AmplyGigs app</li>
+        </ol>
+    </div>
+</body>
+</html>

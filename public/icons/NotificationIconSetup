@@ -1,0 +1,50 @@
+<!-- Save these as separate files in public/icons/ -->
+
+<!-- public/icons/icon-192.png (as SVG for now) -->
+<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="24" fill="url(#grad)"/>
+  <circle cx="96" cy="70" r="25" fill="white"/>
+  <path d="M70 110 L96 130 L122 110 L110 140 L82 140 Z" fill="white"/>
+  <text x="96" y="170" text-anchor="middle" fill="white" font-family="Arial" font-size="20" font-weight="bold">AG</text>
+</svg>
+
+<!-- public/icons/badge-72.png (as SVG for now) -->
+<svg width="72" height="72" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="36" cy="36" r="36" fill="#6366f1"/>
+  <circle cx="36" cy="25" r="8" fill="white"/>
+  <path d="M25 40 L36 45 L47 40 L43 55 L29 55 Z" fill="white"/>
+</svg>
+
+<!-- Instructions for creating actual PNG files: -->
+<!-- 
+1. Save the SVGs above as separate files
+2. Use an online converter like https://convertio.co/svg-png/ 
+3. Convert icon-192.svg to icon-192.png
+4. Convert badge-72.svg to badge-72.png
+5. Place both in public/icons/
+-->
+
+<!-- Or use these quick CSS-generated icons in your HTML: -->
+<style>
+.temp-icon {
+  width: 192px;
+  height: 192px;
+  background: linear-gradient(45deg, #6366f1, #8b5cf6);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 48px;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+}
+</style>
+
+<div class="temp-icon">AG</div>
