@@ -1,3 +1,5 @@
+//src/components/Sidebar.js
+
 "use client";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -56,7 +58,7 @@ export default function Sidebar({ isOpen, onClose }) {
             <Link href="/musician/events" className="block hover:text-blue-400" onClick={onClose}>
               Events
             </Link>
-            <Link href="/settings" className="block hover:text-blue-400" onClick={onClose}>
+            <Link href="/musician/settings" className="block hover:text-blue-400" onClick={onClose}>
               Settings
             </Link>
           </>

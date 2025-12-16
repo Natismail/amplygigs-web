@@ -1,3 +1,5 @@
+// src/app/api/earnings/route.js
+
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseServerClient'; // Note: Use a server-side Supabase client
 import { headers } from 'next/headers';

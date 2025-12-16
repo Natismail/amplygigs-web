@@ -1,74 +1,88 @@
+// // // src/app/layout.js
+
 // src/app/layout.js
 import { Geist, Geist_Mono, Roboto, Inter } from "next/font/google";
 import "./globals.css";
-import 'leaflet/dist/leaflet.css';
+import "leaflet/dist/leaflet.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import Script from 'next/script';
+import { DataProvider } from "@/context/DataContext";
+import Script from "next/script";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const geistSans = Geist({ 
+  variable: "--font-geist-sans", 
+  subsets: ["latin"] 
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const geistMono = Geist_Mono({ 
+  variable: "--font-geist-mono", 
+  subsets: ["latin"] 
 });
 
-const roboto = Roboto({
-  weight: ["400", "500", "700"], // Regular, Medium, Bold
-  subsets: ["latin"],
-  variable: "--font-roboto",
+const roboto = Roboto({ 
+  weight: ["400", "500", "700"], 
+  subsets: ["latin"], 
+  variable: "--font-roboto" 
 });
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
+const inter = Inter({ 
+  subsets: ["latin"], 
+  variable: "--font-inter" 
 });
 
+// ✅ Metadata can only be exported from Server Components
 export const metadata = {
-  title: "AmplyGigs",
-  description: "Are you ready to meet amazing musicians or get the worthy platform?, connect now...",
+  title: "AmplyGigs - Connect Musicians with Clients",
+  description: "Real-time location tracking and booking platform for musicians and event organizers",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AmplyGigs",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#6366f1',
+  themeColor: "#6366f1",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* PWA and Notification Meta Tags */}
+        {/* PWA Meta Tags */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="AmplyGigs" />
         
-        {/* Notification Icons */}
+        {/* Additional Icons */}
         <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="shortcut icon" href="/icons/badge-72.png" />
       </head>
-      <body
+      <body 
         className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} ${inter.variable} antialiased`}
       >
-        <div>
-          <main className="flex-grow">
-            <AuthProvider>
-              <ThemeProvider>
-                {children}
-              </ThemeProvider>
-            </AuthProvider>
-          </main>
-        </div>
+        <ThemeProvider>
+          <AuthProvider>
+            <DataProvider>
+              {children}
+            </DataProvider>
+          </AuthProvider>
+        </ThemeProvider>
 
-        {/* Service Worker Registration Script */}
+        {/* Service Worker Registration */}
         <Script 
           id="register-service-worker" 
           strategy="afterInteractive"
@@ -78,75 +92,89 @@ export default function RootLayout({ children }) {
               window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js')
                   .then(function(registration) {
-                    console.log('✅ AmplyGigs Service Worker registered successfully:', registration.scope);
+                    console.log('✅ Service Worker registered:', registration.scope);
                     
-                    // Listen for service worker updates
+                    // Check for updates
                     registration.addEventListener('updatefound', () => {
+                      const newWorker = registration.installing;
                       console.log('🔄 Service Worker update found');
+                      
+                      newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                          console.log('✨ New version available! Refresh to update.');
+                        }
+                      });
                     });
                   })
                   .catch(function(error) {
-                    console.error('❌ AmplyGigs Service Worker registration failed:', error);
+                    console.error('❌ Service Worker registration failed:', error);
                   });
               });
 
-              // Listen for service worker messages
+              // Listen for messages from service worker
               navigator.serviceWorker.addEventListener('message', function(event) {
                 console.log('📨 Message from Service Worker:', event.data);
               });
             } else {
-              console.log('❌ Service Worker not supported in this browser');
+              console.log('❌ Service Worker not supported');
             }
           `}
         </Script>
 
-        {/* Notification Permission Helper Script */}
+        {/* Notification Helpers */}
         <Script 
           id="notification-helper" 
           strategy="afterInteractive"
         >
           {`
-            // Global notification helper functions for AmplyGigs
             window.AmplyGigs = window.AmplyGigs || {};
             
+            // Request notification permission
             window.AmplyGigs.requestNotificationPermission = async function() {
               if (!('Notification' in window)) {
-                console.log('❌ This browser does not support notifications');
+                console.log('❌ Notifications not supported');
                 return false;
               }
-
+              
               if (Notification.permission === 'granted') {
+                console.log('✅ Notifications already granted');
                 return true;
               }
-
+              
               if (Notification.permission === 'denied') {
-                console.log('❌ Notification permission denied');
+                console.log('❌ Notifications denied');
                 return false;
               }
-
+              
               const permission = await Notification.requestPermission();
+              console.log('Notification permission:', permission);
               return permission === 'granted';
             };
 
+            // Show notification
             window.AmplyGigs.showNotification = function(title, options = {}) {
-              if (Notification.permission === 'granted') {
-                const defaultOptions = {
-                  icon: '/icons/icon-192.png',
-                  badge: '/icons/badge-72.png',
-                  tag: 'amplygigs-' + Date.now(),
-                  renotify: true,
-                  requireInteraction: false,
-                  ...options
-                };
-                
-                return new Notification(title, defaultOptions);
+              if (Notification.permission !== 'granted') {
+                console.log('⚠️ Notifications not granted');
+                return null;
               }
+              
+              const defaultOptions = {
+                icon: '/icons/icon-192.png',
+                badge: '/icons/badge-72.png',
+                tag: 'amplygigs-' + Date.now(),
+                renotify: true,
+                requireInteraction: false,
+                vibrate: [200, 100, 200],
+                ...options
+              };
+              
+              return new Notification(title, defaultOptions);
             };
 
-            // Test notification function (useful for debugging)
+            // Test notification
             window.AmplyGigs.testNotification = function() {
               window.AmplyGigs.showNotification('🎵 AmplyGigs Test', {
-                body: 'Notifications are working! Ready for live tracking.',
+                body: 'Notifications are working perfectly!',
                 icon: '/icons/icon-192.png'
               });
             };
@@ -158,3 +186,4 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+
