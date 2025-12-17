@@ -21,7 +21,9 @@
         "subaccount",
         "supabase",
         "turbopack",
+        "ussd",
         "vercel",
-        "verif"
+        "verif",
+        "weisser"
     ]
 }
