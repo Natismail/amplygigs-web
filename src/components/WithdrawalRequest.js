@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from "next/navigation";
+
 
 export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
   const { user } = useAuth();
@@ -16,6 +18,7 @@ export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
 
   useEffect(() => {
     fetchBankAccounts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchBankAccounts = async () => {
@@ -106,7 +109,7 @@ export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
               Please add a bank account before you can withdraw funds.
             </p>
             <button
-              onClick={() => window.location.href = '/musician/settings/bank-accounts'}
+              onClick={() => router.push = '/musician/settings/bank-accounts'}
               className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm"
             >
               Add Bank Account
@@ -202,7 +205,7 @@ export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
                   </div>
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-2">
                     <div className="flex justify-between">
-                      <span className="font-semibold text-gray-900 dark:text-white">You'll Receive:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">You&apos;ll Receive:</span>
                       <span className="font-bold text-green-600">₦{calculateNetAmount().toLocaleString()}</span>
                     </div>
                   </div>

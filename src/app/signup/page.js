@@ -151,14 +151,14 @@ export default function SignUpPage() {
             className="flex-1 py-2 border rounded-lg flex items-center justify-center gap-2 hover:bg-gray-100"
           >
             <Image src="/images/google.svg" alt="Google" className="w-5 h-5" width={40} height={40}/>
-            Google
+            {/* Google */}
           </button>
           <button
             onClick={() => handleSocialLogin("facebook")}
             className="flex-1 py-2 border rounded-lg flex items-center justify-center gap-2 hover:bg-gray-100"
           >
             <Image src="/images/facebook.svg" alt="Facebook" className="w-5 h-5" width={40} height={40}  />
-            Facebook
+            {/* Facebook */}
           </button>
         </div>
 

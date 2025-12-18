@@ -21,6 +21,7 @@ export default function BankAccountManager({ onAccountAdded }) {
   useEffect(() => {
     fetchBankAccounts();
     fetchNigerianBanks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchBankAccounts = async () => {

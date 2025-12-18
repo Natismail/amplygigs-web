@@ -1,3 +1,6 @@
+// src/app/(app)/tracking/page.js
+
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -70,6 +73,7 @@ export default function LiveTracking() {
         setLoading(false);
       }
     }
+// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, session]);
 
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function LiveTracking() {
       }, 10000);
       return () => clearInterval(interval);
     }
+// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackingActive, locationPermission]);
 
   useEffect(() => {
@@ -112,6 +117,7 @@ export default function LiveTracking() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackingActive]);
 
   const showLowBatteryWarning = () => {

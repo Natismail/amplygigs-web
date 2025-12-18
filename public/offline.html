@@ -34,19 +34,27 @@
     }
     
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+      }
+      50% { 
+        opacity: 0.6;
+        transform: scale(0.95);
+      }
     }
     
     h1 {
       font-size: 32px;
       margin-bottom: 10px;
+      font-weight: 700;
     }
     
     p {
       font-size: 18px;
       margin-bottom: 30px;
       opacity: 0.9;
+      line-height: 1.5;
     }
     
     .button {
@@ -58,15 +66,51 @@
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
-      transition: transform 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
     
     .button:hover {
       transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
     
     .button:active {
       transform: scale(0.95);
+    }
+
+    .status {
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .status.show {
+      opacity: 1;
+    }
+
+    .features {
+      margin-top: 40px;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 0;
+      font-size: 15px;
+    }
+
+    .checkmark {
+      font-size: 18px;
     }
   </style>
 </head>
@@ -74,17 +118,90 @@
   <div class="container">
     <div class="icon">📡</div>
     <h1>You're Offline</h1>
-    <p>It looks like you've lost your internet connection. Don't worry, we'll reconnect as soon as you're back online!</p>
-    <button class="button" onclick="window.location.reload()">
+    <p>It looks like you've lost your internet connection. Don't worry, AmplyGigs works offline for viewing cached content!</p>
+    
+    <button class="button" onclick="retryConnection()">
       Try Again
     </button>
+
+    <div class="status" id="status"></div>
+
+    <div class="features">
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>View previously loaded musicians</span>
+      </div>
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>Access your profile offline</span>
+      </div>
+      <div class="feature">
+        <span class="checkmark">✓</span>
+        <span>Browse cached bookings</span>
+      </div>
+      <div class="feature">
+        <span class="checkmark">⏳</span>
+        <span>New data will sync when you're back online</span>
+      </div>
+    </div>
   </div>
   
   <script>
+    const statusEl = document.getElementById('status');
+    let retryCount = 0;
+    let checkInterval;
+
+    function showStatus(message) {
+      statusEl.textContent = message;
+      statusEl.classList.add('show');
+      setTimeout(() => {
+        statusEl.classList.remove('show');
+      }, 3000);
+    }
+
+    function retryConnection() {
+      retryCount++;
+      showStatus(`Checking connection... (Attempt ${retryCount})`);
+      
+      if (navigator.onLine) {
+        showStatus('You\'re online! Reloading...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } else {
+        showStatus('Still offline. We\'ll keep checking...');
+      }
+    }
+
     // Auto-reload when back online
     window.addEventListener('online', () => {
-      window.location.reload();
+      showStatus('Connection restored! Reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     });
+
+    window.addEventListener('offline', () => {
+      showStatus('Connection lost');
+    });
+
+    // Check connection status every 5 seconds
+    checkInterval = setInterval(() => {
+      if (navigator.onLine) {
+        clearInterval(checkInterval);
+        showStatus('Back online! Reloading...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    }, 5000);
+
+    // Initial status check
+    setTimeout(() => {
+      if (!navigator.onLine) {
+        showStatus('Waiting for connection...');
+      }
+    }, 2000);
   </script>
 </body>
 </html>

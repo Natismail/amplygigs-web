@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from "next/navigation";
 
 const PLATFORM_FEE_PERCENTAGE = 5; // 5%
 
@@ -38,7 +39,7 @@ export default function PlatformFeePaymentForm({ booking, onPaymentSuccess }) {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        window.location.href = result.paymentLink;
+        router.push = result.paymentLink;
       } else {
         setError(result.error || 'Payment initiation failed');
       }

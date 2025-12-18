@@ -4,6 +4,7 @@
 import { Geist, Geist_Mono, Roboto, Inter } from "next/font/google";
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
+import PWARegister from '@/components/PWARegister';
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { DataProvider } from "@/context/DataContext";
@@ -78,6 +79,7 @@ export default function RootLayout({ children }) {
           <AuthProvider>
             <DataProvider>
               {children}
+              <PWARegister />
             </DataProvider>
           </AuthProvider>
         </ThemeProvider>

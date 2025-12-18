@@ -1,7 +1,7 @@
 {
-  "name": "AmplyGigs - Live Music Tracking",
+  "name": "AmplyGigs - Connect Musicians with Clients",
   "short_name": "AmplyGigs",
-  "description": "Real-time location tracking for musicians and venues",
+  "description": "Real-time platform connecting musicians with clients for event bookings and live tracking",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -9,19 +9,25 @@
   "orientation": "portrait",
   "scope": "/",
   "lang": "en",
-  "categories": ["music", "entertainment", "productivity"],
+  "categories": ["music", "entertainment", "productivity", "lifestyle"],
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/badge-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "badge"
     }
   ],
   "screenshots": [
@@ -29,16 +35,54 @@
       "src": "/screenshots/desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "AmplyGigs Desktop View"
     },
     {
       "src": "/screenshots/mobile.png",
       "sizes": "390x844",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "AmplyGigs Mobile View"
     }
   ],
   "shortcuts": [
+    {
+      "name": "Find Musicians",
+      "short_name": "Find",
+      "description": "Browse available musicians for your event",
+      "url": "/client/home",
+      "icons": [
+        {
+          "src": "/icons/badge-72.png",
+          "sizes": "72x72"
+        }
+      ]
+    },
+    {
+      "name": "My Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your musician dashboard",
+      "url": "/musician/dashboard",
+      "icons": [
+        {
+          "src": "/icons/badge-72.png",
+          "sizes": "72x72"
+        }
+      ]
+    },
+    {
+      "name": "My Bookings",
+      "short_name": "Bookings",
+      "description": "Manage your bookings",
+      "url": "/musician/bookings",
+      "icons": [
+        {
+          "src": "/icons/badge-72.png",
+          "sizes": "72x72"
+        }
+      ]
+    },
     {
       "name": "Start Tracking",
       "short_name": "Track",
@@ -53,6 +97,15 @@
     }
   ],
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }
-

@@ -1,0 +1,233 @@
+// src/hooks/useKYC.js
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
+
+export function useKYC() {
+  const { user } = useAuth();
+  const [verification, setVerification] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch verification status
+  const fetchVerification = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('musician_verifications')
+        .select('*')
+        .eq('musician_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+        throw error;
+      }
+
+      setVerification(data);
+    } catch (err) {
+      console.error('Error fetching verification:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchVerification();
+  }, [fetchVerification]);
+
+  // Upload document to Supabase Storage
+  const uploadDocument = async (file, documentType) => {
+    if (!user || !file) return null;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${documentType}_${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('verification-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('verification-documents')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (err) {
+      console.error('Upload error:', err);
+      throw err;
+    }
+  };
+
+  // Submit ID verification
+  const submitIDVerification = async ({ idType, idNumber, idFront, idBack }) => {
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Upload ID images
+      const [idFrontUrl, idBackUrl] = await Promise.all([
+        uploadDocument(idFront, 'id_front'),
+        uploadDocument(idBack, 'id_back'),
+      ]);
+
+      if (!idFrontUrl || !idBackUrl) {
+        throw new Error('Failed to upload ID images');
+      }
+
+      // Create or update verification record
+      const payload = {
+        musician_id: user.id,
+        id_type: idType,
+        id_number: idNumber,
+        id_front_image_url: idFrontUrl,
+        id_back_image_url: idBackUrl,
+        status: 'under_review',
+        submitted_at: new Date().toISOString(),
+      };
+
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('musician_verifications')
+        .upsert(payload, { onConflict: 'musician_id' })
+        .select()
+        .single();
+
+      if (verificationError) throw verificationError;
+
+      setVerification(verificationData);
+      return { success: true, data: verificationData };
+    } catch (err) {
+      console.error('ID verification error:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Submit selfie verification
+  const submitSelfieVerification = async (selfieFile) => {
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const selfieUrl = await uploadDocument(selfieFile, 'selfie');
+      if (!selfieUrl) throw new Error('Failed to upload selfie');
+
+      const { data, error } = await supabase
+        .from('musician_verifications')
+        .update({
+          selfie_image_url: selfieUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('musician_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setVerification(data);
+      return { success: true, data };
+    } catch (err) {
+      console.error('Selfie verification error:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Submit phone verification
+  const submitPhoneVerification = async (phoneNumber, otp) => {
+    if (!user) return { success: false, error: 'Not authenticated' };
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Call your OTP verification API
+      const response = await fetch('/api/verify-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, otp }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error);
+
+      // Update verification record
+      const { data, error } = await supabase
+        .from('musician_verifications')
+        .update({
+          phone_verified: true,
+          phone_verified_at: new Date().toISOString(),
+        })
+        .eq('musician_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setVerification(data);
+      return { success: true, data };
+    } catch (err) {
+      console.error('Phone verification error:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Calculate completion percentage
+  const getCompletionPercentage = useCallback(() => {
+    if (!verification) return 0;
+
+    let completed = 0;
+    const total = 4; // ID, Phone, Selfie, Basic Info
+
+    if (verification.id_verified || verification.id_front_image_url) completed++;
+    if (verification.phone_verified) completed++;
+    if (verification.selfie_image_url) completed++;
+    if (verification.id_number) completed++;
+
+    return Math.round((completed / total) * 100);
+  }, [verification]);
+
+  // Status checks
+  const isVerified = verification?.status === 'approved';
+  const isPending = verification?.status === 'under_review';
+  const isRejected = verification?.status === 'rejected';
+  const isUnverified = !verification || verification?.status === 'pending' || !verification?.status;
+
+  return {
+    verification,
+    loading,
+    uploading,
+    error,
+    isVerified,
+    isPending,
+    isRejected,
+    isUnverified,
+    completionPercentage: getCompletionPercentage(),
+    submitIDVerification,
+    submitSelfieVerification,
+    submitPhoneVerification,
+    uploadDocument,
+    refreshVerification: fetchVerification,
+  };
+}

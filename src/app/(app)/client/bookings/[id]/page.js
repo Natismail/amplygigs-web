@@ -1,4 +1,4 @@
-// src/app/musician/bookings/[bookingId]/page.js
+// src/app/client/bookings/[id]/page.js
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,13 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import LiveTracking from '@/components/LiveTracking';
+import LiveMap from '@/components/LiveMap';
 import Link from 'next/link';
 
-export default function BookingDetailsPage() {
+export default function ClientBookingDetailPage() {
   const { user } = useAuth();
   const { bookings, fetchBookings } = useData();
-  const { bookingId } = useParams();
+  const { id } = useParams();
   const router = useRouter();
   
   const [booking, setBooking] = useState(null);
@@ -23,7 +23,7 @@ export default function BookingDetailsPage() {
 
   useEffect(() => {
     // First try to get from cache
-    const cachedBooking = bookings.find(b => b.id === bookingId);
+    const cachedBooking = bookings.find(b => b.id === id);
     
     if (cachedBooking) {
       setBooking(cachedBooking);
@@ -38,10 +38,10 @@ export default function BookingDetailsPage() {
       fetchBookingDetails();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId, bookings]);
+  }, [id, bookings]);
 
   const fetchBookingDetails = async () => {
-    if (!user || !bookingId) return;
+    if (!user || !id) return;
     
     setLoading(true);
     const { data, error } = await supabase
@@ -52,7 +52,7 @@ export default function BookingDetailsPage() {
         musician:musician_id(first_name, last_name, phone, email),
         events:event_id(title, description)
       `)
-      .eq('id', bookingId)
+      .eq('id', id)
       .single();
 
     if (error) {
@@ -68,8 +68,8 @@ export default function BookingDetailsPage() {
     setLoading(false);
   };
 
-  const handleAcceptGig = async () => {
-    if (!confirm('Are you sure you want to accept this gig?')) return;
+  const handleCancelBooking = async () => {
+    if (!confirm('Are you sure you want to cancel this booking?')) return;
     
     setActionLoading(true);
     setError(null);
@@ -77,50 +77,21 @@ export default function BookingDetailsPage() {
     try {
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'confirmed' })
-        .eq('id', bookingId);
+        .update({ status: 'cancelled' })
+        .eq('id', id);
 
       if (error) throw error;
 
       // Update local state
-      setBooking({ ...booking, status: 'confirmed' });
-      setShowTracking(true);
+      setBooking({ ...booking, status: 'cancelled' });
       
       // Refresh bookings in cache
       await fetchBookings(true);
       
-      alert('Gig accepted successfully!');
+      alert('Booking cancelled successfully');
+      router.push('/client/bookings');
     } catch (err) {
-      setError('Failed to accept gig: ' + err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeclineGig = async () => {
-    if (!confirm('Are you sure you want to decline this gig?')) return;
-    
-    setActionLoading(true);
-    setError(null);
-
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'declined' })
-        .eq('id', bookingId);
-
-      if (error) throw error;
-
-      // Update local state
-      setBooking({ ...booking, status: 'declined' });
-      
-      // Refresh bookings in cache
-      await fetchBookings(true);
-      
-      alert('Gig declined.');
-      router.push('/musician/bookings');
-    } catch (err) {
-      setError('Failed to decline gig: ' + err.message);
+      setError('Failed to cancel booking: ' + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -155,7 +126,7 @@ export default function BookingDetailsPage() {
       case 'confirmed': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
       case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
       case 'completed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'declined': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
@@ -173,7 +144,7 @@ export default function BookingDetailsPage() {
           </button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              Gig Details
+              Booking Details
             </h1>
           </div>
         </div>
@@ -185,7 +156,7 @@ export default function BookingDetailsPage() {
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
               <h2 className="text-2xl font-bold mb-2">
-                {booking.events?.title || 'Gig Details'}
+                {booking.events?.title || 'Event Booking'}
               </h2>
               <p className="text-purple-100 text-sm">
                 {booking.events?.description || 'Booking Information'}
@@ -202,7 +173,7 @@ export default function BookingDetailsPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                📍 Share Your Location
+                📍 Live Location Tracking
               </h3>
               <Link
                 href={`/tracking?bookingId=${booking.id}`}
@@ -212,44 +183,56 @@ export default function BookingDetailsPage() {
               </Link>
             </div>
             
-            <LiveTracking 
-              bookingId={booking.id}
+            <LiveMap 
+              musicianId={booking.musician_id}
               eventLocation={{
                 latitude: booking.event_latitude,
                 longitude: booking.event_longitude,
               }}
             />
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 text-sm">
+                📱 How it works
+              </h4>
+              <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                <li>• Track the musician&apos;s live location in real-time</li>
+                <li>• Get notified when they&apos;re on the way</li>
+                <li>• See ETA and distance to venue</li>
+                <li>• Automatic arrival notification</li>
+              </ul>
+            </div>
           </div>
         )}
 
-        {/* Client Info */}
+        {/* Musician Info */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-            <span>👤</span> Client Information
+            <span>🎵</span> Musician Information
           </h3>
           <div className="space-y-3">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
               <p className="font-medium text-gray-900 dark:text-white">
-                {booking.client?.first_name} {booking.client?.last_name}
+                {booking.musician?.first_name} {booking.musician?.last_name}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
               <a 
-                href={`tel:${booking.client?.phone}`}
+                href={`tel:${booking.musician?.phone}`}
                 className="font-medium text-blue-600 hover:text-blue-700"
               >
-                {booking.client?.phone || 'Not provided'}
+                {booking.musician?.phone || 'Not provided'}
               </a>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
               <a 
-                href={`mailto:${booking.client?.email}`}
+                href={`mailto:${booking.musician?.email}`}
                 className="font-medium text-blue-600 hover:text-blue-700"
               >
-                {booking.client?.email || 'Not provided'}
+                {booking.musician?.email || 'Not provided'}
               </a>
             </div>
           </div>
@@ -258,7 +241,7 @@ export default function BookingDetailsPage() {
         {/* Event Details */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-            <span>🎵</span> Event Details
+            <span>📅</span> Event Details
           </h3>
           <div className="space-y-3">
             <div>
@@ -306,14 +289,11 @@ export default function BookingDetailsPage() {
           </h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Offered Amount</span>
+              <span className="text-gray-600 dark:text-gray-400">Booking Amount</span>
               <span className="text-3xl font-bold text-green-600 dark:text-green-400">
                 ₦{booking.amount?.toLocaleString() || 0}
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              You&apos;ll receive 90% after platform fee: <span className="font-semibold text-gray-900 dark:text-white">₦{((booking.amount || 0) * 0.9).toLocaleString()}</span>
-            </p>
             {booking.payment_status && (
               <div className="flex justify-between items-center pt-3 border-t border-green-200 dark:border-green-700">
                 <span className="text-sm text-gray-600 dark:text-gray-400">Payment Status</span>
@@ -333,18 +313,17 @@ export default function BookingDetailsPage() {
         {booking.status === 'pending' && (
           <div className="space-y-3">
             <button
-              onClick={handleAcceptGig}
-              disabled={actionLoading}
-              className="w-full min-h-[56px] bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-semibold hover:from-green-700 hover:to-green-800 active:scale-98 transition-all shadow-lg disabled:opacity-50"
+              onClick={() => router.push(`/payment?bookingId=${booking.id}`)}
+              className="w-full min-h-[56px] bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 active:scale-98 transition-all shadow-lg"
             >
-              {actionLoading ? 'Processing...' : '✓ Accept Gig'}
+              💳 Complete Payment
             </button>
             <button
-              onClick={handleDeclineGig}
+              onClick={handleCancelBooking}
               disabled={actionLoading}
               className="w-full min-h-[56px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-98 transition-all disabled:opacity-50"
             >
-              ✗ Decline
+              {actionLoading ? 'Cancelling...' : '✗ Cancel Booking'}
             </button>
           </div>
         )}
@@ -361,5 +340,3 @@ export default function BookingDetailsPage() {
     </div>
   );
 }
-
-
