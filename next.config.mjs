@@ -30,6 +30,11 @@ const nextConfig = {
     ],
   },
 
+  // Prevent React from double-mounting components in dev
+  experimental: {
+    optimizePackageImports: ['@/components', '@/lib'],
+  },
+
   // ✅ PWA headers
   async headers() {
     return [
