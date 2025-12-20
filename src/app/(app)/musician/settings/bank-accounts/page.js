@@ -1,3 +1,6 @@
+//src/app/(app)/musician/settings/bank-accounts
+
+
 "use client";
 
 import { useEffect, useState } from "react";

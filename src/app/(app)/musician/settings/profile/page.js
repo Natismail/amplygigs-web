@@ -1,3 +1,5 @@
+//src/app/(app)/musician/settings/profile
+
 "use client";
 
 import Link from "next/link";

@@ -2,6 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
+
+/* ===============================================
+   FORM ELEMENT BASE STYLES (FIX INPUT COLORS)
+   =============================================== */
+
+input,
+textarea,
+select {
+  @apply bg-white text-gray-900 border border-gray-300 rounded-lg;
+}
+
+/* Placeholder color */
+input::placeholder,
+textarea::placeholder {
+  @apply text-gray-400;
+}
+
+/* Focus states */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none ring-2 ring-purple-500 border-purple-500;
+}
+
+/* ===============================================
+   DARK MODE OVERRIDES
+   =============================================== */
+
+.dark input,
+.dark textarea,
+.dark select {
+  @apply bg-gray-800 text-gray-100 border-gray-600;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  @apply text-gray-500;
+}
+
+
+
 /* ====== Global Reset & Base ====== */
 html, body {
   @apply h-full bg-white text-gray-900 transition-colors duration-300;
@@ -35,23 +78,308 @@ body.dark {
   @apply bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
 }
 
+/* ===============================================
+   iOS SAFE AREA SUPPORT
+   =============================================== */
 
+/* Safe area padding for notch and home indicator */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
 
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
+.safe-left {
+  padding-left: env(safe-area-inset-left);
+}
 
+.safe-right {
+  padding-right: env(safe-area-inset-right);
+}
 
+/* Height utilities for safe areas */
+.h-safe-bottom {
+  height: env(safe-area-inset-bottom);
+}
 
+.h-safe-top {
+  height: env(safe-area-inset-top);
+}
 
+/* Combined padding */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
 
+.pt-safe {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
 
+/* ===============================================
+   TOUCH OPTIMIZATIONS
+   =============================================== */
 
+/* Remove tap highlight on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
 
+/* Smooth scrolling */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
 
+/* Better momentum scrolling on iOS */
+.overflow-scroll,
+.overflow-y-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
 
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
-/* ============================================================
-   Tailwind v4 base imports
-============================================================ */
-/* @import "tailwindcss/preflight";
-@import "tailwindcss/utilities"; */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 
+/* ===============================================
+   BUTTON & INTERACTIVE ELEMENTS
+   =============================================== */
+
+/* Touch-friendly minimum sizes */
+button,
+a,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+/* Active state for better feedback */
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+/* Prevent double-tap zoom on buttons */
+button {
+  touch-action: manipulation;
+}
+
+/* ===============================================
+   iOS SPECIFIC FIXES
+   =============================================== */
+
+/* Fix iOS input zoom */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Prevent iOS from styling form elements */
+input[type="submit"],
+input[type="button"],
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Remove iOS input shadows */
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* ===============================================
+   PULL TO REFRESH
+   =============================================== */
+
+/* Prevent pull-to-refresh on PWA */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Re-enable for specific containers if needed */
+.allow-overscroll {
+  overscroll-behavior-y: auto;
+}
+
+/* ===============================================
+   DARK MODE OPTIMIZATIONS
+   =============================================== */
+
+/* Better dark mode on iOS */
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+  
+  /* Prevent white flash on navigation */
+  body {
+    background-color: rgb(3, 7, 18);
+  }
+}
+
+/* ===============================================
+   CUSTOM UTILITIES
+   =============================================== */
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+/* Smooth animations */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bottom navigation safe area */
+.bottom-nav-safe {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+/* ===============================================
+   SWIPE GESTURES (Optional Enhancement)
+   =============================================== */
+
+.swipeable {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* ===============================================
+   LOADING STATES
+   =============================================== */
+
+/* Skeleton loader */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Dark mode skeleton */
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    #1f2937 25%,
+    #111827 50%,
+    #1f2937 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* ===============================================
+   PERFORMANCE OPTIMIZATIONS
+   =============================================== */
+
+/* Hardware acceleration for animations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Optimize images */
+img {
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* ===============================================
+   MOBILE-SPECIFIC LAYOUTS
+   =============================================== */
+
+/* Full height on mobile (accounting for address bar) */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen-mobile {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Sticky elements on iOS */
+.sticky {
+  position: -webkit-sticky;
+  position: sticky;
+}
+
+/* ===============================================
+   HAPTIC FEEDBACK SIMULATION
+   =============================================== */
+
+@keyframes haptic {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.haptic:active {
+  animation: haptic 0.1s ease-in-out;
+}
+
+/* ===============================================
+   FADE IN ANIMATION
+   =============================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}

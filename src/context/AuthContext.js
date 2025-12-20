@@ -22,85 +22,155 @@ export const AuthProvider = ({ children }) => {
   const router = useRouter();
 
   // Fetch user profile from database
-  const fetchUserProfile = useCallback(async (supabaseUser) => {
-    if (!supabaseUser) {
-      console.log('No supabase user provided');
-      setUser(null);
-      return;
-    }
+  // const fetchUserProfile = useCallback(async (supabaseUser) => {
+  //   if (!supabaseUser) {
+  //     console.log('No supabase user provided');
+  //     setUser(null);
+  //     return;
+  //   }
 
-    try {
-      console.log('📥 Fetching profile for user:', supabaseUser.id);
+  //   try {
+  //     console.log('📥 Fetching profile for user:', supabaseUser.id);
       
-      const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('*') // Select all columns instead of specific ones
-        .eq('id', supabaseUser.id)
-        .single();
+  //     const { data: profile, error } = await supabase
+  //       .from('user_profiles')
+  //       .select('*') // Select all columns instead of specific ones
+  //       .eq('id', supabaseUser.id)
+  //       .single();
 
-      if (error) {
-        // If error code is PGRST116, it means no rows found
-        if (error.code === 'PGRST116') {
-          console.log('⚠️ No profile found, creating new profile...');
+  //     if (error) {
+  //       // If error code is PGRST116, it means no rows found
+  //       if (error.code === 'PGRST116') {
+  //         console.log('⚠️ No profile found, creating new profile...');
           
-          // Create a basic profile for the user
-          const { data: newProfile, error: insertError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              first_name: supabaseUser.user_metadata?.first_name || '',
-              last_name: supabaseUser.user_metadata?.last_name || '',
-              role: 'CLIENT', // Default role
-              created_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
+  //         // Create a basic profile for the user
+  //         const { data: newProfile, error: insertError } = await supabase
+  //           .from('user_profiles')
+  //           .insert({
+  //             id: supabaseUser.id,
+  //             email: supabaseUser.email,
+  //             first_name: supabaseUser.user_metadata?.first_name || '',
+  //             last_name: supabaseUser.user_metadata?.last_name || '',
+  //             role: 'CLIENT', // Default role
+  //             created_at: new Date().toISOString(),
+  //           })
+  //           .select()
+  //           .single();
 
-          if (insertError) {
-            console.error('❌ Error creating profile:', insertError);
-            // Fallback to basic user info
-            setUser({ 
-              ...supabaseUser, 
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              role: 'CLIENT',
-              first_name: '',
-              last_name: ''
-            });
-          } else {
-            console.log('✅ Profile created successfully');
-            setUser({ ...supabaseUser, ...newProfile });
-          }
-        } else {
-          console.error('❌ Error fetching profile:', error.message, error);
-          // Fallback to basic user info
-          setUser({ 
-            ...supabaseUser, 
+  //         if (insertError) {
+  //           console.error('❌ Error creating profile:', insertError);
+  //           // Fallback to basic user info
+  //           setUser({ 
+  //             ...supabaseUser, 
+  //             id: supabaseUser.id,
+  //             email: supabaseUser.email,
+  //             role: 'CLIENT',
+  //             first_name: '',
+  //             last_name: ''
+  //           });
+  //         } else {
+  //           console.log('✅ Profile created successfully');
+  //           setUser({ ...supabaseUser, ...newProfile });
+  //         }
+  //       } else {
+  //         console.error('❌ Error fetching profile:', error.message, error);
+  //         // Fallback to basic user info
+  //         setUser({ 
+  //           ...supabaseUser, 
+  //           id: supabaseUser.id,
+  //           email: supabaseUser.email,
+  //           role: 'CLIENT',
+  //           first_name: '',
+  //           last_name: ''
+  //         });
+  //       }
+  //     } else {
+  //       console.log('✅ Profile fetched successfully');
+  //       setUser({ ...supabaseUser, ...profile });
+  //     }
+  //   } catch (err) {
+  //     console.error('❌ Exception in fetchUserProfile:', err);
+  //     // Fallback to basic user info
+  //     setUser({ 
+  //       ...supabaseUser, 
+  //       id: supabaseUser.id,
+  //       email: supabaseUser.email,
+  //       role: 'CLIENT',
+  //       first_name: '',
+  //       last_name: ''
+  //     });
+  //   }
+  // }, []);
+
+
+  const fetchUserProfile = useCallback(async (supabaseUser) => {
+  if (!supabaseUser) {
+    setUser(null);
+    return;
+  }
+
+  try {
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No profile found, create one
+        const { data: newProfile, error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            first_name: supabaseUser.user_metadata?.first_name || '',
+            last_name: supabaseUser.user_metadata?.last_name || '',
+            role: 'CLIENT',
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          setUser({
+            ...supabaseUser,
             id: supabaseUser.id,
             email: supabaseUser.email,
             role: 'CLIENT',
             first_name: '',
-            last_name: ''
+            last_name: '',
           });
+        } else {
+          setUser({ ...supabaseUser, ...newProfile });
         }
       } else {
-        console.log('✅ Profile fetched successfully');
-        setUser({ ...supabaseUser, ...profile });
+        console.error('❌ Error fetching profile:', error);
+        setUser({
+          ...supabaseUser,
+          id: supabaseUser.id,
+          email: supabaseUser.email,
+          role: 'CLIENT',
+          first_name: '',
+          last_name: '',
+        });
       }
-    } catch (err) {
-      console.error('❌ Exception in fetchUserProfile:', err);
-      // Fallback to basic user info
-      setUser({ 
-        ...supabaseUser, 
-        id: supabaseUser.id,
-        email: supabaseUser.email,
-        role: 'CLIENT',
-        first_name: '',
-        last_name: ''
-      });
+    } else {
+      setUser({ ...supabaseUser, ...profile }); // <-- merge profile row here
     }
-  }, []);
+  } catch (err) {
+    console.error('❌ Exception in fetchUserProfile:', err);
+    setUser({
+      ...supabaseUser,
+      id: supabaseUser.id,
+      email: supabaseUser.email,
+      role: 'CLIENT',
+      first_name: '',
+      last_name: '',
+    });
+  }
+}, []);
+
 
   useEffect(() => {
     let mounted = true;

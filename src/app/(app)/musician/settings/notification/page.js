@@ -1,3 +1,5 @@
+//src/app/(app)/musician/settings/notifications
+
 "use client";
 
 import { useState } from "react";

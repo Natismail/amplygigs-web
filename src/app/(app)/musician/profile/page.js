@@ -69,28 +69,104 @@ export default function MusicianProfilePage() {
     }));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    setSuccess(false);
-    setError(null);
+  // const handleSave = async () => {
+  //   setSaving(true);
+  //   setSuccess(false);
+  //   setError(null);
 
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update(formData)
-        .eq('id', user.id);
+  //   try {
+  //     const { error } = await supabase
+  //       .from('user_profiles')
+  //       .update(formData)
+  //       .eq('id', user.id);
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      setError(err.message);
-      console.error('Save error:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  //     setSuccess(true);
+  //     setTimeout(() => setSuccess(false), 3000);
+  //   } catch (err) {
+  //     setError(err.message);
+  //     console.error('Save error:', err);
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
+
+
+
+//   const handleSave = async () => {
+//   setSaving(true);
+//   setSuccess(false);
+//   setError(null);
+
+//   try {
+//     const availabilityMap = {
+//       available: true,
+//       busy: false,
+//       unavailable: false
+//     };
+
+//     const updateData = {
+//       ...formData,
+//       is_available: availabilityMap[formData.availability] ?? false
+//     };
+//     delete updateData.availability; // remove string field
+
+//     const { error } = await supabase
+//       .from('user_profiles')
+//       .update(updateData)
+//       .eq('id', user.id);
+
+//     if (error) throw error;
+
+//     setSuccess(true);
+//     setTimeout(() => setSuccess(false), 3000);
+//   } catch (err) {
+//     setError(err.message);
+//     console.error('Save error:', err);
+//   } finally {
+//     setSaving(false);
+//   }
+// };
+
+
+const handleSave = async () => {
+  setSaving(true);
+  setSuccess(false);
+  setError(null);
+
+  try {
+    // Create a copy and sanitize numeric fields
+    const payload = {
+      ...formData,
+      experience_years: formData.experience_years ? parseInt(formData.experience_years, 10) : null,
+      hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
+    };
+
+    // Update availability mapping to your DB column
+    payload.is_available = formData.availability === 'available';
+
+    // Remove frontend-only fields if needed
+    delete payload.availability;
+    delete payload.genres; // handle separately if needed
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update(payload)
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+  } catch (err) {
+    setError(err.message);
+    console.error('Save error:', err);
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const tabs = [
     { id: 'basic', label: '👤 Basic Info', icon: '👤' },
