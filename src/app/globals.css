@@ -45,6 +45,44 @@ select:focus {
 
 
 
+
+/* Splash Screen Animations */
+@keyframes fade-in {
+  from { 
+    opacity: 0; 
+    transform: translateY(-10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes fade-in-delay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+.animate-fade-in-delay {
+  animation: fade-in-delay 1s ease-out 0.3s both;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-700 {
+  animation-delay: 700ms;
+}
+
 /* ====== Global Reset & Base ====== */
 html, body {
   @apply h-full bg-white text-gray-900 transition-colors duration-300;

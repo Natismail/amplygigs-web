@@ -46,7 +46,7 @@ export const DataProvider = ({ children }) => {
     wallet: null,
   });
 
-  // Track if initial fetch has been done
+  // Track if initial fetch has been done FOR THIS USER
   const initialFetchDone = useRef({
     bookings: false,
     events: false,
@@ -57,6 +57,9 @@ export const DataProvider = ({ children }) => {
 
   // Track current user ID to detect user changes
   const currentUserId = useRef(null);
+  
+  // CRITICAL: Track if we've ever initialized for this user
+  const hasInitialized = useRef(false);
 
   // Helper to check if data needs refresh
   const shouldRefetch = useCallback((dataType) => {
@@ -94,6 +97,9 @@ export const DataProvider = ({ children }) => {
         profile: false,
         wallet: false,
       };
+      
+      // Reset initialization flag
+      hasInitialized.current = false;
       
       // Update current user ID
       currentUserId.current = user?.id || null;
@@ -338,11 +344,22 @@ export const DataProvider = ({ children }) => {
     setStats(newStats);
   }, [bookings, profile, user]);
 
-  // Initial data fetch - ONLY ONCE on mount with proper user
+  // CRITICAL FIX: Initial data fetch - ONLY ONCE EVER for this user
   useEffect(() => {
-    if (!user) return;
+    // Don't fetch if no user
+    if (!user) {
+      console.log('⏭️ No user, skipping initial fetch');
+      return;
+    }
+
+    // CRITICAL: Don't fetch if we've already initialized for this user
+    if (hasInitialized.current && currentUserId.current === user.id) {
+      console.log('✅ Already initialized for this user, skipping fetch');
+      return;
+    }
 
     console.log('🚀 Initial data fetch triggered for user:', user.id);
+    hasInitialized.current = true;
 
     // Fetch profile first (most critical)
     if (!initialFetchDone.current.profile) {
@@ -434,5 +451,3 @@ export const DataProvider = ({ children }) => {
     </DataContext.Provider>
   );
 };
-
-
