@@ -6,6 +6,8 @@ import { useTheme } from "@/context/ThemeContext";
 import Avatar from "./Avatar";
 import { Menu, Sun, Moon, Bell } from "lucide-react";
 import { useState } from "react";
+import NotificationBell from '@/components/social/NotificationBell';
+
 
 export default function Navbar({ onMenuClick }) {
   const { user } = useAuth();
@@ -48,7 +50,7 @@ export default function Navbar({ onMenuClick }) {
         </button>
 
         {/* Notifications */}
-        <div className="relative">
+        {/* <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center relative"
@@ -56,10 +58,10 @@ export default function Navbar({ onMenuClick }) {
           >
             <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          </button> */}
 
           {/* Notifications Dropdown */}
-          {showNotifications && (
+          {/* {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
@@ -70,8 +72,12 @@ export default function Navbar({ onMenuClick }) {
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          )} 
+
+
+        </div>*/}   
+<NotificationBell />
+
 
         {/* User Profile */}
         {user && (

@@ -7,14 +7,27 @@ import Link from 'next/link';
 import { MapPin, Music, Star } from 'lucide-react';
 import FollowButton from './FollowButton';
 import { useAuth } from '@/context/AuthContext';
+// Add this import
+import { MessageCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useSocial } from '@/context/SocialContext';
 
 export default function UserProfileCard({ user, showFollowButton = true }) {
   const { user: currentUser } = useAuth();
   const isOwnProfile = currentUser?.id === user.id;
+const router = useRouter();
+const { getOrCreateConversation } = useSocial();
 
   const getProfileImage = () => {
     return user.profile_picture_url || '/images/default-avatar.png';
   };
+
+  const handleMessage = async () => {
+  const { data } = await getOrCreateConversation(user.id);
+  if (data) {
+    router.push('/messages');
+  }
+};
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -74,6 +87,20 @@ export default function UserProfileCard({ user, showFollowButton = true }) {
         {!isOwnProfile && showFollowButton && (
           <FollowButton targetUserId={user.id} targetUser={user} />
         )}
+
+{!isOwnProfile && (
+  <div className="flex gap-2">
+    <FollowButton targetUserId={user.id} targetUser={user} />
+    <button
+      onClick={handleMessage}
+      className="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition"
+      title="Send message"
+    >
+      <MessageCircle className="w-5 h-5" />
+    </button>
+  </div>
+)}
+
       </div>
 
       {/* Bio */}

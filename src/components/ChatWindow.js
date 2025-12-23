@@ -47,7 +47,7 @@ export default function ChatWindow({ gigId, user }) {
       </div>
       <form onSubmit={sendMessage} className="flex gap-2">
         <input
-          className="border p-2 flex-1 rounded"
+          className="border p-2 flex-1 rounded text-black"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message..."

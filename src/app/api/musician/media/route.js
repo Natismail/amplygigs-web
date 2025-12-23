@@ -1,24 +1,18 @@
-//src/app/api/musician/media/route.js
-
+// src/app/api/musician/media/route.js
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-/* =========================
-   GET — fetch videos
-========================= */
-export async function GET(req) {
+// GET - Fetch videos
+export async function GET(request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const musician_id = searchParams.get("musician_id");
+    const supabase = createRouteHandlerClient({ cookies });
+    const { searchParams } = new URL(request.url);
+    const musicianId = searchParams.get("musician_id");
 
-    if (!musician_id) {
+    if (!musicianId) {
       return NextResponse.json(
-        { success: false, data: [], error: "musician_id required" },
+        { error: "musician_id is required" },
         { status: 400 }
       );
     }
@@ -26,149 +20,238 @@ export async function GET(req) {
     const { data, error } = await supabase
       .from("musician_media")
       .select("*")
-      .eq("musician_id", musician_id)
+      .eq("musician_id", musicianId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    return NextResponse.json({
-      success: true,
-      data: data || [],
-    });
-  } catch (err) {
-    console.error("GET videos error:", err);
+    return NextResponse.json(data || []);
+  } catch (error) {
+    console.error("Error fetching videos:", error);
     return NextResponse.json(
-      { success: false, data: [] },
+      { error: error.message },
       { status: 500 }
     );
   }
 }
 
-/* =========================
-   POST — upload video
-========================= */
-export async function POST(req) {
+// POST - Upload video
+export async function POST(request) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("video");
-    const musician_id = formData.get("musician_id");
-
-    if (!file || !musician_id) {
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
-        { success: false, error: "video and musician_id required" },
-        { status: 400 }
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${musician_id}/${Date.now()}.${fileExt}`;
+    const formData = await request.formData();
+    const videoFile = formData.get("video");
+    const musicianId = formData.get("musician_id");
+    const title = formData.get("title") || videoFile.name;
+    const description = formData.get("description") || "";
 
-    const { error: uploadError } = await supabase.storage
-      .from("performance-videos")
-      .upload(fileName, file, {
-        contentType: file.type,
+    // Verify user owns this musician profile
+    if (user.id !== musicianId) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only upload videos to your own profile" },
+        { status: 403 }
+      );
+    }
+
+    // Upload to Supabase Storage
+    const fileExt = videoFile.name.split(".").pop();
+    const fileName = `${musicianId}/${Date.now()}.${fileExt}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("musician-videos")
+      .upload(fileName, videoFile, {
         cacheControl: "3600",
+        upsert: false,
       });
 
     if (uploadError) throw uploadError;
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage
-      .from("performance-videos")
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from("musician-videos")
       .getPublicUrl(fileName);
 
-    const { data: newVideo, error: dbError } = await supabase
+    // Save to database
+    const { data: mediaRecord, error: dbError } = await supabase
       .from("musician_media")
-      .insert([{ musician_id, video_url: publicUrl }])
+      .insert({
+        musician_id: musicianId,
+        video_url: publicUrl,
+        title: title,
+        description: description,
+        file_size_bytes: videoFile.size,
+      })
       .select()
       .single();
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      // If database insert fails, delete the uploaded file
+      await supabase.storage
+        .from("musician-videos")
+        .remove([fileName]);
+      throw dbError;
+    }
 
+    return NextResponse.json(mediaRecord, { status: 201 });
+  } catch (error) {
+    console.error("Error uploading video:", error);
     return NextResponse.json(
-      { success: true, data: newVideo },
-      { status: 201 }
-    );
-  } catch (err) {
-    console.error("POST video error:", err);
-    return NextResponse.json(
-      { success: false, error: err.message },
+      { error: error.message },
       { status: 500 }
     );
   }
 }
 
+// DELETE - Delete video
+export async function DELETE(request) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
-// import { NextResponse } from "next/server";
-// import { supabase } from "@/lib/supabaseClient";
+    const { searchParams } = new URL(request.url);
+    const videoId = searchParams.get("id");
 
-// // GET: list all musician's videos
-// export async function GET(req) {
-//   const { searchParams } = new URL(req.url);
-//   const musician_id = searchParams.get("musician_id");
+    if (!videoId) {
+      return NextResponse.json(
+        { error: "Video ID is required" },
+        { status: 400 }
+      );
+    }
 
-//   if (!musician_id) {
-//     return NextResponse.json({ error: "musician_id required" }, { status: 400 });
-//   }
+    // Get video record
+    const { data: video, error: fetchError } = await supabase
+      .from("musician_media")
+      .select("*")
+      .eq("id", videoId)
+      .single();
 
-//   const { data, error } = await supabase
-//     .from("musician_media")
-//     .select("*")
-//     .eq("musician_id", musician_id)
-//     .order("created_at", { ascending: false });
+    if (fetchError) throw fetchError;
 
-//   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Verify ownership
+    if (video.musician_id !== user.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only delete your own videos" },
+        { status: 403 }
+      );
+    }
 
-//   return NextResponse.json(data);
-// }
+    // Extract file path from URL
+    const urlParts = video.video_url.split("/musician-videos/");
+    const filePath = urlParts[1];
 
-// // POST: upload a new video
-// export async function POST(req) {
-//   try {
-//     const formData = await req.formData();
-//     const file = formData.get("video");
-//     const musician_id = formData.get("musician_id");
+    // Delete from storage
+    if (filePath) {
+      const { error: storageError } = await supabase.storage
+        .from("musician-videos")
+        .remove([filePath]);
 
-//     if (!file || !musician_id) {
-//       return NextResponse.json({ error: "video file and musician_id required" }, { status: 400 });
-//     }
+      if (storageError) {
+        console.error("Storage deletion error:", storageError);
+        // Continue even if storage deletion fails
+      }
+    }
 
-//     // create a unique filename
-//     const fileExt = file.name.split(".").pop();
-//     const fileName = `${musician_id}/${Date.now()}.${fileExt}`;
+    // Delete from database
+    const { error: deleteError } = await supabase
+      .from("musician_media")
+      .delete()
+      .eq("id", videoId);
 
-//     // upload to Supabase Storage
-//     const { error: uploadError } = await supabase.storage
-//       .from("performance-videos")
-//       .upload(fileName, file, {
-//         contentType: file.type,
-//         cacheControl: "3600",
-//         upsert: false,
-//       });
+    if (deleteError) throw deleteError;
 
-//     if (uploadError) {
-//       return NextResponse.json({ error: uploadError.message }, { status: 500 });
-//     }
+    return NextResponse.json(
+      { message: "Video deleted successfully" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error deleting video:", error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+}
 
-//     // get the public URL
-//     const {
-//       data: { publicUrl },
-//     } = supabase.storage.from("performance-videos").getPublicUrl(fileName);
+// PATCH - Update video metadata
+export async function PATCH(request) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
-//     // insert record into DB
-//     const { data: newVideo, error: dbError } = await supabase
-//       .from("musician_media")
-//       .insert([{ musician_id, video_url: publicUrl }])
-//       .select()
-//       .single();
+    const body = await request.json();
+    const { id, title, description, is_featured } = body;
 
-//     if (dbError) {
-//       return NextResponse.json({ error: dbError.message }, { status: 500 });
-//     }
+    if (!id) {
+      return NextResponse.json(
+        { error: "Video ID is required" },
+        { status: 400 }
+      );
+    }
 
-//     return NextResponse.json(newVideo, { status: 201 });
-//   } catch (err) {
-//     return NextResponse.json({ error: err.message }, { status: 500 });
-//   }
-// }
+    // Verify ownership
+    const { data: video } = await supabase
+      .from("musician_media")
+      .select("musician_id")
+      .eq("id", id)
+      .single();
+
+    if (video.musician_id !== user.id) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    // Update
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (is_featured !== undefined) updates.is_featured = is_featured;
+
+    const { data, error } = await supabase
+      .from("musician_media")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Error updating video:", error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+}
+

@@ -18,17 +18,23 @@ export const useSocial = () => {
 export const SocialProvider = ({ children }) => {
   const { user } = useAuth();
   
+  // State
   const [posts, setPosts] = useState([]);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [conversations, setConversations] = useState([]);
+  const [activeConversation, setActiveConversation] = useState(null);
+  const [messages, setMessages] = useState([]);
 
   const [loading, setLoading] = useState({
     posts: false,
     followers: false,
     following: false,
     notifications: false,
+    conversations: false,
   });
 
   // =====================================================
@@ -172,7 +178,7 @@ export const SocialProvider = ({ children }) => {
   }, [user]);
 
   // =====================================================
-  // POST FUNCTIONS (We'll expand this)
+  // POST FUNCTIONS
   // =====================================================
 
   const fetchFeed = useCallback(async () => {
@@ -181,7 +187,6 @@ export const SocialProvider = ({ children }) => {
     setLoading(prev => ({ ...prev, posts: true }));
 
     try {
-      // Get posts from followed users + own posts
       const { data, error } = await supabase
         .from('posts')
         .select(`
@@ -214,288 +219,869 @@ export const SocialProvider = ({ children }) => {
     }
   }, [user]);
 
+  const uploadMedia = useCallback(async (file, userId) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('posts')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('posts')
+        .getPublicUrl(fileName);
+
+      return { url: publicUrl, error: null };
+    } catch (error) {
+      console.error('Media upload error:', error);
+      return { url: null, error };
+    }
+  }, []);
+
+  const createPost = useCallback(async ({ caption, mediaFile, mediaType }) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      let mediaUrl = null;
+      let thumbnailUrl = null;
+
+      if (mediaFile) {
+        const { url, error } = await uploadMedia(mediaFile, user.id);
+        if (error) throw error;
+        mediaUrl = url;
+      }
+
+      const { data, error } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          caption,
+          media_url: mediaUrl,
+          media_type: mediaType || (mediaFile ? 'video' : 'text'),
+          thumbnail_url: thumbnailUrl,
+          is_public: true,
+        })
+        .select(`
+          *,
+          user:user_id (
+            id,
+            first_name,
+            last_name,
+            role,
+            profile_picture_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setPosts(prev => [data, ...prev]);
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error creating post:', error);
+      return { data: null, error };
+    }
+  }, [user, uploadMedia]);
+
+  const deletePost = useCallback(async (postId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setPosts(prev => prev.filter(p => p.id !== postId));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const updatePost = useCallback(async (postId, updates) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .update(updates)
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...data } : p));
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error updating post:', error);
+      return { data: null, error };
+    }
+  }, [user]);
 
   // =====================================================
-// POST UPLOAD & CRUD FUNCTIONS (Add to SocialContext)
-// =====================================================
+  // LIKE FUNCTIONS
+  // =====================================================
 
-const uploadMedia = useCallback(async (file, userId) => {
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}/${Date.now()}.${fileExt}`;
-    
-    const { data, error } = await supabase.storage
-      .from('posts')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+  const likePost = useCallback(async (postId) => {
+    if (!user) return { error: 'Not authenticated' };
 
-    if (error) throw error;
+    try {
+      const { error } = await supabase
+        .from('post_likes')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+        });
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('posts')
-      .getPublicUrl(fileName);
+      if (error) throw error;
 
-    return { url: publicUrl, error: null };
-  } catch (error) {
-    console.error('Media upload error:', error);
-    return { url: null, error };
-  }
-}, []);
+      // Get post owner to create notification
+      const { data: post } = await supabase
+        .from('posts')
+        .select('user_id, caption')
+        .eq('id', postId)
+        .single();
 
-const createPost = useCallback(async ({ caption, mediaFile, mediaType }) => {
+      if (post && post.user_id !== user.id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: post.user_id,
+            type: 'like',
+            title: 'New Like',
+            message: `${user.first_name} ${user.last_name} liked your post`,
+            related_user_id: user.id,
+            related_post_id: postId,
+            action_url: `/feed?post=${postId}`,
+          });
+      }
+
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, likes_count: (p.likes_count || 0) + 1, user_liked: true }
+          : p
+      ));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error liking post:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const unlikePost = useCallback(async (postId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('post_id', postId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0), user_liked: false }
+          : p
+      ));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error unliking post:', error);
+      return { error };
+    }
+  }, [user]);
+
+  // =====================================================
+  // COMMENT FUNCTIONS
+  // =====================================================
+
+  const addComment = useCallback(async (postId, content) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await supabase
+        .from('post_comments')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+          content,
+        })
+        .select(`
+          *,
+          user:user_id (
+            id,
+            first_name,
+            last_name,
+            profile_picture_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Get post owner to create notification
+      const { data: post } = await supabase
+        .from('posts')
+        .select('user_id')
+        .eq('id', postId)
+        .single();
+
+      if (post && post.user_id !== user.id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: post.user_id,
+            type: 'comment',
+            title: 'New Comment',
+            message: `${user.first_name} ${user.last_name} commented: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
+            related_user_id: user.id,
+            related_post_id: postId,
+            action_url: `/feed?post=${postId}`,
+          });
+      }
+
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, comments_count: (p.comments_count || 0) + 1 }
+          : p
+      ));
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      return { data: null, error };
+    }
+  }, [user]);
+
+  const fetchComments = useCallback(async (postId) => {
+    try {
+      const { data, error } = await supabase
+        .from('post_comments')
+        .select(`
+          *,
+          user:user_id (
+            id,
+            first_name,
+            last_name,
+            profile_picture_url
+          )
+        `)
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return { data: null, error };
+    }
+  }, []);
+
+  // =====================================================
+  // SHARE FUNCTION
+  // =====================================================
+
+  const sharePost = useCallback(async (postId, caption = '') => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('post_shares')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+          shared_with_caption: caption,
+        });
+
+      if (error) throw error;
+
+      setPosts(prev => prev.map(p => 
+        p.id === postId 
+          ? { ...p, shares_count: (p.shares_count || 0) + 1 }
+          : p
+      ));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error sharing post:', error);
+      return { error };
+    }
+  }, [user]);
+
+  // =====================================================
+  // MESSAGING FUNCTIONS
+  // =====================================================
+
+const getOrCreateConversation = useCallback(async (otherUserId) => {
   if (!user) return { error: 'Not authenticated' };
 
   try {
-    let mediaUrl = null;
-    let thumbnailUrl = null;
-
-    // Upload media if provided
-    if (mediaFile) {
-      const { url, error } = await uploadMedia(mediaFile, user.id);
-      if (error) throw error;
-      mediaUrl = url;
-
-      // For videos, you could generate a thumbnail here
-      // For now, we'll leave it null
-    }
-
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        user_id: user.id,
-        caption,
-        media_url: mediaUrl,
-        media_type: mediaType || (mediaFile ? 'video' : 'text'),
-        thumbnail_url: thumbnailUrl,
-        is_public: true,
-      })
+    console.log('🔍 Checking for existing conversation with user:', otherUserId);
+    
+    // Check if conversation already exists between these two users
+    const { data: existingConversations, error: fetchError } = await supabase
+      .from('conversation_participants')
       .select(`
-        *,
-        user:user_id (
+        conversation_id,
+        conversations!inner (
           id,
-          first_name,
-          last_name,
-          role,
-          profile_picture_url
+          created_at,
+          updated_at
         )
       `)
-      .single();
-
-    if (error) throw error;
-
-    // Optimistically add to feed
-    setPosts(prev => [data, ...prev]);
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error creating post:', error);
-    return { data: null, error };
-  }
-}, [user, uploadMedia]);
-
-const deletePost = useCallback(async (postId) => {
-  if (!user) return { error: 'Not authenticated' };
-
-  try {
-    const { error } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', postId)
       .eq('user_id', user.id);
 
-    if (error) throw error;
+    if (fetchError) {
+      console.error('❌ Error fetching existing conversations:', fetchError);
+      throw fetchError;
+    }
 
-    // Remove from local state
-    setPosts(prev => prev.filter(p => p.id !== postId));
+    console.log('📋 Found participations:', existingConversations?.length || 0);
 
-    return { error: null };
-  } catch (error) {
-    console.error('Error deleting post:', error);
-    return { error };
-  }
-}, [user]);
+    // Find conversation where the other user is also a participant
+    for (const conv of existingConversations || []) {
+      const { data: participants, error: participantsError } = await supabase
+        .from('conversation_participants')
+        .select('user_id')
+        .eq('conversation_id', conv.conversation_id);
 
-const updatePost = useCallback(async (postId, updates) => {
-  if (!user) return { error: 'Not authenticated' };
+      if (participantsError) {
+        console.error('❌ Error fetching participants:', participantsError);
+        continue;
+      }
 
-  try {
-    const { data, error } = await supabase
-      .from('posts')
-      .update(updates)
-      .eq('id', postId)
-      .eq('user_id', user.id)
+      const participantIds = participants?.map(p => p.user_id) || [];
+      
+      if (participantIds.includes(otherUserId) && participantIds.length === 2) {
+        console.log('✅ Found existing conversation:', conv.conversation_id);
+        return { data: conv.conversations, error: null };
+      }
+    }
+
+    console.log('➕ Creating new conversation...');
+
+    // Create new conversation
+    const { data: newConversation, error: createError } = await supabase
+      .from('conversations')
+      .insert({})
       .select()
       .single();
 
-    if (error) throw error;
+    if (createError) {
+      console.error('❌ Error creating conversation:', createError);
+      throw createError;
+    }
 
-    // Update local state
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, ...data } : p));
+    console.log('✅ Conversation created:', newConversation.id);
 
-    return { data, error: null };
+    // Add both participants
+    const { error: participantsError } = await supabase
+      .from('conversation_participants')
+      .insert([
+        { conversation_id: newConversation.id, user_id: user.id },
+        { conversation_id: newConversation.id, user_id: otherUserId }
+      ]);
+
+    if (participantsError) {
+      console.error('❌ Error adding participants:', participantsError);
+      throw participantsError;
+    }
+
+    console.log('✅ Participants added successfully');
+
+    return { data: newConversation, error: null };
   } catch (error) {
-    console.error('Error updating post:', error);
+    console.error('❌ Full error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    });
     return { data: null, error };
   }
 }, [user]);
+// In src/context/SocialContext.js - Replace fetchConversations
 
-// =====================================================
-// LIKE FUNCTIONS
-// =====================================================
-
-const likePost = useCallback(async (postId) => {
-  if (!user) return { error: 'Not authenticated' };
-
-  try {
-    const { error } = await supabase
-      .from('post_likes')
-      .insert({
-        post_id: postId,
-        user_id: user.id,
-      });
-
-    if (error) throw error;
-
-    // Optimistically update UI
-    setPosts(prev => prev.map(p => 
-      p.id === postId 
-        ? { ...p, likes_count: (p.likes_count || 0) + 1, user_liked: true }
-        : p
-    ));
-
-    return { error: null };
-  } catch (error) {
-    console.error('Error liking post:', error);
-    return { error };
+const fetchConversations = useCallback(async () => {
+  if (!user) {
+    console.log('⏭️ No user, skipping conversations fetch');
+    return { error: 'Not authenticated' };
   }
-}, [user]);
 
-const unlikePost = useCallback(async (postId) => {
-  if (!user) return { error: 'Not authenticated' };
+  setLoading(prev => ({ ...prev, conversations: true }));
 
   try {
-    const { error } = await supabase
-      .from('post_likes')
-      .delete()
-      .eq('post_id', postId)
+    console.log('📥 Fetching conversations for user:', user.id);
+    
+    // Get all conversations for current user
+    const { data: participations, error } = await supabase
+      .from('conversation_participants')
+      .select(`
+        conversation_id,
+        last_read_at,
+        is_muted,
+        is_archived,
+        conversations!inner (
+          id,
+          created_at,
+          updated_at
+        )
+      `)
       .eq('user_id', user.id);
 
-    if (error) throw error;
-
-    // Optimistically update UI
-    setPosts(prev => prev.map(p => 
-      p.id === postId 
-        ? { ...p, likes_count: Math.max((p.likes_count || 0) - 1, 0), user_liked: false }
-        : p
-    ));
-
-    return { error: null };
-  } catch (error) {
-    console.error('Error unliking post:', error);
-    return { error };
-  }
-}, [user]);
-
-// =====================================================
-// COMMENT FUNCTIONS
-// =====================================================
-
-const addComment = useCallback(async (postId, content) => {
-  if (!user) return { error: 'Not authenticated' };
-
-  try {
-    const { data, error } = await supabase
-      .from('post_comments')
-      .insert({
-        post_id: postId,
-        user_id: user.id,
-        content,
-      })
-      .select(`
-        *,
-        user:user_id (
-          id,
-          first_name,
-          last_name,
-          profile_picture_url
-        )
-      `)
-      .single();
-
-    if (error) throw error;
-
-    // Update post comments count
-    setPosts(prev => prev.map(p => 
-      p.id === postId 
-        ? { ...p, comments_count: (p.comments_count || 0) + 1 }
-        : p
-    ));
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error adding comment:', error);
-    return { data: null, error };
-  }
-}, [user]);
-
-const fetchComments = useCallback(async (postId) => {
-  try {
-    const { data, error } = await supabase
-      .from('post_comments')
-      .select(`
-        *,
-        user:user_id (
-          id,
-          first_name,
-          last_name,
-          profile_picture_url
-        )
-      `)
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-
-    return { data, error: null };
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    return { data: null, error };
-  }
-}, []);
-
-// =====================================================
-// SHARE FUNCTION
-// =====================================================
-
-const sharePost = useCallback(async (postId, caption = '') => {
-  if (!user) return { error: 'Not authenticated' };
-
-  try {
-    const { error } = await supabase
-      .from('post_shares')
-      .insert({
-        post_id: postId,
-        user_id: user.id,
-        shared_with_caption: caption,
+    if (error) {
+      console.error('❌ Error fetching participations:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
       });
+      throw error;
+    }
 
-    if (error) throw error;
+    console.log('📋 Found participations:', participations?.length || 0);
 
-    // Update shares count
-    setPosts(prev => prev.map(p => 
-      p.id === postId 
-        ? { ...p, shares_count: (p.shares_count || 0) + 1 }
-        : p
-    ));
+    // For each conversation, get the other participant and last message
+    const conversationsWithDetails = await Promise.all(
+      (participations || []).map(async (participation) => {
+        const conversationId = participation.conversation_id;
 
-    return { error: null };
+        // Get other participant
+        const { data: participants, error: participantsError } = await supabase
+          .from('conversation_participants')
+          .select(`
+            user_id,
+            user_profiles!inner (
+              id,
+              first_name,
+              last_name,
+              profile_picture_url,
+              role
+            )
+          `)
+          .eq('conversation_id', conversationId)
+          .neq('user_id', user.id)
+          .single();
+
+        if (participantsError) {
+          console.warn('⚠️ Error fetching participant for conversation:', conversationId);
+        }
+
+        // Get last message
+        const { data: lastMessage } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        // Count unread messages
+        const { count: unreadCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', user.id)
+          .gt('created_at', participation.last_read_at || '1970-01-01');
+
+        return {
+          ...participation.conversations,
+          otherUser: participants?.user_profiles,
+          lastMessage,
+          unreadCount: unreadCount || 0,
+          isMuted: participation.is_muted,
+          isArchived: participation.is_archived,
+        };
+      })
+    );
+
+    console.log('✅ Fetched conversations with details:', conversationsWithDetails.length);
+
+    setConversations(conversationsWithDetails);
+    return { data: conversationsWithDetails, error: null };
   } catch (error) {
-    console.error('Error sharing post:', error);
-    return { error };
+    console.error('❌ Full error details:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    });
+    return { data: null, error };
+  } finally {
+    setLoading(prev => ({ ...prev, conversations: false }));
   }
 }, [user]);
+
+
+  const fetchMessages = useCallback(async (conversationId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:sender_id (
+            id,
+            first_name,
+            last_name,
+            profile_picture_url
+          )
+        `)
+        .eq('conversation_id', conversationId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setMessages(data || []);
+      
+      await supabase
+        .from('conversation_participants')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('conversation_id', conversationId)
+        .eq('user_id', user.id);
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      return { data: null, error };
+    }
+  }, [user]);
+
+  const sendMessage = useCallback(async (conversationId, content, mediaFile = null) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      let mediaUrl = null;
+      let mediaType = null;
+
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('messages')
+          .upload(fileName, mediaFile);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('messages')
+          .getPublicUrl(fileName);
+
+        mediaUrl = publicUrl;
+        mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content,
+          media_url: mediaUrl,
+          media_type: mediaType,
+        })
+        .select(`
+          *,
+          sender:sender_id (
+            id,
+            first_name,
+            last_name,
+            profile_picture_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+
+      setMessages(prev => [...prev, data]);
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return { data: null, error };
+    }
+  }, [user]);
+
+  const deleteMessage = useCallback(async (messageId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_deleted: true })
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
+
+      if (error) throw error;
+
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const subscribeToMessages = useCallback((conversationId) => {
+    if (!user) return null;
+
+    const channel = supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload) => {
+          const { data: sender } = await supabase
+            .from('user_profiles')
+            .select('id, first_name, last_name, profile_picture_url')
+            .eq('id', payload.new.sender_id)
+            .single();
+
+          const newMessage = {
+            ...payload.new,
+            sender,
+          };
+
+          setMessages(prev => [...prev, newMessage]);
+        }
+      )
+      .subscribe();
+
+    return channel;
+  }, [user]);
+
+  // =====================================================
+  // NOTIFICATION FUNCTIONS
+  // =====================================================
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return { error: 'Not authenticated' };
+
+    setLoading(prev => ({ ...prev, notifications: true }));
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          *,
+          related_user:related_user_id (
+            id,
+            first_name,
+            last_name,
+            profile_picture_url,
+            role
+          ),
+          related_post:related_post_id (
+            id,
+            caption,
+            media_url
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      setNotifications(data || []);
+      
+      const unreadCount = data?.filter(n => !n.is_read).length || 0;
+      setUnreadNotificationsCount(unreadCount);
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return { data: null, error };
+    } finally {
+      setLoading(prev => ({ ...prev, notifications: false }));
+    }
+  }, [user]);
+
+  const markNotificationAsRead = useCallback(async (notificationId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      );
+      setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const markAllNotificationsAsRead = useCallback(async () => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadNotificationsCount(0);
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const deleteNotification = useCallback(async (notificationId) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      return { error };
+    }
+  }, [user]);
+
+  const createNotification = useCallback(async ({ 
+    userId, 
+    type, 
+    title, 
+    message, 
+    relatedUserId = null,
+    relatedPostId = null,
+    actionUrl = null 
+  }) => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type,
+          title,
+          message,
+          related_user_id: relatedUserId,
+          related_post_id: relatedPostId,
+          action_url: actionUrl,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      return { data: null, error };
+    }
+  }, []);
+
+  const subscribeToNotifications = useCallback(() => {
+    if (!user) return null;
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const { data: relatedUser } = payload.new.related_user_id 
+            ? await supabase
+                .from('user_profiles')
+                .select('id, first_name, last_name, profile_picture_url, role')
+                .eq('id', payload.new.related_user_id)
+                .single()
+            : { data: null };
+
+          const { data: relatedPost } = payload.new.related_post_id
+            ? await supabase
+                .from('posts')
+                .select('id, caption, media_url')
+                .eq('id', payload.new.related_post_id)
+                .single()
+            : { data: null };
+
+          const newNotification = {
+            ...payload.new,
+            related_user: relatedUser,
+            related_post: relatedPost,
+          };
+
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadNotificationsCount(prev => prev + 1);
+
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(newNotification.title, {
+              body: newNotification.message,
+              icon: relatedUser?.profile_picture_url || '/icons/icon-192.png',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return channel;
+  }, [user]);
 
   const value = {
     // State
@@ -503,6 +1089,11 @@ const sharePost = useCallback(async (postId, caption = '') => {
     followers,
     following,
     notifications,
+    unreadNotificationsCount,
+    conversations,
+    activeConversation,
+    messages,
+    uploadProgress,
     loading,
     
     // Follow functions
@@ -514,30 +1105,44 @@ const sharePost = useCallback(async (postId, caption = '') => {
     
     // Post functions
     fetchFeed,
+    createPost,
+    deletePost,
+    updatePost,
+    uploadMedia,
     
-    // Setters (for optimistic updates)
+    // Like functions
+    likePost,
+    unlikePost,
+    
+    // Comment functions
+    addComment,
+    fetchComments,
+    
+    // Share function
+    sharePost,
+    
+    // Messaging functions
+    getOrCreateConversation,
+    fetchConversations,
+    fetchMessages,
+    sendMessage,
+    deleteMessage,
+    subscribeToMessages,
+    setActiveConversation,
+    
+    // Notification functions
+    fetchNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    createNotification,
+    subscribeToNotifications,
+    
+    // Setters
     setPosts,
     setFollowers,
     setFollowing,
     setNotifications,
-
-    // Post functions
-  createPost,
-  deletePost,
-  updatePost,
-  uploadMedia,
-  uploadProgress,
-  
-  // Like functions
-  likePost,
-  unlikePost,
-  
-  // Comment functions
-  addComment,
-  fetchComments,
-  
-  // Share function
-  sharePost,
   };
 
   return (
@@ -546,4 +1151,3 @@ const sharePost = useCallback(async (postId, caption = '') => {
     </SocialContext.Provider>
   );
 };
-
