@@ -19,6 +19,18 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const DataProvider = ({ children }) => {
   const { user } = useAuth();
+
+
+  // 🔍 DEBUG: Track component lifecycle
+  useEffect(() => {
+    console.log('🎨 DataProvider MOUNTED');
+    return () => console.log('💀 DataProvider UNMOUNTED');
+  }, []);
+  
+  // 🔍 DEBUG: Track user changes
+  useEffect(() => {
+    console.log('👤 User changed in DataProvider:', user?.id);
+  }, [user?.id]);
   
   // State for different data types
   const [bookings, setBookings] = useState([]);
@@ -344,48 +356,48 @@ export const DataProvider = ({ children }) => {
     setStats(newStats);
   }, [bookings, profile, user]);
 
-  // CRITICAL FIX: Initial data fetch - ONLY ONCE EVER for this user
-  useEffect(() => {
-    // Don't fetch if no user
-    if (!user) {
-      console.log('⏭️ No user, skipping initial fetch');
-      return;
-    }
+  // // CRITICAL FIX: Initial data fetch - ONLY ONCE EVER for this user
+  // useEffect(() => {
+  //   // Don't fetch if no user
+  //   if (!user) {
+  //     console.log('⏭️ No user, skipping initial fetch');
+  //     return;
+  //   }
 
-    // CRITICAL: Don't fetch if we've already initialized for this user
-    if (hasInitialized.current && currentUserId.current === user.id) {
-      console.log('✅ Already initialized for this user, skipping fetch');
-      return;
-    }
+  //   // CRITICAL: Don't fetch if we've already initialized for this user
+  //   if (hasInitialized.current && currentUserId.current === user.id) {
+  //     console.log('✅ Already initialized for this user, skipping fetch');
+  //     return;
+  //   }
 
-    console.log('🚀 Initial data fetch triggered for user:', user.id);
-    hasInitialized.current = true;
+  //   console.log('🚀 Initial data fetch triggered for user:', user.id);
+  //   hasInitialized.current = true;
 
-    // Fetch profile first (most critical)
-    if (!initialFetchDone.current.profile) {
-      fetchProfile();
-    }
+  //   // Fetch profile first (most critical)
+  //   if (!initialFetchDone.current.profile) {
+  //     fetchProfile();
+  //   }
 
-    // Then fetch other data based on role
-    if (!initialFetchDone.current.bookings) {
-      fetchBookings();
-    }
+  //   // Then fetch other data based on role
+  //   if (!initialFetchDone.current.bookings) {
+  //     fetchBookings();
+  //   }
 
-    if (user.role === 'MUSICIAN') {
-      if (!initialFetchDone.current.wallet) {
-        fetchWallet();
-      }
-      if (!initialFetchDone.current.events) {
-        fetchEvents();
-      }
-      if (!initialFetchDone.current.externalEvents) {
-        fetchExternalEvents();
-      }
-    }
+  //   if (user.role === 'MUSICIAN') {
+  //     if (!initialFetchDone.current.wallet) {
+  //       fetchWallet();
+  //     }
+  //     if (!initialFetchDone.current.events) {
+  //       fetchEvents();
+  //     }
+  //     if (!initialFetchDone.current.externalEvents) {
+  //       fetchExternalEvents();
+  //     }
+  //   }
     
-    // This effect should ONLY run when user ID changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  //   // This effect should ONLY run when user ID changes
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [user?.id]);
 
   // Invalidate cache (force refresh)
   const invalidateCache = useCallback((dataType) => {

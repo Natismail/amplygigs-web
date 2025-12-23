@@ -18,14 +18,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user, signIn, loading: authLoading } = useAuth();
+const [hasRedirected, setHasRedirected] = useState(false); // Add this state
+
+  // // Redirect if already logged in
+  // useEffect(() => {
+  //   if (!authLoading && user) {
+  //     handleRedirectAfterLogin(user);
+  //   }
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [user, authLoading, router]);
+
 
   // Redirect if already logged in
-  useEffect(() => {
-    if (!authLoading && user) {
-      handleRedirectAfterLogin(user);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, router]);
+useEffect(() => {
+  if (!authLoading && user && !hasRedirected) {
+    setHasRedirected(true); // Prevent multiple redirects
+    handleRedirectAfterLogin(user);
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [user, authLoading]);
 
   const handleRedirectAfterLogin = async (currentUser) => {
     console.log('🔄 Redirecting user:', currentUser);
@@ -185,7 +196,7 @@ const handleSocialLogin = async (provider) => {
             </label>
             <input
               type="email"
-              placeholder="•••••••••••••••••.com"
+              placeholder="Enter your email"
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -200,7 +211,7 @@ const handleSocialLogin = async (provider) => {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="•••••••••••••••••"
+                placeholder="•••••••••••••••••••"
                 className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-11 sm:pr-12 text-sm sm:text-base rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
