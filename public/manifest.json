@@ -5,45 +5,96 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6366f1",
-  "orientation": "portrait",
+  "theme_color": "#8B5CF6",
+  "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
+  "dir": "ltr",
   "categories": ["music", "entertainment", "productivity", "lifestyle"],
+  "id": "/?source=pwa",
   "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icons/badge-72.png",
-      "sizes": "72x72",
+      "src": "/icons/maskable-icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "badge"
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
+    {
+      "src": "/screenshots/mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AmplyGigs Home Screen"
+    },
+    {
+      "src": "/screenshots/mobile-2.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Browse Musicians"
+    },
     {
       "src": "/screenshots/desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "AmplyGigs Desktop View"
-    },
-    {
-      "src": "/screenshots/mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "AmplyGigs Mobile View"
+      "label": "AmplyGigs Desktop Dashboard"
     }
   ],
   "shortcuts": [
@@ -51,11 +102,12 @@
       "name": "Find Musicians",
       "short_name": "Find",
       "description": "Browse available musicians for your event",
-      "url": "/client/home",
+      "url": "/client/home?source=shortcut",
       "icons": [
         {
-          "src": "/icons/badge-72.png",
-          "sizes": "72x72"
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
@@ -63,11 +115,12 @@
       "name": "My Dashboard",
       "short_name": "Dashboard",
       "description": "View your musician dashboard",
-      "url": "/musician/dashboard",
+      "url": "/musician/dashboard?source=shortcut",
       "icons": [
         {
-          "src": "/icons/badge-72.png",
-          "sizes": "72x72"
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
@@ -75,23 +128,25 @@
       "name": "My Bookings",
       "short_name": "Bookings",
       "description": "Manage your bookings",
-      "url": "/musician/bookings",
+      "url": "/musician/bookings?source=shortcut",
       "icons": [
         {
-          "src": "/icons/badge-72.png",
-          "sizes": "72x72"
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     },
     {
-      "name": "Start Tracking",
-      "short_name": "Track",
-      "description": "Start live location tracking",
-      "url": "/tracking",
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "View your messages",
+      "url": "/messages?source=shortcut",
       "icons": [
         {
-          "src": "/icons/badge-72.png",
-          "sizes": "72x72"
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
         }
       ]
     }
@@ -107,5 +162,12 @@
       "text": "text",
       "url": "url"
     }
+  },
+  "display_override": ["standalone", "minimal-ui"],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
   }
 }

@@ -1,9 +1,11 @@
+// src/components/PostEventForm.js - FIXED VERSION
 "use client";
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
+import { X, ChevronLeft, ChevronRight, Upload, Check } from "lucide-react";
 
 export default function PostEventForm({ onSuccess, onCancel }) {
   const { user } = useAuth();
@@ -43,19 +45,56 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     }
 
     setForm({ ...form, media_file: file });
+    setError(null);
 
     const reader = new FileReader();
     reader.onload = () => setMediaPreview(reader.result);
     reader.readAsDataURL(file);
   };
 
-  const handleNext = () => {
-    // Validate step 1
-    if (currentStep === 1) {
-      if (!form.title.trim() || !form.description.trim() || !form.event_type) {
-        setError("Please fill in all required fields");
-        return;
+  // Validation for each step
+  const validateStep = (step) => {
+    setError(null);
+    
+    if (step === 1) {
+      if (!form.title.trim()) {
+        setError("Event title is required");
+        return false;
       }
+      if (!form.description.trim()) {
+        setError("Event description is required");
+        return false;
+      }
+      if (!form.event_type) {
+        setError("Please select an event type");
+        return false;
+      }
+      return true;
+    }
+    
+    if (step === 2) {
+      if (!form.event_date) {
+        setError("Event date is required");
+        return false;
+      }
+      // Validate date is not in the past
+      const selectedDate = new Date(form.event_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        setError("Event date cannot be in the past");
+        return false;
+      }
+      return true;
+    }
+
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!validateStep(currentStep)) {
+      return;
     }
     
     setError(null);
@@ -69,6 +108,13 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Final validation
+    if (!validateStep(1) || !validateStep(2)) {
+      setCurrentStep(1);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -79,32 +125,49 @@ export default function PostEventForm({ onSuccess, onCancel }) {
       return;
     }
 
-    // Combine date and time
-    const eventDateTime = form.event_date && form.event_time 
-      ? `${form.event_date}T${form.event_time}:00`
-      : null;
-
-    const proposedAmount = form.proposed_amount
-      ? parseInt(form.proposed_amount, 10)
-      : null;
-
     try {
+      // Combine date and time
+      let eventDateTime = form.event_date;
+      if (form.event_time) {
+        eventDateTime = `${form.event_date}T${form.event_time}:00`;
+      }
+
+      const proposedAmount = form.proposed_amount
+        ? parseFloat(form.proposed_amount)
+        : null;
+
       let mediaUrl = null;
+      
+      // Upload media file if exists
       if (form.media_file) {
         const file = form.media_file;
-        const filePath = `${user.id}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("event-media")
-          .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         
-        if (uploadError) throw new Error("Failed to upload file.");
+        // Check if bucket exists, if not, inform user
+        const { error: uploadError } = await supabase.storage
+          .from("posts") // or "event-media" if you have that bucket
+          .upload(fileName, file, { 
+            cacheControl: "3600", 
+            upsert: false 
+          });
+        
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          throw new Error("Failed to upload file. Make sure the 'posts' storage bucket exists.");
+        }
 
-        const { data } = supabase.storage.from("event-media").getPublicUrl(filePath);
+        const { data } = supabase.storage
+          .from("posts")
+          .getPublicUrl(fileName);
+        
         mediaUrl = data.publicUrl;
       }
 
-      const { error: dbError } = await supabase.from("events").insert([
-        {
+      // Insert event
+      const { data: eventData, error: dbError } = await supabase
+        .from("events")
+        .insert([{
           creator_id: user.id,
           title: form.title,
           description: form.description,
@@ -117,15 +180,20 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           requirements: form.requirements,
           media_url: mediaUrl,
           status: 'open',
-        },
-      ]);
+        }])
+        .select()
+        .single();
 
       if (dbError) throw new Error(dbError.message);
 
       setSuccess(true);
+      
+      // Wait a bit to show success message, then callback
       setTimeout(() => {
         setSuccess(false);
-        onSuccess?.();
+        if (onSuccess) {
+          onSuccess(eventData);
+        }
       }, 2000);
 
       // Reset form
@@ -146,304 +214,314 @@ export default function PostEventForm({ onSuccess, onCancel }) {
       setCurrentStep(1);
     } catch (err) {
       setError(err.message);
-      console.error(err);
+      console.error("Post event error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl relative overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">Post a New Event</h2>
-              <p className="text-purple-100 text-sm mt-1">
-                Step {currentStep} of 3
-              </p>
-            </div>
-            <button
-              onClick={onCancel}
-              className="text-white hover:bg-white/20 rounded-full p-2 transition"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 text-white flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold">Post a New Event</h2>
+            <p className="text-purple-100 text-sm mt-1">
+              Step {currentStep} of 3
+            </p>
           </div>
-          
-          {/* Progress Bar */}
-          <div className="mt-4 h-2 bg-purple-800 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-white transition-all duration-300"
-              style={{ width: `${(currentStep / 3) * 100}%` }}
-            />
-          </div>
+          <button
+            onClick={onCancel}
+            className="text-white hover:bg-white/20 rounded-full p-2 transition"
+            type="button"
+          >
+            <X className="h-6 w-6" />
+          </button>
         </div>
+        
+        {/* Progress Bar */}
+        <div className="h-2 bg-purple-800 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-white transition-all duration-300"
+            style={{ width: `${(currentStep / 3) * 100}%` }}
+          />
+        </div>
+      </div>
 
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
-          {/* Success / Error Messages */}
-          {success && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4 flex items-center gap-3">
-              <span className="text-2xl">✅</span>
-              <p className="text-green-800 dark:text-green-200 font-medium">
-                Event posted successfully!
-              </p>
+      {/* Scrollable Content */}
+      <div className="p-6 overflow-y-auto flex-1">
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-xl p-4 mb-4 flex items-center gap-3 animate-fadeIn">
+            <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <p className="text-green-800 dark:text-green-200 font-medium">
+              Event posted successfully!
+            </p>
+          </div>
+        )}
+        
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 rounded-xl p-4 mb-4">
+            <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g., Birthday Celebration, Corporate Dinner"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Event Type *
+                </label>
+                <select
+                  value={form.event_type}
+                  onChange={(e) => setForm({ ...form, event_type: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                  required
+                >
+                  <option value="">Select event type</option>
+                  {eventTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Description *
+                </label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Describe your event, the atmosphere you want, music style preferences..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white resize-none text-base"
+                  rows="4"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {form.description.length}/500 characters
+                </p>
+              </div>
             </div>
           )}
-          
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4 flex items-center gap-3">
-              <span className="text-2xl">❌</span>
-              <p className="text-red-800 dark:text-red-200">{error}</p>
-            </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step 1: Basic Info */}
-            {currentStep === 1 && (
-              <div className="space-y-4 animate-fadeIn">
+          {/* Step 2: Event Details */}
+          {currentStep === 2 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Venue / Location
+                </label>
+                <input
+                  type="text"
+                  value={form.venue}
+                  onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                  placeholder="e.g., Oriental Hotel, Lagos"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Event Title *
+                    Event Date *
                   </label>
                   <input
-                    type="text"
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="e.g., Birthday Celebration, Corporate Dinner"
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring focus:ring-purple-200 dark:bg-gray-700 dark:text-white transition"
+                    type="date"
+                    value={form.event_date}
+                    onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
                     required
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Event Type *
+                    Start Time
                   </label>
-                  <select
-                    value={form.event_type}
-                    onChange={(e) => setForm({ ...form, event_type: e.target.value })}
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    required
-                  >
-                    <option value="">Select event type</option>
-                    {eventTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Description *
-                  </label>
-                  <textarea
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    placeholder="Describe your event, the atmosphere you want, music style preferences..."
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring focus:ring-purple-200 dark:bg-gray-700 dark:text-white transition"
-                    rows="4"
-                    required
+                  <input
+                    type="time"
+                    value={form.event_time}
+                    onChange={(e) => setForm({ ...form, event_time: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
                   />
                 </div>
               </div>
-            )}
 
-            {/* Step 2: Event Details */}
-            {currentStep === 2 && (
-              <div className="space-y-4 animate-fadeIn">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Venue / Location
-                  </label>
-                  <input
-                    type="text"
-                    value={form.venue}
-                    onChange={(e) => setForm({ ...form, venue: e.target.value })}
-                    placeholder="e.g., Oriental Hotel, Lagos"
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                      Event Date
-                    </label>
-                    <input
-                      type="date"
-                      value={form.event_date}
-                      onChange={(e) => setForm({ ...form, event_date: e.target.value })}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                      Start Time
-                    </label>
-                    <input
-                      type="time"
-                      value={form.event_time}
-                      onChange={(e) => setForm({ ...form, event_time: e.target.value })}
-                      className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                      Duration (hours)
-                    </label>
-                    <input
-                      type="number"
-                      value={form.duration}
-                      onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                      placeholder="e.g., 4"
-                      min="1"
-                      className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                      Expected Attendees
-                    </label>
-                    <input
-                      type="number"
-                      value={form.expected_attendees}
-                      onChange={(e) => setForm({ ...form, expected_attendees: e.target.value })}
-                      placeholder="e.g., 100"
-                      className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Proposed Budget (₦)
+                    Duration (hours)
                   </label>
                   <input
                     type="number"
-                    value={form.proposed_amount}
-                    onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
-                    placeholder="e.g., 50000"
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    This helps musicians provide appropriate quotes
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Additional Info */}
-            {currentStep === 3 && (
-              <div className="space-y-4 animate-fadeIn">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Special Requirements
-                  </label>
-                  <textarea
-                    value={form.requirements}
-                    onChange={(e) => setForm({ ...form, requirements: e.target.value })}
-                    placeholder="Any specific requirements? (e.g., specific songs, equipment needs, dress code)"
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition"
-                    rows="3"
+                    value={form.duration}
+                    onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                    placeholder="e.g., 4"
+                    min="1"
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Upload Media (Optional)
+                    Expected Attendees
                   </label>
                   <input
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handleFileChange}
-                    className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 dark:bg-gray-700 dark:text-white transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                    type="number"
+                    value={form.expected_attendees}
+                    onChange={(e) => setForm({ ...form, expected_attendees: e.target.value })}
+                    placeholder="e.g., 100"
+                    min="1"
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Add photos or videos of the venue (max 5MB)
-                  </p>
-                  
-                  {mediaPreview && (
-                    <div className="mt-4 relative">
-                      {form.media_file?.type.startsWith("image") ? (
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Proposed Budget (₦)
+                </label>
+                <input
+                  type="number"
+                  value={form.proposed_amount}
+                  onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
+                  placeholder="e.g., 50000"
+                  min="0"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This helps musicians provide appropriate quotes
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Additional Info */}
+          {currentStep === 3 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Special Requirements
+                </label>
+                <textarea
+                  value={form.requirements}
+                  onChange={(e) => setForm({ ...form, requirements: e.target.value })}
+                  placeholder="Any specific requirements? (e.g., specific songs, equipment needs, dress code)"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white resize-none text-base"
+                  rows="3"
+                />
+              </div>
+
+              <div>
+                <label className="block-1 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Upload Media (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Add photos or videos of the venue (max 5MB)
+                </p>
+                
+                {mediaPreview && (
+                  <div className="mt-4 relative">
+                    {form.media_file?.type.startsWith("image") ? (
+                      <div className="relative w-full h-48 rounded-xl overflow-hidden">
                         <Image 
                           src={mediaPreview} 
                           alt="Preview" 
-                          className="w-full h-48 object-cover rounded-xl" 
-                          width={800} 
-                          height={450} 
+                          fill
+                          className="object-cover"
                         />
-                      ) : (
-                        <video 
-                          src={mediaPreview} 
-                          controls 
-                          className="w-full h-48 rounded-xl" 
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm({ ...form, media_file: null });
-                          setMediaPreview(null);
-                        }}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      </div>
+                    ) : (
+                      <video 
+                        src={mediaPreview} 
+                        controls 
+                        className="w-full h-48 rounded-xl" 
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm({ ...form, media_file: null });
+                        setMediaPreview(null);
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Navigation Buttons */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              {currentStep > 1 && (
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-                >
-                  ← Back
-                </button>
-              )}
-              
-              {currentStep < 3 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition shadow-lg"
-                >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Posting...
-                    </span>
-                  ) : (
-                    "Post Event"
-                  )}
-                </button>
-              )}
             </div>
-          </form>
-        </div>
+          )}
+        </form>
+      </div>
+
+      {/* Footer Navigation - Fixed at bottom */}
+      <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
+        {currentStep > 1 && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Back
+          </button>
+        )}
+        
+        {currentStep < 3 ? (
+          <button
+            type="button"
+            onClick={handleNext}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition shadow-lg"
+          >
+            Next
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                Posting...
+              </>
+            ) : (
+              <>
+                <Check className="w-5 h-5" />
+                Post Event
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-// src/app/(app)/client/home/page.js - IMPROVED VERSION
+// src/app/(app)/client/home/page.js - WITH DEBUG INFO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import MusicianCard from "@/components/MusicianCard";
 import PostEventForm from "@/components/PostEventForm";
 import SearchFilterBar from "@/components/SearchFilterBar";
-import { Plus, Calendar, Users, TrendingUp, Eye } from "lucide-react";
+import { Plus, Calendar, Users, TrendingUp, Eye, Edit, Trash2, RefreshCw, MapPin } from "lucide-react";
 import LoadingSpinner, { SkeletonCard } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 
@@ -22,6 +22,7 @@ export default function ClientHome() {
   const [clientEvents, setClientEvents] = useState([]);
   const [showPostForm, setShowPostForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -37,7 +38,7 @@ export default function ClientHome() {
   // Fetch musicians
   useEffect(() => {
     if (!user) return;
-    fetchMusicians();
+    fetchMusicians(); 
   }, [user]);
 
   // Fetch client's events
@@ -66,26 +67,64 @@ export default function ClientHome() {
   };
 
   const fetchClientEvents = async () => {
+    setEventsLoading(true);
     try {
+      console.log("🔍 Fetching events for user:", user?.id);
+
       const { data, error } = await supabase
         .from("events")
         .select(`
           *,
-          event_interests(musician_id)
+          event_interests(id, musician_id)
         `)
-        .eq("client_id", user.id)
+        .eq("creator_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setClientEvents(data || []);
+      if (error) {
+        console.error("❌ Error fetching events:", error);
+        throw error;
+      }
+
+      console.log("✅ Fetched events:", data);
+      
+      // Add interested count to each event
+      const eventsWithCount = (data || []).map(event => ({
+        ...event,
+        interested_count: event.event_interests?.length || 0
+      }));
+      
+      console.log("📊 Events with count:", eventsWithCount);
+      setClientEvents(eventsWithCount);
     } catch (error) {
       console.error("Error fetching events:", error);
+      alert("Failed to fetch events. Check console for details.");
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    if (!confirm("Are you sure you want to delete this event?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventId)
+        .eq("creator_id", user.id);
+
+      if (error) throw error;
+
+      alert("Event deleted successfully");
+      fetchClientEvents();
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Failed to delete event");
     }
   };
 
   // Apply filters
   const filteredMusicians = musicians.filter((m) => {
-    // Search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       const matches =
@@ -96,12 +135,10 @@ export default function ClientHome() {
       if (!matches) return false;
     }
 
-    // Roles filter
     if (filters.roles?.length > 0 && !filters.roles.includes(m.primary_role)) {
       return false;
     }
 
-    // Genres filter
     if (
       filters.genres?.length > 0 &&
       !filters.genres.some((g) => m.genres?.includes(g))
@@ -109,7 +146,6 @@ export default function ClientHome() {
       return false;
     }
 
-    // Location filter
     if (
       filters.location &&
       !m.location?.toLowerCase().includes(filters.location.toLowerCase())
@@ -117,7 +153,6 @@ export default function ClientHome() {
       return false;
     }
 
-    // Availability filter
     if (filters.availability === "available" && !m.is_available) {
       return false;
     }
@@ -125,12 +160,10 @@ export default function ClientHome() {
       return false;
     }
 
-    // Rating filter
     if (filters.rating && (m.average_rating || 0) < filters.rating) {
       return false;
     }
 
-    // Price filter
     if (filters.priceMin && (m.hourly_rate || 0) < Number(filters.priceMin)) {
       return false;
     }
@@ -170,7 +203,7 @@ export default function ClientHome() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
               onClick={() => setActiveTab("find")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
@@ -216,7 +249,6 @@ export default function ClientHome() {
         {/* Find Musicians Tab */}
         {activeTab === "find" && (
           <div className="space-y-6">
-            {/* Search & Filters - Sticky */}
             <div className="sticky top-[140px] z-10">
               <SearchFilterBar
                 filters={filters}
@@ -225,7 +257,6 @@ export default function ClientHome() {
               />
             </div>
 
-            {/* Musicians Grid */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -266,21 +297,70 @@ export default function ClientHome() {
         {/* My Events Tab */}
         {activeTab === "myEvents" && (
           <div className="space-y-6">
-            {clientEvents.length === 0 ? (
-              <EmptyState
-                icon="events"
-                title="No Events Posted"
-                description="Post your first event to start finding talented musicians for your gigs"
-                action={() => setShowPostForm(true)}
-                actionLabel="Post Event"
-              />
+            {/* Refresh Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  My Posted Events
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Total: {clientEvents.length} events
+                </p>
+              </div>
+              <button
+                onClick={fetchClientEvents}
+                disabled={eventsLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
+              >
+                <RefreshCw className={`w-4 h-4 ${eventsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+
+            {eventsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            ) : clientEvents.length === 0 ? (
+              <>
+                <EmptyState
+                  icon="events"
+                  title="No Events Posted"
+                  description="Post your first event to start finding talented musicians for your gigs"
+                  action={() => setShowPostForm(true)}
+                  actionLabel="Post Event"
+                />
+                
+                {/* Debug Info */}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+                  <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-3">
+                    🔍 Debug Information
+                  </h4>
+                  <div className="space-y-2 text-sm text-yellow-700 dark:text-yellow-300">
+                    <p>• User ID: <code className="bg-yellow-100 dark:bg-yellow-900/40 px-2 py-1 rounded">{user?.id}</code></p>
+                    <p>• Looking for events where creator_id = {user?.id}</p>
+                    <p>• Check browser console (F12) for detailed logs</p>
+                    <p>• Try posting a new event to see if it appears</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      console.log("Manual fetch triggered");
+                      fetchClientEvents();
+                    }}
+                    className="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium"
+                  >
+                    🔄 Retry Fetch
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {clientEvents.map((event) => (
                   <div
                     key={event.id}
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition cursor-pointer"
-                    onClick={() => router.push(`/events/${event.id}`)}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition"
                   >
                     {/* Event Image */}
                     {event.media_url && (
@@ -295,28 +375,48 @@ export default function ClientHome() {
                     )}
 
                     {/* Event Info */}
-                    <div className="p-4">
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-1">
-                        {event.title}
-                      </h3>
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 line-clamp-1">
+                            {event.title}
+                          </h3>
+                          {event.event_type && (
+                            <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium">
+                              {event.event_type}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                         {event.description}
                       </p>
 
                       <div className="space-y-2 text-sm">
-                        {event.location && (
+                        {event.venue && (
                           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Calendar className="w-4 h-4" />
-                            {event.location}
+                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                            <span className="line-clamp-1">{event.venue}</span>
+                          </div>
+                        )}
+
+                        {event.event_date && (
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <Calendar className="w-4 h-4 flex-shrink-0" />
+                            {new Date(event.event_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
                           </div>
                         )}
 
                         <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                           <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
                             <Eye className="w-4 h-4" />
-                            <span className="font-medium">
-                              {event.event_interests?.length || 0} interested
+                            <span className="font-medium text-sm">
+                              {event.interested_count} interested
                             </span>
                           </div>
 
@@ -326,6 +426,24 @@ export default function ClientHome() {
                             </span>
                           )}
                         </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => router.push(`/events/${event.id}`)}
+                          className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Details
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                          title="Delete event"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -339,15 +457,21 @@ export default function ClientHome() {
       {/* Post Event Modal */}
       {showPostForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative w-full max-w-2xl">
-            <PostEventForm
-              onSuccess={() => {
-                setShowPostForm(false);
-                fetchClientEvents();
-              }}
-              onCancel={() => setShowPostForm(false)}
-            />
-          </div>
+          <PostEventForm
+            onSuccess={(eventData) => {
+              console.log("✅ Event posted:", eventData);
+              setShowPostForm(false);
+              fetchClientEvents(); // Refresh events list
+              
+              alert("✅ Event posted successfully!");
+              
+              if (eventData?.id) {
+                // Switch to My Events tab to see the new event
+                setActiveTab("myEvents");
+              }
+            }}
+            onCancel={() => setShowPostForm(false)}
+          />
         </div>
       )}
     </div>
