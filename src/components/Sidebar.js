@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { 
   X, Home, User, Calendar, CheckCircle, MapPin, 
   DollarSign, Music, Settings, LogOut, Shield,
-  Users, CreditCard, Ticket, Crown, Wrench, MessageCircle, Bell
+  Users, CreditCard, Ticket, Crown, Wrench, MessageCircle, Bell, TrendingUp
 } from "lucide-react";
 import { useState } from "react";
 
@@ -150,6 +150,12 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/bookings" icon={Calendar}>
                 Bookings
               </NavLink>
+              {/* <Link href="/musician/gigs">
+  <TrendingUp /> Available Gigs
+</Link> */}
+<NavLink href="/musician/gigs" icon={TrendingUp}>
+                Available Gigs
+              </NavLink>
               <NavLink href="/kyc/verify" icon={Shield}>
                 Verification
               </NavLink>
@@ -166,6 +172,9 @@ export default function Sidebar({ isOpen, onClose }) {
 <NavLink href="/messages" icon={MessageCircle}>
   Messages
 </NavLink>
+<NavLink href="/musician/proposals" icon={TrendingUp}>
+                Proposals
+              </NavLink>
               
 <NavLink href="/network" icon={Users}>
   Network
@@ -173,9 +182,9 @@ export default function Sidebar({ isOpen, onClose }) {
 <NavLink href="/musician/discover" icon={MapPin}>
   Discover Events
 </NavLink>
-{/* <NavLink href="/feed" icon={Home}>
+<NavLink href="/feed" icon={Home}>
   Feed
-</NavLink> */}
+</NavLink>
 <NavLink href="/notifications" icon={Bell}>Notifications</NavLink>
 <NavLink href="/musician/settings" icon={Settings}>
                 Settings
@@ -195,6 +204,9 @@ export default function Sidebar({ isOpen, onClose }) {
               </div>
               <NavLink href="/client/home" icon={Home}>
                 Home
+              </NavLink>
+              <NavLink href="/client/proposals" icon={TrendingUp}>
+                Proposals
               </NavLink>
               <NavLink href="/client/bookings" icon={Calendar}>
                 My Bookings

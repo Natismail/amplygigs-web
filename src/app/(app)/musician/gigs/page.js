@@ -1,0 +1,386 @@
+// src/app/(app)/musician/gigs/page.js - NEW FILE
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
+import {
+  Calendar,
+  MapPin,
+  DollarSign,
+  Users,
+  Clock,
+  TrendingUp,
+  Filter,
+  Search,
+  CheckCircle,
+  Loader,
+} from "lucide-react";
+
+export default function MusicianGigsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
+
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState("all"); // all | interested | matched
+  const [processingInterest, setProcessingInterest] = useState({});
+
+  useEffect(() => {
+    if (user) {
+      fetchAvailableGigs();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, filter]);
+
+  const fetchAvailableGigs = async () => {
+    setLoading(true);
+    try {
+      // Fetch events with interest status
+      const { data: eventsData, error } = await supabase
+        .from("events")
+        .select(`
+          *,
+          creator:creator_id(first_name, last_name, profile_picture_url),
+          event_interests(id, musician_id)
+        `)
+        .eq("status", "open")
+        .gte("event_date", new Date().toISOString())
+        .order("event_date", { ascending: true });
+
+      if (error) throw error;
+
+      // Mark events where musician has shown interest
+      const enrichedEvents = eventsData.map((event) => ({
+        ...event,
+        hasShownInterest: event.event_interests?.some(
+          (interest) => interest.musician_id === user.id
+        ),
+        interestedCount: event.event_interests?.length || 0,
+      }));
+
+      // Apply filters
+      let filteredEvents = enrichedEvents;
+      if (filter === "interested") {
+        filteredEvents = enrichedEvents.filter((e) => e.hasShownInterest);
+      } else if (filter === "matched") {
+        // Could add genre/role matching logic here
+        filteredEvents = enrichedEvents;
+      }
+
+      setEvents(filteredEvents);
+    } catch (error) {
+      console.error("Error fetching gigs:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShowInterest = async (eventId) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    setProcessingInterest({ ...processingInterest, [eventId]: true });
+
+    try {
+      const event = events.find((e) => e.id === eventId);
+
+      if (event.hasShownInterest) {
+        // Remove interest
+        const { error } = await supabase
+          .from("event_interests")
+          .delete()
+          .eq("event_id", eventId)
+          .eq("musician_id", user.id);
+
+        if (error) throw error;
+
+        // Update local state
+        setEvents(
+          events.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  hasShownInterest: false,
+                  interestedCount: Math.max(0, e.interestedCount - 1),
+                }
+              : e
+          )
+        );
+      } else {
+        // Show interest
+        const { error } = await supabase.from("event_interests").insert({
+          event_id: eventId,
+          musician_id: user.id,
+        });
+
+        if (error) throw error;
+
+        // Update local state
+        setEvents(
+          events.map((e) =>
+            e.id === eventId
+              ? {
+                  ...e,
+                  hasShownInterest: true,
+                  interestedCount: e.interestedCount + 1,
+                }
+              : e
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error updating interest:", error);
+      alert("Failed to update interest. Please try again.");
+    } finally {
+      setProcessingInterest({ ...processingInterest, [eventId]: false });
+    }
+  };
+
+  const filteredEvents = events.filter(
+    (event) =>
+      event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.venue?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Available Gigs
+            </h1>
+            <button
+              onClick={() => router.push("/musician/bookings")}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition"
+            >
+              My Bookings
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search events..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {[
+              { id: "all", label: "All Events", icon: TrendingUp },
+              { id: "interested", label: "My Interests", icon: CheckCircle },
+              { id: "matched", label: "Matched", icon: Filter },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                    filter === tab.id
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="bg-white dark:bg-gray-800 rounded-xl p-6 animate-pulse"
+              >
+                <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
+            <TrendingUp className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Events Found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              {filter === "interested"
+                ? "You haven't shown interest in any events yet"
+                : "Check back soon for new gig opportunities"}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300"
+              >
+                {/* Event Image */}
+                {event.media_url ? (
+                  <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
+                    <Image
+                      src={event.media_url}
+                      alt={event.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                    {/* Interest Badge */}
+                    {event.interestedCount > 0 && (
+                      <div className="absolute top-3 right-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-gray-900 dark:text-white">
+                        {event.interestedCount}{" "}
+                        {event.interestedCount === 1
+                          ? "interested"
+                          : "interested"}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-48 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20 flex items-center justify-center">
+                    <Calendar className="w-16 h-16 text-purple-300 dark:text-purple-700" />
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="p-5 space-y-3">
+                  {/* Title & Type */}
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      {event.title}
+                    </h3>
+                    {event.event_type && (
+                      <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                        {event.event_type}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                    {event.description}
+                  </p>
+
+                  {/* Details */}
+                  <div className="space-y-2 text-sm">
+                    {event.venue && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <MapPin className="w-4 h-4" />
+                        <span className="line-clamp-1">{event.venue}</span>
+                      </div>
+                    )}
+
+                    {event.event_date && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Calendar className="w-4 h-4" />
+                        <span>
+                          {new Date(event.event_date).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                    {event.duration && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Clock className="w-4 h-4" />
+                        <span>{event.duration} hours</span>
+                      </div>
+                    )}
+
+                    {event.expected_attendees && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Users className="w-4 h-4" />
+                        <span>~{event.expected_attendees} attendees</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Budget */}
+                  {event.proposed_amount && (
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Budget
+                      </span>
+                      <span className="font-bold text-lg text-purple-600 dark:text-purple-400">
+                        ₦{event.proposed_amount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => router.push(`/events/${event.id}`)}
+                      className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium text-sm transition"
+                    >
+                      View Details
+                    </button>
+                    <button
+                      onClick={() => handleShowInterest(event.id)}
+                      disabled={processingInterest[event.id]}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition ${
+                        event.hasShownInterest
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                          : "bg-purple-600 hover:bg-purple-700 text-white"
+                      }`}
+                    >
+                      {processingInterest[event.id] ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : event.hasShownInterest ? (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          Interested
+                        </>
+                      ) : (
+                        "Show Interest"
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Posted by */}
+                  {event.creator && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                      <span>Posted by:</span>
+                      <span className="font-medium">
+                        {event.creator.first_name} {event.creator.last_name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

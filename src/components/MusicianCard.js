@@ -1,29 +1,47 @@
-// src/components/MusicianCard.js
+// src/components/MusicianCard.js - FULLY OPTIMIZED
 "use client";
 import Link from "next/link";
-import { FaYoutube, FaInstagram, FaTwitter } from "react-icons/fa";
-import { FaStar } from "react-icons/fa6";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useSocial } from "@/context/SocialContext";
-import { MessageCircle } from "lucide-react";
+import { 
+  MessageCircle, 
+  MapPin, 
+  Star, 
+  Award, 
+  Music, 
+  CheckCircle,
+  Clock
+} from "lucide-react";
+import { FaYoutube, FaInstagram, FaTwitter, FaTiktok } from "react-icons/fa";
 
 export default function MusicianCard({ musician }) {
   const {
     id,
-    name,
-    role,
-    available,
+    first_name,
+    last_name,
+    display_name,
+    primary_role,
+    is_available,
     bio,
-    socials,
+    location,
     youtube,
+    instagram,
+    twitter,
+    tiktok,
     profile_picture_url,
     gadget_specs,
     average_rating,
+    hourly_rate,
+    genres,
+    experience_years,
+    followers_count,
   } = musician;
 
   const router = useRouter();
   const { getOrCreateConversation } = useSocial();
+
+  const displayName = display_name || `${first_name} ${last_name}`;
 
   const handleChat = async (e) => {
     e.stopPropagation();
@@ -32,194 +50,227 @@ export default function MusicianCard({ musician }) {
     
     if (error) {
       console.error('Failed to create conversation:', error);
-      alert('Failed to start conversation. Please try again.');
       return;
     }
     
     router.push('/messages');
   };
 
+  const handleCardClick = () => {
+    router.push(`/musician/${id}`);
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-xl p-5 flex flex-col gap-4 transition hover:shadow-lg hover:scale-[1.02]">
-      {/* Profile picture */}
-      {profile_picture_url && (
-        <Image
-          src={profile_picture_url}
-          alt={`${name}'s profile`}
-          className="w-full h-48 object-cover rounded-xl"
-          width={400}
-          height={250}
-        />
-      )}
+    <div 
+      onClick={handleCardClick}
+      className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300 cursor-pointer"
+    >
+      {/* Image Section */}
+      <div className="relative h-48 sm:h-56 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20">
+        {profile_picture_url ? (
+          <Image
+            src={profile_picture_url}
+            alt={displayName}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Music className="w-16 h-16 text-purple-300 dark:text-purple-700" />
+          </div>
+        )}
 
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{name}</h2>
-        <p className="text-gray-600 dark:text-gray-300">{role}</p>
+        {/* Availability Badge */}
+        <div className="absolute top-3 left-3">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
+            is_available 
+              ? 'bg-green-500/90 text-white'
+              : 'bg-gray-500/90 text-white'
+          }`}>
+            {is_available ? (
+              <>
+                <CheckCircle className="w-3 h-3" />
+                Available
+              </>
+            ) : (
+              <>
+                <Clock className="w-3 h-3" />
+                Busy
+              </>
+            )}
+          </span>
+        </div>
 
-        <p className={`mt-2 text-sm font-semibold ${available ? "text-green-500" : "text-red-500"}`}>
-          {available ? "Available" : "Not Available"}
-        </p>
+        {/* Top Rated Badge */}
+        {average_rating >= 4.5 && (
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-500/90 text-white rounded-full text-xs font-semibold backdrop-blur-sm">
+              <Award className="w-3 h-3" />
+              Top Rated
+            </span>
+          </div>
+        )}
 
-        {bio && <p className="mt-3 text-gray-700 dark:text-gray-400 text-sm">{bio}</p>}
+        {/* Overlay Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
 
-        {gadget_specs && (
-          <p className="mt-3 text-gray-500 dark:text-gray-400 text-sm">
-            <span className="font-semibold">Gear:</span>{" "}
-            {typeof gadget_specs === "string" ? gadget_specs : gadget_specs.map((g) => g.name).join(", ")}
+      {/* Content Section */}
+      <div className="p-4 space-y-3">
+        {/* Name & Role */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+            {displayName}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
+            <Music className="w-3.5 h-3.5" />
+            {primary_role || 'Musician'}
+          </p>
+        </div>
+
+        {/* Stats Row */}
+        <div className="flex items-center gap-3 text-sm">
+          {/* Rating */}
+          {average_rating > 0 && (
+            <div className="flex items-center gap-1">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {average_rating.toFixed(1)}
+              </span>
+            </div>
+          )}
+
+          {/* Experience */}
+          {experience_years > 0 && (
+            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+              <Award className="w-4 h-4" />
+              <span>{experience_years}y</span>
+            </div>
+          )}
+
+          {/* Followers */}
+          {followers_count > 0 && (
+            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+              <span className="font-semibold">{followers_count}</span>
+              <span className="text-xs">followers</span>
+            </div>
+          )}
+        </div>
+
+        {/* Location & Rate */}
+        <div className="flex items-center justify-between text-sm">
+          {location && (
+            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+              <MapPin className="w-3.5 h-3.5" />
+              <span className="line-clamp-1">{location}</span>
+            </div>
+          )}
+          
+          {hourly_rate && (
+            <div className="font-semibold text-purple-600 dark:text-purple-400">
+              ₦{hourly_rate.toLocaleString()}/hr
+            </div>
+          )}
+        </div>
+
+        {/* Genres */}
+        {genres && genres.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {genres.slice(0, 3).map((genre, index) => (
+              <span 
+                key={index}
+                className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium"
+              >
+                {genre}
+              </span>
+            ))}
+            {genres.length > 3 && (
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full text-xs font-medium">
+                +{genres.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Bio */}
+        {bio && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+            {bio}
           </p>
         )}
-      </div>
 
-      {average_rating && (
-        <div className="flex items-center gap-1">
-          {[...Array(5)].map((_, i) => (
-            <FaStar
-              key={i}
-              size={18}
-              className={i < average_rating ? "text-yellow-400" : "text-gray-300 dark:text-gray-600"}
-            />
-          ))}
-          <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">{average_rating.toFixed(1)}</span>
+        {/* Social Links */}
+        {(youtube || instagram || twitter || tiktok) && (
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+            {youtube && (
+              <a 
+                href={youtube} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-red-600 hover:scale-110 transition-transform"
+              >
+                <FaYoutube size={18} />
+              </a>
+            )}
+            {instagram && (
+              <a 
+                href={instagram} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-pink-600 hover:scale-110 transition-transform"
+              >
+                <FaInstagram size={18} />
+              </a>
+            )}
+            {twitter && (
+              <a 
+                href={twitter} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-sky-500 hover:scale-110 transition-transform"
+              >
+                <FaTwitter size={18} />
+              </a>
+            )}
+            {tiktok && (
+              <a 
+                href={tiktok} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-gray-900 dark:text-white hover:scale-110 transition-transform"
+              >
+                <FaTiktok size={18} />
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/musician/${id}`);
+            }}
+            className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium text-sm transition"
+          >
+            View Profile
+          </button>
+          <button
+            onClick={handleChat}
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium text-sm transition shadow-sm hover:shadow-md"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Message</span>
+          </button>
         </div>
-      )}
-
-      {/* Socials */}
-      <div className="flex items-center gap-4 mt-2">
-        {youtube && (
-          <a href={youtube} target="_blank" rel="noopener noreferrer">
-            <FaYoutube size={22} className="text-red-600 hover:scale-110 transition" />
-          </a>
-        )}
-        {socials?.instagram && (
-          <a href={socials.instagram} target="_blank" rel="noopener noreferrer">
-            <FaInstagram size={22} className="text-pink-500 hover:scale-110 transition" />
-          </a>
-        )}
-        {socials?.twitter && (
-          <a href={socials.twitter} target="_blank" rel="noopener noreferrer">
-            <FaTwitter size={22} className="text-sky-500 hover:scale-110 transition" />
-          </a>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex gap-2 mt-4">
-        <Link 
-          href={`/musician/${id}`} 
-          className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-center transition"
-        >
-          View Profile
-        </Link>
-        <button
-          onClick={handleChat}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-        >
-          <MessageCircle className="w-4 h-4" />
-          Message
-        </button>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-// "use client";
-// import Link from "next/link";
-// import { FaYoutube, FaInstagram, FaTwitter } from "react-icons/fa";
-// import { FaStar } from "react-icons/fa6";
-// import { useRouter } from "next/navigation";
-// import Image from "next/image";
-
-// export default function MusicianCard({ musician }) {
-//   const {
-//     id,
-//     name,
-//     role,
-//     available,
-//     bio,
-//     socials,
-//     youtube,
-//     profile_picture_url,
-//     gadget_specs,
-//     average_rating,
-//   } = musician;
-
-//   const router = useRouter();
-
-//   const handleChat = (e) => {
-//     e.stopPropagation(); // Prevent card click
-//     router.push(`/chat/${id}`); // Direct chat page
-//   };
-
-//   return (
-//     <div className="bg-white dark:bg-gray-800 shadow rounded-xl p-5 flex flex-col gap-4 transition hover:shadow-lg hover:scale-[1.02]">
-//       {/* Profile picture */}
-//       {profile_picture_url && (
-//         <Image
-//           src={profile_picture_url}
-//           alt={`${name}'s profile`}
-//           className="w-full h-48 object-cover rounded-xl"
-//           width={400}
-//           height={250}
-//         />
-//       )}
-
-//       <div>
-//         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{name}</h2>
-//         <p className="text-gray-600 dark:text-gray-300">{role}</p>
-
-//         <p className={`mt-2 text-sm font-semibold ${available ? "text-green-500" : "text-red-500"}`}>
-//           {available ? "Available" : "Not Available"}
-//         </p>
-
-//         {bio && <p className="mt-3 text-gray-700 dark:text-gray-400 text-sm">{bio}</p>}
-
-//         {gadget_specs && (
-//           <p className="mt-3 text-gray-500 dark:text-gray-400 text-sm">
-//             <span className="font-semibold">Gear:</span>{" "}
-//             {typeof gadget_specs === "string" ? gadget_specs : gadget_specs.map((g) => g.name).join(", ")}
-//           </p>
-//         )}
-//       </div>
-
-//       {average_rating && (
-//         <div className="flex items-center gap-1">
-//           {[...Array(5)].map((_, i) => (
-//             <FaStar
-//               key={i}
-//               size={18}
-//               className={i < average_rating ? "text-yellow-400" : "text-gray-300 dark:text-gray-600"}
-//             />
-//           ))}
-//           <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">{average_rating.toFixed(1)}</span>
-//         </div>
-//       )}
-
-//       {/* Socials */}
-//       <div className="flex items-center gap-4 mt-2">
-//         {youtube && <FaYoutube size={22} className="text-red-600 hover:scale-110 transition" />}
-//         {socials?.instagram && <FaInstagram size={22} className="text-pink-500 hover:scale-110 transition" />}
-//         {socials?.twitter && <FaTwitter size={22} className="text-sky-500 hover:scale-110 transition" />}
-//       </div>
-
-//       {/* Action buttons */}
-//       <div className="flex justify-between mt-4">
-//         <Link href={`/musician/${id}`} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
-//           View Profile
-//         </Link>
-//         <button
-//           onClick={handleChat}
-//           className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-//         >
-//           Chat
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
 

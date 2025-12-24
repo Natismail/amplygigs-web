@@ -1,331 +1,355 @@
+// src/app/(app)/client/home/page.js - IMPROVED VERSION
 "use client";
+
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import MusicianCard from "@/components/MusicianCard";
 import PostEventForm from "@/components/PostEventForm";
 import SearchFilterBar from "@/components/SearchFilterBar";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { Plus, Calendar, Users, TrendingUp, Eye } from "lucide-react";
+import LoadingSpinner, { SkeletonCard } from "@/components/LoadingSpinner";
+import EmptyState from "@/components/EmptyState";
 
 export default function ClientHome() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [view, setView] = useState("events"); // events | musicians
+  const [activeTab, setActiveTab] = useState("find"); // find | myEvents | feed
   const [musicians, setMusicians] = useState([]);
   const [clientEvents, setClientEvents] = useState([]);
   const [showPostForm, setShowPostForm] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState({
+    search: "",
     genres: [],
     location: "",
+    roles: [],
     availability: "",
     rating: 0,
+    priceMin: "",
+    priceMax: "",
   });
 
-  /* ---------------- FETCH DATA ---------------- */
-
+  // Fetch musicians
   useEffect(() => {
     if (!user) return;
-
-    supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("role", "MUSICIAN")
-      .then(({ data }) => setMusicians(data || []));
+    fetchMusicians();
   }, [user]);
 
+  // Fetch client's events
   useEffect(() => {
     if (!user) return;
-
-    supabase
-      .from("events")
-      .select("*, event_interests(musician_id)")
-      .eq("client_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setClientEvents(data || []));
+    fetchClientEvents();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  const fetchMusicians = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("role", "MUSICIAN")
+        .order("average_rating", { ascending: false });
 
-  /* ---------------- FILTER LOGIC ---------------- */
+      if (error) throw error;
+      setMusicians(data || []);
+    } catch (error) {
+      console.error("Error fetching musicians:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const fetchClientEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          *,
+          event_interests(musician_id)
+        `)
+        .eq("client_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setClientEvents(data || []);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
+  };
+
+  // Apply filters
   const filteredMusicians = musicians.filter((m) => {
-    if (
-      filters.genres.length &&
-      !filters.genres.some((g) => m.genres?.includes(g))
-    )
-      return false;
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const matches =
+        m.first_name?.toLowerCase().includes(searchLower) ||
+        m.last_name?.toLowerCase().includes(searchLower) ||
+        m.primary_role?.toLowerCase().includes(searchLower) ||
+        m.display_name?.toLowerCase().includes(searchLower);
+      if (!matches) return false;
+    }
 
+    // Roles filter
+    if (filters.roles?.length > 0 && !filters.roles.includes(m.primary_role)) {
+      return false;
+    }
+
+    // Genres filter
+    if (
+      filters.genres?.length > 0 &&
+      !filters.genres.some((g) => m.genres?.includes(g))
+    ) {
+      return false;
+    }
+
+    // Location filter
     if (
       filters.location &&
       !m.location?.toLowerCase().includes(filters.location.toLowerCase())
-    )
+    ) {
       return false;
+    }
 
-    if (filters.availability && m.availability !== filters.availability)
+    // Availability filter
+    if (filters.availability === "available" && !m.is_available) {
       return false;
+    }
+    if (filters.availability === "busy" && m.is_available) {
+      return false;
+    }
 
-    if (filters.rating && (m.average_rating || 0) < filters.rating)
+    // Rating filter
+    if (filters.rating && (m.average_rating || 0) < filters.rating) {
       return false;
+    }
+
+    // Price filter
+    if (filters.priceMin && (m.hourly_rate || 0) < Number(filters.priceMin)) {
+      return false;
+    }
+    if (filters.priceMax && (m.hourly_rate || 0) > Number(filters.priceMax)) {
+      return false;
+    }
 
     return true;
   });
 
-  const filteredEvents = clientEvents.filter((e) => {
-    if (
-      filters.genres.length &&
-      !filters.genres.some((g) => e.required_genres?.includes(g))
-    )
-      return false;
-
-    if (
-      filters.location &&
-      !e.location?.toLowerCase().includes(filters.location.toLowerCase())
-    )
-      return false;
-
-    return true;
-  });
-
-  /* ---------------- UI ---------------- */
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <LoadingSpinner size="lg" message="Loading dashboard..." />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Welcome Back! 👋
+            </h1>
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Client Dashboard</h1>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView("events")}
-            className={`px-4 py-2 rounded ${
-              view === "events" ? "bg-purple-700 text-white" : "bg-gray-200"
-            }`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setView("musicians")}
-            className={`px-4 py-2 rounded ${
-              view === "musicians" ? "bg-purple-700 text-white" : "bg-gray-200"
-            }`}
-          >
-            Musicians
-          </button>
-        </div>
-      </div>
-
-      {/* SEARCH & FILTER */}
-      <SearchFilterBar filters={filters} setFilters={setFilters} />
-
-      {/* EVENTS VIEW */}
-      {view === "events" && (
-        <>
-          <div className="flex justify-end">
+            {/* Post Event Button */}
             <button
               onClick={() => setShowPostForm(true)}
-              className="bg-purple-800 text-white px-4 py-2 rounded"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition shadow-lg hover:shadow-xl"
             >
-              ➕ Post Event
+              <Plus className="w-5 h-5" />
+              <span className="hidden sm:inline">Post Event</span>
             </button>
           </div>
 
-          {filteredEvents.length === 0 ? (
-            <p className="text-gray-500">No events found.</p>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {filteredEvents.map((event) => (
-                <div key={event.id} className="border rounded-lg p-4">
-                  <h3 className="font-bold">{event.title}</h3>
-                  <p className="text-sm">{event.description}</p>
-                  <p className="text-sm">Location: {event.location}</p>
+          {/* Tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            <button
+              onClick={() => setActiveTab("find")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                activeTab === "find"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Find Musicians
+            </button>
 
-                  {event.media_url && (
-                    <Image
-                      src={event.media_url}
-                      alt="Event"
-                      width={400}
-                      height={200}
-                      className="rounded mt-2"
-                    />
-                  )}
+            <button
+              onClick={() => setActiveTab("myEvents")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                activeTab === "myEvents"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              My Events
+              {clientEvents.length > 0 && (
+                <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                  {clientEvents.length}
+                </span>
+              )}
+            </button>
 
-                  <p className="text-xs mt-2">
-                    Interested Musicians: {event.event_interests.length}
-                  </p>
-                </div>
-              ))}
+            <button
+              onClick={() => router.push("/feed")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Feed
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Find Musicians Tab */}
+        {activeTab === "find" && (
+          <div className="space-y-6">
+            {/* Search & Filters - Sticky */}
+            <div className="sticky top-[140px] z-10">
+              <SearchFilterBar
+                filters={filters}
+                setFilters={setFilters}
+                resultsCount={filteredMusicians.length}
+              />
             </div>
-          )}
-        </>
-      )}
 
-      {/* MUSICIANS VIEW */}
-      {view === "musicians" && (
-        <>
-          {filteredMusicians.length === 0 ? (
-            <p className="text-gray-500">No musicians match your filters.</p>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {filteredMusicians.map((m) => (
-                <MusicianCard key={m.id} musician={m} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+            {/* Musicians Grid */}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            ) : filteredMusicians.length === 0 ? (
+              <EmptyState
+                icon="users"
+                title="No Musicians Found"
+                description={
+                  musicians.length === 0
+                    ? "No musicians available at the moment. Check back later!"
+                    : "No musicians match your filters. Try adjusting your search criteria."
+                }
+                action={() => setFilters({
+                  search: "",
+                  genres: [],
+                  location: "",
+                  roles: [],
+                  availability: "",
+                  rating: 0,
+                  priceMin: "",
+                  priceMax: "",
+                })}
+                actionLabel="Clear Filters"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredMusicians.map((musician) => (
+                  <MusicianCard key={musician.id} musician={musician} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* POST EVENT MODAL */}
+        {/* My Events Tab */}
+        {activeTab === "myEvents" && (
+          <div className="space-y-6">
+            {clientEvents.length === 0 ? (
+              <EmptyState
+                icon="events"
+                title="No Events Posted"
+                description="Post your first event to start finding talented musicians for your gigs"
+                action={() => setShowPostForm(true)}
+                actionLabel="Post Event"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {clientEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition cursor-pointer"
+                    onClick={() => router.push(`/events/${event.id}`)}
+                  >
+                    {/* Event Image */}
+                    {event.media_url && (
+                      <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
+                        <Image
+                          src={event.media_url}
+                          alt={event.title}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+
+                    {/* Event Info */}
+                    <div className="p-4">
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-1">
+                        {event.title}
+                      </h3>
+
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                        {event.description}
+                      </p>
+
+                      <div className="space-y-2 text-sm">
+                        {event.location && (
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <Calendar className="w-4 h-4" />
+                            {event.location}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                            <Eye className="w-4 h-4" />
+                            <span className="font-medium">
+                              {event.event_interests?.length || 0} interested
+                            </span>
+                          </div>
+
+                          {event.proposed_amount && (
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              ₦{event.proposed_amount.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Post Event Modal */}
       {showPostForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <PostEventForm
-            onSuccess={() => {
-              setShowPostForm(false);
-              router.refresh();
-            }}
-            onCancel={() => setShowPostForm(false)}
-          />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="relative w-full max-w-2xl">
+            <PostEventForm
+              onSuccess={() => {
+                setShowPostForm(false);
+                fetchClientEvents();
+              }}
+              onCancel={() => setShowPostForm(false)}
+            />
+          </div>
         </div>
       )}
     </div>
   );
 }
-
-
-
-// // src/app/client/page.js
-// "use client";
-// import Image from "next/image";
-// import { useState, useEffect } from "react";
-// import { supabase } from "@/lib/supabaseClient";
-// import { useAuth } from "@/context/AuthContext";
-// import MusicianCard from "@/components/MusicianCard";
-// import PostEventForm from "@/components/PostEventForm";
-// //import Layout from "@/components/Layout";
-// import { useRouter } from "next/navigation";
-
-// export default function ClientHome() {
-//   const { user, loading } = useAuth();
-//   const [musicians, setMusicians] = useState([]);
-//   const [clientEvents, setClientEvents] = useState([]);
-//   const [showPostForm, setShowPostForm] = useState(false);
-//   const router = useRouter();
-
-//   // Fetch all available musicians
-//   useEffect(() => {
-//     async function fetchMusicians() {
-//       if (!loading && user) {
-//         const { data, error } = await supabase
-//           .from("user_profiles")
-//           .select("id, name, bio, youtube, socials, available")
-//           .eq("role", "MUSICIAN");
-
-//         if (error) {
-//           console.error("Error fetching musicians:", error.message);
-//         } else {
-//           setMusicians(data);
-//         }
-//       }
-//     }
-//     fetchMusicians();
-//   }, [loading, user]);
-
-//   // Fetch the current client's events
-//   useEffect(() => {
-//     async function fetchClientEvents() {
-//       if (user) {
-//         const { data, error } = await supabase
-//           .from("events")
-//           .select("*, event_interests(musician_id)")
-//           .eq("client_id", user.id)
-//           .order("created_at", { ascending: false });
-
-//         if (error) {
-//           console.error("Error fetching client events:", error.message);
-//         } else {
-//           setClientEvents(data);
-//         }
-//       }
-//     }
-//     fetchClientEvents();
-//   }, [user]);
-
-//   if (loading) {
-//     return <div className="text-center p-6">Loading...</div>;
-//   }
-
-//   return (
-//     <>
-//       <div className="p-6 dark:text-white -mt-8">
-//         <div className="flex justify-between items-center mb-6">
-//           <h1 className="text-xl font-bold">🎵 Your Posted Events</h1>
-//           <button
-//             onClick={() => setShowPostForm(true)}
-//             disabled={loading} // This is the key change
-//             className="bg-purple-800 text-white px-4 py-2 rounded hover:bg-purple-900 disabled:opacity-50"
-//           >
-//             ➕ Post Event
-//           </button>
-//         </div>
-
-//         {/* Display client's events */}
-//         {clientEvents.length === 0 ? (
-//           <p className="text-gray-500 mb-8">You have not posted any events yet.</p>
-//         ) : (
-//           <div className="mb-8 space-y-4 space-x-4 grid sm:grid-cols-1 md:grid-cols-4 lg:grid-cols-4 px-4">
-//             {clientEvents.map((event) => (
-//               <div key={event.id} className="p-4 border rounded-lg shadow-sm">
-//                 <h3 className="text-lg font-bold">{event.title}</h3>
-//                 <p className="text-sm text-gray-600 dark:text-gray-400">{event.description}</p>
-//                 <p className="text-sm">Location: {event.location}</p>
-//                 <p className="text-sm">Proposed Amount: ${event.proposed_amount}</p>
-//                 {event.media_url && (
-//                   <Image src={event.media_url} alt="Event Media" className="mt-2 rounded-md max-h-64 object-cover" width={800}
-//             height={450} />
-//                 )}
-//                 <div className="mt-2 text-sm text-gray-500">
-//                   {event.event_interests.length > 0
-//                     ? `Interested Musicians: ${event.event_interests.length}`
-//                     : "No musicians have shown interest yet."}
-//                 </div>
-//                 <a href={`/events/${event.id}`} className="text-blue-500 hover:underline mt-2 inline-block">
-//                   View Details
-//                 </a>
-//               </div>
-//             ))}
-//           </div>
-//         )}
-
-//         <h1 className="text-xl font-bold mb-4">🎵 Find Musicians</h1>
-//         {musicians.length === 0 ? (
-//           <p className="text-gray-500">No musicians found.</p>
-//         ) : (
-//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-//             {musicians.map((m) => (
-//               <MusicianCard key={m.id} musician={m} />
-//             ))}
-//           </div>
-//         )}
-//       </div>
-
-//       {showPostForm && (
-//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-//           <div className="relative w-full max-w-xl mx-4">
-//             <PostEventForm
-//               onSuccess={() => {
-//                 alert("✅ Event posted successfully!");
-//                 setShowPostForm(false);
-//                 router.refresh();
-//               }}
-//               onCancel={() => setShowPostForm(false)}
-//             />
-//           </div>
-//         </div>
-//       )}
-//     </>
-//   );
-// }
-
