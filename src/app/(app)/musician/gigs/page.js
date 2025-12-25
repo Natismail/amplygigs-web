@@ -79,68 +79,146 @@ export default function MusicianGigsPage() {
     }
   };
 
-  const handleShowInterest = async (eventId) => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+  // REPLACE handleShowInterest in src/app/(app)/musician/gigs/page.js
 
-    setProcessingInterest({ ...processingInterest, [eventId]: true });
+const handleShowInterest = async (eventId) => {
+  if (!user) {
+    router.push("/login");
+    return;
+  }
 
-    try {
-      const event = events.find((e) => e.id === eventId);
+  setProcessingInterest({ ...processingInterest, [eventId]: true });
 
-      if (event.hasShownInterest) {
-        // Remove interest
-        const { error } = await supabase
-          .from("event_interests")
-          .delete()
-          .eq("event_id", eventId)
-          .eq("musician_id", user.id);
+  try {
+    const event = events.find((e) => e.id === eventId);
 
-        if (error) throw error;
+    if (event.hasShownInterest) {
+      // Remove interest
+      console.log('🗑️ Removing interest...', { eventId, userId: user.id });
 
-        // Update local state
+      const { error } = await supabase
+        .from("event_interests")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("musician_id", user.id);
+
+      if (error) {
+        console.error('❌ Delete error:', {
+          message: error.message,
+          details: error.details,
+          code: error.code,
+        });
+        throw new Error(error.message || 'Failed to remove interest');
+      }
+
+      // Update local state
+      setEvents(
+        events.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                hasShownInterest: false,
+                interestedCount: Math.max(0, e.interestedCount - 1),
+              }
+            : e
+        )
+      );
+      
+      console.log('✅ Interest removed');
+    } else {
+      // Show interest
+      console.log('📝 Showing interest...', { eventId, userId: user.id });
+
+      // Check if already interested (prevents duplicate key error)
+      const { data: existing, error: checkError } = await supabase
+        .from("event_interests")
+        .select('id')
+        .eq("event_id", eventId)
+        .eq("musician_id", user.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('❌ Check error:', {
+          message: checkError.message,
+          details: checkError.details,
+          code: checkError.code,
+        });
+        throw new Error(checkError.message || 'Failed to check interest');
+      }
+
+      if (existing) {
+        console.log('⚠️ Already showed interest');
+        alert("You already showed interest in this event");
+        
+        // Update local state to match database
         setEvents(
           events.map((e) =>
             e.id === eventId
-              ? {
-                  ...e,
-                  hasShownInterest: false,
-                  interestedCount: Math.max(0, e.interestedCount - 1),
-                }
+              ? { ...e, hasShownInterest: true }
               : e
           )
         );
-      } else {
-        // Show interest
-        const { error } = await supabase.from("event_interests").insert({
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("event_interests")
+        .insert({
           event_id: eventId,
           musician_id: user.id,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Insert error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
         });
-
-        if (error) throw error;
-
-        // Update local state
-        setEvents(
-          events.map((e) =>
-            e.id === eventId
-              ? {
-                  ...e,
-                  hasShownInterest: true,
-                  interestedCount: e.interestedCount + 1,
-                }
-              : e
-          )
-        );
+        throw new Error(error.message || 'Failed to register interest');
       }
-    } catch (error) {
-      console.error("Error updating interest:", error);
-      alert("Failed to update interest. Please try again.");
-    } finally {
-      setProcessingInterest({ ...processingInterest, [eventId]: false });
+
+      console.log('✅ Interest registered:', data);
+
+      // Update local state
+      setEvents(
+        events.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                hasShownInterest: true,
+                interestedCount: e.interestedCount + 1,
+              }
+            : e
+        )
+      );
     }
-  };
+  } catch (error) {
+    console.error("❌ Error updating interest:", error);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    
+    // User-friendly error message
+    let userMessage = "Failed to update interest. Please try again.";
+    
+    if (error.message?.includes('duplicate')) {
+      userMessage = "You already showed interest in this event";
+    } else if (error.message?.includes('permission')) {
+      userMessage = "You don't have permission to do this";
+    } else if (error.message?.includes('foreign key')) {
+      userMessage = "Event not found";
+    } else if (error.message) {
+      userMessage = error.message;
+    }
+    
+    alert(userMessage);
+  } finally {
+    setProcessingInterest({ ...processingInterest, [eventId]: false });
+  }
+};
 
   const filteredEvents = events.filter(
     (event) =>

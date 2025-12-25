@@ -1,11 +1,11 @@
-// src/components/social/NotificationsDropdown.js
+// src/components/social/NotificationsDropdown.js - FINAL FIX
 "use client";
 
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { useSocial } from '@/context/SocialContext';
-import { Heart, MessageCircle, UserPlus, Share2, Trash2, CheckCheck, Bell } from 'lucide-react'; // ← ADD Bell HERE
+import { Heart, MessageCircle, UserPlus, Share2, Trash2, CheckCheck, Bell } from 'lucide-react';
 
 export default function NotificationsDropdown({ onClose }) {
   const router = useRouter();
@@ -74,10 +74,11 @@ export default function NotificationsDropdown({ onClose }) {
           </div>
         ) : (
           notifications.map((notification) => (
-            <button
+            // FIXED: Changed from button to div
+            <div
               key={notification.id}
               onClick={() => handleNotificationClick(notification)}
-              className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition border-b border-gray-100 dark:border-gray-700 text-left ${
+              className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition border-b border-gray-100 dark:border-gray-700 cursor-pointer ${
                 !notification.is_read ? 'bg-blue-50 dark:bg-blue-900/10' : ''
               }`}
             >
@@ -118,11 +119,12 @@ export default function NotificationsDropdown({ onClose }) {
                 <button
                   onClick={(e) => handleDelete(e, notification.id)}
                   className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition"
+                  aria-label="Delete notification"
                 >
                   <Trash2 className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-            </button>
+            </div>
           ))
         )}
       </div>

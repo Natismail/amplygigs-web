@@ -1,4 +1,4 @@
-// src/app/(app)/client/home/page.js - WITH DEBUG INFO
+// src/app/(app)/client/home/page.js - FIXED EMPTY EVENTS HANDLING
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import MusicianCard from "@/components/MusicianCard";
 import PostEventForm from "@/components/PostEventForm";
 import SearchFilterBar from "@/components/SearchFilterBar";
-import { Plus, Calendar, Users, TrendingUp, Eye, Edit, Trash2, RefreshCw, MapPin } from "lucide-react";
+import { Plus, Calendar, Users, TrendingUp, Eye, Trash2, RefreshCw, MapPin } from "lucide-react";
 import LoadingSpinner, { SkeletonCard } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 
@@ -17,12 +17,13 @@ export default function ClientHome() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState("find"); // find | myEvents | feed
+  const [activeTab, setActiveTab] = useState("find");
   const [musicians, setMusicians] = useState([]);
   const [clientEvents, setClientEvents] = useState([]);
   const [showPostForm, setShowPostForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState(null);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -67,9 +68,16 @@ export default function ClientHome() {
   };
 
   const fetchClientEvents = async () => {
+    if (!user?.id) {
+      console.log('⚠️ No user ID, skipping fetch');
+      return;
+    }
+
     setEventsLoading(true);
+    setEventsError(null);
+    
     try {
-      console.log("🔍 Fetching events for user:", user?.id);
+      console.log("🔍 Fetching events for user:", user.id);
 
       const { data, error } = await supabase
         .from("events")
@@ -82,6 +90,14 @@ export default function ClientHome() {
 
       if (error) {
         console.error("❌ Error fetching events:", error);
+        
+        // Handle "no rows" gracefully - this is OK for new users
+        if (error.code === 'PGRST116' || error.message?.includes('no rows')) {
+          console.log('✅ No events yet (new user)');
+          setClientEvents([]);
+          return;
+        }
+        
         throw error;
       }
 
@@ -96,8 +112,12 @@ export default function ClientHome() {
       console.log("📊 Events with count:", eventsWithCount);
       setClientEvents(eventsWithCount);
     } catch (error) {
-      console.error("Error fetching events:", error);
-      alert("Failed to fetch events. Check console for details.");
+      console.error("❌ Error fetching events:", error);
+      setEventsError(error.message || 'Failed to fetch events');
+      // Don't show alert for new users with no events
+      if (!error.message?.includes('no rows')) {
+        console.log('Non-critical error, continuing...');
+      }
     } finally {
       setEventsLoading(false);
     }
@@ -192,7 +212,6 @@ export default function ClientHome() {
               Welcome Back! 👋
             </h1>
 
-            {/* Post Event Button */}
             <button
               onClick={() => setShowPostForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition shadow-lg hover:shadow-xl"
@@ -297,25 +316,42 @@ export default function ClientHome() {
         {/* My Events Tab */}
         {activeTab === "myEvents" && (
           <div className="space-y-6">
-            {/* Refresh Button */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   My Posted Events
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Total: {clientEvents.length} events
+                  {clientEvents.length === 0 ? 'No events yet' : `${clientEvents.length} event${clientEvents.length === 1 ? '' : 's'}`}
                 </p>
               </div>
               <button
                 onClick={fetchClientEvents}
                 disabled={eventsLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${eventsLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
             </div>
+
+            {/* Error State */}
+            {eventsError && clientEvents.length === 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+                <h4 className="font-semibold text-red-800 dark:text-red-200 mb-2">
+                  ⚠️ Error Loading Events
+                </h4>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                  {eventsError}
+                </p>
+                <button
+                  onClick={fetchClientEvents}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
 
             {eventsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -323,38 +359,14 @@ export default function ClientHome() {
                   <SkeletonCard key={i} />
                 ))}
               </div>
-            ) : clientEvents.length === 0 ? (
-              <>
-                <EmptyState
-                  icon="events"
-                  title="No Events Posted"
-                  description="Post your first event to start finding talented musicians for your gigs"
-                  action={() => setShowPostForm(true)}
-                  actionLabel="Post Event"
-                />
-                
-                {/* Debug Info */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
-                  <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-3">
-                    🔍 Debug Information
-                  </h4>
-                  <div className="space-y-2 text-sm text-yellow-700 dark:text-yellow-300">
-                    <p>• User ID: <code className="bg-yellow-100 dark:bg-yellow-900/40 px-2 py-1 rounded">{user?.id}</code></p>
-                    <p>• Looking for events where creator_id = {user?.id}</p>
-                    <p>• Check browser console (F12) for detailed logs</p>
-                    <p>• Try posting a new event to see if it appears</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      console.log("Manual fetch triggered");
-                      fetchClientEvents();
-                    }}
-                    className="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium"
-                  >
-                    🔄 Retry Fetch
-                  </button>
-                </div>
-              </>
+            ) : clientEvents.length === 0 && !eventsError ? (
+              <EmptyState
+                icon="events"
+                title="No Events Posted Yet"
+                description="Post your first event to start finding talented musicians for your gigs"
+                action={() => setShowPostForm(true)}
+                actionLabel="Post Your First Event"
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {clientEvents.map((event) => (
@@ -362,7 +374,6 @@ export default function ClientHome() {
                     key={event.id}
                     className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition"
                   >
-                    {/* Event Image */}
                     {event.media_url && (
                       <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
                         <Image
@@ -374,7 +385,6 @@ export default function ClientHome() {
                       </div>
                     )}
 
-                    {/* Event Info */}
                     <div className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -428,7 +438,6 @@ export default function ClientHome() {
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={() => router.push(`/events/${event.id}`)}
@@ -461,14 +470,9 @@ export default function ClientHome() {
             onSuccess={(eventData) => {
               console.log("✅ Event posted:", eventData);
               setShowPostForm(false);
-              fetchClientEvents(); // Refresh events list
-              
+              fetchClientEvents();
               alert("✅ Event posted successfully!");
-              
-              if (eventData?.id) {
-                // Switch to My Events tab to see the new event
-                setActiveTab("myEvents");
-              }
+              setActiveTab("myEvents");
             }}
             onCancel={() => setShowPostForm(false)}
           />
@@ -477,3 +481,5 @@ export default function ClientHome() {
     </div>
   );
 }
+
+
