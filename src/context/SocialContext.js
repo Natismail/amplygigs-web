@@ -769,66 +769,153 @@ const fetchConversations = useCallback(async () => {
     }
   }, [user]);
 
-  const sendMessage = useCallback(async (conversationId, content, mediaFile = null) => {
-    if (!user) return { error: 'Not authenticated' };
+ // SIMPLIFIED VERSION - Removes manual notification creation
+// Let the SQL trigger handle notifications instead
+// Replace sendMessage in src/context/SocialContext.js
 
-    try {
-      let mediaUrl = null;
-      let mediaType = null;
+const sendMessage = useCallback(async (conversationId, content, mediaFile = null) => {
+  if (!user) {
+    console.error('❌ User not authenticated');
+    return { error: 'Not authenticated' };
+  }
 
-      if (mediaFile) {
+  try {
+    console.log('📤 Starting message send...', { 
+      conversationId, 
+      hasContent: !!content, 
+      hasMedia: !!mediaFile,
+      userId: user.id 
+    });
+
+    // Get the other user from the conversation
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (!conversation) {
+      console.error('❌ Conversation not found:', conversationId);
+      return { error: 'Conversation not found' };
+    }
+
+    const receiverId = conversation.otherUser?.id;
+    if (!receiverId) {
+      console.error('❌ Receiver ID not found');
+      return { error: 'Receiver not found' };
+    }
+
+    console.log('✅ Receiver found:', {
+      receiverId,
+      receiverName: `${conversation.otherUser.first_name} ${conversation.otherUser.last_name}`
+    });
+
+    let mediaUrl = null;
+    let mediaType = null;
+
+    // Handle media upload
+    if (mediaFile) {
+      console.log('📎 Uploading media...');
+      try {
         const fileExt = mediaFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         
-        const { data, error } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('messages')
           .upload(fileName, mediaFile);
 
-        if (error) throw error;
+        if (uploadError) {
+          console.error('❌ Media upload error:', uploadError);
+          throw new Error(`Media upload failed: ${uploadError.message}`);
+        }
 
-        const { data: { publicUrl } } = supabase.storage
+        const { data: urlData } = supabase.storage
           .from('messages')
           .getPublicUrl(fileName);
 
-        mediaUrl = publicUrl;
+        mediaUrl = urlData.publicUrl;
         mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
+        console.log('✅ Media uploaded:', mediaUrl);
+      } catch (uploadErr) {
+        console.error('❌ Exception during media upload:', uploadErr);
+        throw uploadErr;
       }
+    }
 
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content,
-          media_url: mediaUrl,
-          media_type: mediaType,
-        })
-        .select(`
-          *,
-          sender:sender_id (
-            id,
-            first_name,
-            last_name,
-            profile_picture_url
-          )
-        `)
-        .single();
+    // Prepare message data
+    const messageData = {
+      sender_id: user.id,
+      receiver_id: receiverId,
+      conversation_id: conversationId,
+      sender_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown',
+      content: content?.trim() || '',
+      media_url: mediaUrl,
+      media_type: mediaType,
+      read: false,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
 
-      if (error) throw error;
+    console.log('💾 Inserting message:', JSON.stringify(messageData, null, 2));
 
+    // Insert message (trigger will create notification automatically)
+    const { data, error } = await supabase
+      .from('messages')
+      .insert(messageData)
+      .select(`
+        *,
+        sender:sender_id (
+          id,
+          first_name,
+          last_name,
+          profile_picture_url
+        )
+      `)
+      .single();
+
+    if (error) {
+      console.error('❌ Supabase insert error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+      
+      throw new Error(error.message || 'Failed to send message');
+    }
+
+    if (!data) {
+      throw new Error('No data returned from database');
+    }
+
+    console.log('✅ Message sent successfully:', data);
+
+    // Update conversation timestamp
+    try {
       await supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId);
-
-      setMessages(prev => [...prev, data]);
-
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error sending message:', error);
-      return { data: null, error };
+      console.log('✅ Conversation timestamp updated');
+    } catch (convError) {
+      console.warn('⚠️ Could not update conversation timestamp:', convError);
+      // Don't fail the whole operation if conversation update fails
     }
-  }, [user]);
+
+    // Update local messages state
+    setMessages(prev => [...prev, data]);
+
+    return { data, error: null };
+  } catch (error) {
+    console.error('❌ Exception in sendMessage:', error);
+    
+    return { 
+      data: null, 
+      error: {
+        message: error?.message || 'Unknown error occurred',
+        details: error?.details || null,
+        code: error?.code || null
+      }
+    };
+  }
+}, [user, conversations, setMessages]);
+
 
   const deleteMessage = useCallback(async (messageId) => {
     if (!user) return { error: 'Not authenticated' };

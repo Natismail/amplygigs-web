@@ -124,9 +124,16 @@ export default function EventDetailsPage() {
       alert("Booking created! The musician will be notified.");
       router.push(`/client/bookings/${data.id}`);
     } catch (error) {
-      console.error("Error creating booking:", error);
-      alert("Failed to create booking");
-    }
+  console.error('❌ Error creating booking:', error);
+  console.error('Error details:', {
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+  });
+  console.error('Error type:', typeof error);
+  console.error('Error message:', error?.message);
+}
   };
 
   if (loading) {

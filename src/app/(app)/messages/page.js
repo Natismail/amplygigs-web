@@ -1,4 +1,4 @@
-// src/app/(app)/messages/page.js
+// src/app/(app)/messages/page.js - FIXED LAYOUT
 "use client";
 
 import { useState } from 'react';
@@ -20,23 +20,71 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-950">
+    // FIXED: Use calc to account for navbar height (64px typically)
+    <div className="fixed inset-0 top-[64px] flex overflow-hidden bg-gray-50 dark:bg-gray-950">
       {/* Conversation List - Desktop always visible, Mobile conditionally */}
       <div className={`${
         showChat ? 'hidden lg:block' : 'block'
-      } w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`}>
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+      } w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col h-full`}>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Messages</h1>
         </div>
-        <ConversationList onSelectConversation={handleSelectConversation} />
+        <div className="flex-1 overflow-hidden">
+          <ConversationList onSelectConversation={handleSelectConversation} />
+        </div>
       </div>
 
       {/* Chat Window - Desktop always visible, Mobile conditionally */}
       <div className={`${
         showChat ? 'block' : 'hidden lg:block'
-      } flex-1 bg-white dark:bg-gray-900`}>
+      } flex-1 bg-white dark:bg-gray-900 h-full`}>
         <ChatWindow conversation={selectedConversation} onBack={handleBack} />
       </div>
     </div>
   );
 }
+
+
+
+// // src/app/(app)/messages/page.js
+// "use client";
+
+// import { useState } from 'react';
+// import ConversationList from '@/components/social/ConversationList';
+// import ChatWindow from '@/components/social/ChatWindow';
+
+// export default function MessagesPage() {
+//   const [selectedConversation, setSelectedConversation] = useState(null);
+//   const [showChat, setShowChat] = useState(false);
+
+//   const handleSelectConversation = (conversation) => {
+//     setSelectedConversation(conversation);
+//     setShowChat(true);
+//   };
+
+//   const handleBack = () => {
+//     setShowChat(false);
+//     setSelectedConversation(null);
+//   };
+
+//   return (
+//     <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-950">
+//       {/* Conversation List - Desktop always visible, Mobile conditionally */}
+//       <div className={`${
+//         showChat ? 'hidden lg:block' : 'block'
+//       } w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`}>
+//         <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+//           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Messages</h1>
+//         </div>
+//         <ConversationList onSelectConversation={handleSelectConversation} />
+//       </div>
+
+//       {/* Chat Window - Desktop always visible, Mobile conditionally */}
+//       <div className={`${
+//         showChat ? 'block' : 'hidden lg:block'
+//       } flex-1 bg-white dark:bg-gray-900`}>
+//         <ChatWindow conversation={selectedConversation} onBack={handleBack} />
+//       </div>
+//     </div>
+//   );
+// }

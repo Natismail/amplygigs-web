@@ -1,19 +1,29 @@
-// src/components/Navbar.js - UPDATED WITH MESSAGE NOTIFICATIONS
+// src/components/Navbar.js - WITH BOTH HAMBURGER AND BACK BUTTON
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import Avatar from "./Avatar";
-import { Menu, Sun, Moon, Bell, MessageCircle } from "lucide-react";
+import { Menu, Sun, Moon, MessageCircle, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import NotificationBell from '@/components/social/NotificationBell';
 
 export default function Navbar({ onMenuClick }) {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // Determine if we should show back button
+  const shouldShowBack = pathname !== '/' && 
+                         !pathname.startsWith('/login') && 
+                         !pathname.startsWith('/signup') &&
+                         !pathname.includes('/dashboard') &&
+                         !pathname.includes('/home');
 
   // Fetch unread message count
   useEffect(() => {
@@ -82,10 +92,15 @@ export default function Navbar({ onMenuClick }) {
     };
   }, [user?.id]);
 
+  const handleBack = () => {
+    router.back();
+  };
+
   return (
-    <nav className="sticky top-0 z-30 flex justify-between items-center px-4 sm:px-6 py-3 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+    <nav className="sticky top-0 z-30 flex justify-between items-center px-3 sm:px-6 py-3 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
       {/* Left Section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        {/* Hamburger Menu - ALWAYS VISIBLE */}
         <button
           onClick={onMenuClick}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -93,7 +108,19 @@ export default function Navbar({ onMenuClick }) {
         >
           <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
         </button>
+
+        {/* Back Button - Shows on detail pages */}
+        {shouldShowBack && (
+          <button
+            onClick={handleBack}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          </button>
+        )}
         
+        {/* Logo */}
         <div className="flex items-center gap-2">
           <span className="text-2xl">🎵</span>
           <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white hidden sm:block">
@@ -103,7 +130,7 @@ export default function Navbar({ onMenuClick }) {
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
@@ -131,14 +158,14 @@ export default function Navbar({ onMenuClick }) {
           )}
         </Link>
 
-        {/* Notification Bell (your existing component) */}
+        {/* Notification Bell */}
         <NotificationBell />
 
         {/* User Profile */}
         {user && (
-          <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
             <Avatar user={user} size="sm" />
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
                 {user.first_name} {user.last_name}
               </p>
@@ -152,7 +179,6 @@ export default function Navbar({ onMenuClick }) {
     </nav>
   );
 }
-
 
 
 

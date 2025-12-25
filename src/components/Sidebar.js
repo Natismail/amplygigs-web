@@ -359,6 +359,9 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/update-profile" icon={Music}>
                 Become a Musician
               </NavLink>
+              <NavLink href="/client/settings" icon={Settings}>
+  Settings
+</NavLink>
             </>
           )}
         </nav>

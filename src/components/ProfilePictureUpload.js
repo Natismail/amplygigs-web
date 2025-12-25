@@ -1,4 +1,4 @@
-// src/components/ProfilePictureUpload.js - BEAUTIFUL UI + ARRAYBUFFER FIX
+// src/components/ProfilePictureUpload-BLOB.js
 "use client";
 
 import { useState } from "react";
@@ -45,7 +45,6 @@ export default function ProfilePictureUpload() {
     setSelectedFile(null);
     setPreviewUrl(user?.profile_picture_url || null);
     setMessage({ type: "", text: "" });
-    // Reset file input
     const input = document.getElementById("profile-picture-input");
     if (input) input.value = "";
   };
@@ -90,21 +89,25 @@ export default function ProfilePictureUpload() {
 
       setUploadProgress(40);
 
-      // CRITICAL FIX: Convert to ArrayBuffer
-      console.log("🔄 Converting file to ArrayBuffer...");
+      // DIFFERENT APPROACH: Create a new Blob with explicit type
+      console.log("🔄 Creating Blob with explicit MIME type...");
       setMessage({ type: "info", text: "Processing image..." });
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      console.log("✅ ArrayBuffer created, size:", arrayBuffer.byteLength);
+      
+      const blob = new Blob([selectedFile], { type: fileType });
+      console.log("✅ Blob created:", {
+        size: blob.size,
+        type: blob.type
+      });
 
       setUploadProgress(60);
 
-      // Upload using ArrayBuffer with explicit content-type
+      // Upload using Blob
       console.log("⬆️ Uploading to:", fileName);
       setMessage({ type: "info", text: "Uploading to cloud..." });
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("profile-pictures")
-        .upload(fileName, arrayBuffer, {
+        .upload(fileName, blob, {
           contentType: fileType,
           cacheControl: "3600",
           upsert: false,
@@ -167,7 +170,7 @@ export default function ProfilePictureUpload() {
         setUploadProgress(0);
       }, 3000);
 
-      // Test image accessibility (for debugging)
+      // Test image accessibility
       setTimeout(async () => {
         try {
           const response = await fetch(publicUrl, { method: 'HEAD' });
@@ -178,11 +181,15 @@ export default function ProfilePictureUpload() {
             status: response.status,
             contentType: contentType,
             ok: response.ok,
-            isImage: contentType?.includes('image/')
+            isImage: contentType?.startsWith('image/')
           });
           
-          if (!contentType?.includes('image/')) {
+          if (!contentType?.startsWith('image/')) {
             console.error("❌ WRONG CONTENT TYPE! Expected image/*, got:", contentType);
+            setMessage({ 
+              type: "error", 
+              text: `Image uploaded but has wrong content-type: ${contentType}` 
+            });
           } else {
             console.log("✅✅✅ SUCCESS! Image is accessible with correct content-type!");
           }
@@ -195,7 +202,7 @@ export default function ProfilePictureUpload() {
       console.error("❌ Upload failed:", error);
       setMessage({ 
         type: "error", 
-        text: `Upload failed: ${error.message}` 
+        text: error.message || "Upload failed. Please try again."
       });
       setUploadProgress(0);
     } finally {
@@ -383,7 +390,6 @@ export default function ProfilePictureUpload() {
     </div>
   );
 }
-
 
 
 
