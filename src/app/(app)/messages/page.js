@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import ConversationList from '@/components/social/ConversationList';
 import ChatWindow from '@/components/social/ChatWindow';
+import PullToRefresh from '@/components/PullToRefresh';
+
 
 export default function MessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -19,8 +21,13 @@ export default function MessagesPage() {
     setSelectedConversation(null);
   };
 
+  const handleRefresh = async () => {
+  await fetchConversations();
+};
+
+
   return (
-    // FIXED: Use calc to account for navbar height (64px typically)
+      <PullToRefresh onRefresh={handleRefresh}>
     <div className="fixed inset-0 top-[64px] flex overflow-hidden bg-gray-50 dark:bg-gray-950">
       {/* Conversation List - Desktop always visible, Mobile conditionally */}
       <div className={`${
@@ -41,6 +48,7 @@ export default function MessagesPage() {
         <ChatWindow conversation={selectedConversation} onBack={handleBack} />
       </div>
     </div>
+      </PullToRefresh>
   );
 }
 

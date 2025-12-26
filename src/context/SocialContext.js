@@ -28,6 +28,7 @@ export const SocialProvider = ({ children }) => {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const [loading, setLoading] = useState({
     posts: false,
@@ -36,6 +37,14 @@ export const SocialProvider = ({ children }) => {
     notifications: false,
     conversations: false,
   });
+
+useEffect(() => {
+  if (user?.id) {
+    fetchNotifications();
+    fetchConversations();
+  }
+}, [user?.id, fetchNotifications, fetchConversations]);
+
 
   // =====================================================
   // FOLLOW/UNFOLLOW FUNCTIONS
@@ -620,8 +629,9 @@ const getOrCreateConversation = useCallback(async (otherUserId) => {
     return { data: null, error };
   }
 }, [user]);
-// In src/context/SocialContext.js - Replace fetchConversations
 
+
+// In src/context/SocialContext.js - Replace fetchConversations
 const fetchConversations = useCallback(async () => {
   if (!user) {
     console.log('⏭️ No user, skipping conversations fetch');
@@ -633,7 +643,6 @@ const fetchConversations = useCallback(async () => {
   try {
     console.log('📥 Fetching conversations for user:', user.id);
     
-    // Get all conversations for current user
     const { data: participations, error } = await supabase
       .from('conversation_participants')
       .select(`
@@ -661,12 +670,10 @@ const fetchConversations = useCallback(async () => {
 
     console.log('📋 Found participations:', participations?.length || 0);
 
-    // For each conversation, get the other participant and last message
     const conversationsWithDetails = await Promise.all(
       (participations || []).map(async (participation) => {
         const conversationId = participation.conversation_id;
 
-        // Get other participant
         const { data: participants, error: participantsError } = await supabase
           .from('conversation_participants')
           .select(`
@@ -687,7 +694,6 @@ const fetchConversations = useCallback(async () => {
           console.warn('⚠️ Error fetching participant for conversation:', conversationId);
         }
 
-        // Get last message
         const { data: lastMessage } = await supabase
           .from('messages')
           .select('*')
@@ -696,13 +702,13 @@ const fetchConversations = useCallback(async () => {
           .limit(1)
           .single();
 
-        // Count unread messages
+        // ⭐ UPDATED: More explicit unread count
         const { count: unreadCount } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', conversationId)
-          .neq('sender_id', user.id)
-          .gt('created_at', participation.last_read_at || '1970-01-01');
+          .eq('receiver_id', user.id)    // ⭐ ADDED
+          .eq('read', false);             // ⭐ ADDED
 
         return {
           ...participation.conversations,
@@ -718,6 +724,15 @@ const fetchConversations = useCallback(async () => {
     console.log('✅ Fetched conversations with details:', conversationsWithDetails.length);
 
     setConversations(conversationsWithDetails);
+    
+    // ⭐ ADDED: Calculate total unread
+    const totalUnread = conversationsWithDetails.reduce(
+      (sum, conv) => sum + (conv.unreadCount || 0),
+      0
+    );
+    setUnreadMessagesCount(totalUnread);
+    console.log('📬 Total unread messages:', totalUnread);
+
     return { data: conversationsWithDetails, error: null };
   } catch (error) {
     console.error('❌ Full error details:', {
@@ -731,7 +746,6 @@ const fetchConversations = useCallback(async () => {
     setLoading(prev => ({ ...prev, conversations: false }));
   }
 }, [user]);
-
 
   const fetchMessages = useCallback(async (conversationId) => {
     if (!user) return { error: 'Not authenticated' };
@@ -975,48 +989,51 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
   // NOTIFICATION FUNCTIONS
   // =====================================================
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return { error: 'Not authenticated' };
+  
+const fetchNotifications = useCallback(async () => {
+  if (!user) return { error: 'Not authenticated' };
 
-    setLoading(prev => ({ ...prev, notifications: true }));
+  setLoading(prev => ({ ...prev, notifications: true }));
 
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select(`
-          *,
-          related_user:related_user_id (
-            id,
-            first_name,
-            last_name,
-            profile_picture_url,
-            role
-          ),
-          related_post:related_post_id (
-            id,
-            caption,
-            media_url
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select(`
+        *,
+        related_user:related_user_id (
+          id,
+          first_name,
+          last_name,
+          profile_picture_url,
+          role
+        ),
+        related_post:related_post_id (
+          id,
+          caption,
+          media_url
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setNotifications(data || []);
-      
-      const unreadCount = data?.filter(n => !n.is_read).length || 0;
-      setUnreadNotificationsCount(unreadCount);
+    setNotifications(data || []);
+    
+    // ⭐ UPDATED: Check both is_read and read
+    const unreadCount = data?.filter(n => !n.is_read && !n.read).length || 0;
+    setUnreadNotificationsCount(unreadCount);
 
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return { data: null, error };
-    } finally {
-      setLoading(prev => ({ ...prev, notifications: false }));
-    }
-  }, [user]);
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return { data: null, error };
+  } finally {
+    setLoading(prev => ({ ...prev, notifications: false }));
+  }
+}, [user]);
+
 
   const markNotificationAsRead = useCallback(async (notificationId) => {
     if (!user) return { error: 'Not authenticated' };
@@ -1170,6 +1187,82 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
     return channel;
   }, [user]);
 
+
+
+  // =============================================
+  // REAL-TIME SUBSCRIPTIONS
+  // =============================================
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('🔔 Setting up real-time subscriptions');
+
+    // Notifications channel
+    const notifChannel = supabase
+      .channel(`notif:${user.id}`)
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          console.log('🔔 New notification:', payload.new);
+          setNotifications(prev => [payload.new, ...prev]);
+          setUnreadNotificationsCount(prev => prev + 1);
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(payload.new.title, {
+              body: payload.new.message,
+              icon: '/icons/icon-192.png',
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
+          if (payload.new.is_read || payload.new.read) {
+            setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    // Messages channel
+    const msgChannel = supabase
+      .channel(`msg:${user.id}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
+        (payload) => {
+          console.log('💬 New message:', payload.new);
+          setUnreadMessagesCount(prev => prev + 1);
+          fetchConversations();
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('New Message', {
+              body: payload.new.content?.substring(0, 50) + '...',
+              icon: '/icons/icon-192.png',
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new.read && !payload.old.read) {
+            setUnreadMessagesCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notifChannel);
+      supabase.removeChannel(msgChannel);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+
   const value = {
     // State
     posts,
@@ -1230,6 +1323,25 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
     setFollowers,
     setFollowing,
     setNotifications,
+
+    notifications,
+    unreadNotificationsCount,
+    loadingNotifications: loading.notifications,
+    fetchNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    subscribeToNotifications,
+    conversations,
+    unreadMessagesCount,
+    loadingConversations: loading.conversations,
+    fetchConversations,
+    getOrCreateConversation,
+    sendMessage,
+    followUser,
+    unfollowUser,
+    checkIfFollowing,
+    loading,
   };
 
   return (
@@ -1238,3 +1350,9 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
     </SocialContext.Provider>
   );
 };
+
+// export function useSocial() {
+//   const context = useContext(SocialContext);
+//   if (!context) throw new Error('useSocial must be used within SocialProvider');
+//   return context;
+// }

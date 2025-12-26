@@ -11,6 +11,7 @@ import ProfileCard from "@/components/dashboard/ProfileCard";
 import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
 import { fetchPublicEvents } from "@/lib/google/fetchPublicEvents";
 import Link from "next/link";
+import PullToRefresh from '@/components/PullToRefresh';
 
 export default function MusicianDashboard() {
   const router = useRouter();
@@ -121,7 +122,15 @@ useEffect(() => {
 
   const recentGigs = bookings?.filter(b => b.musician_id === user?.id).slice(0, 3) || [];
 
+
+ const handleRefresh = async () => {
+    console.log('🔄 Refreshing profile...');
+    await fetchProfile();
+    await fetchBookings();
+  };
+
   return (
+        <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 sm:pb-6">
       {/* Mobile Header - Sticky */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-4 safe-top">
@@ -387,7 +396,7 @@ useEffect(() => {
       {/* iOS Safe Area Bottom Padding */}
       <div className="h-safe-bottom"></div>
     </div>
-
+    </PullToRefresh>
   );
 }
 

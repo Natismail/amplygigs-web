@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import UserProfileCard from '@/components/social/UserProfileCard';
 import { Search, Users, Music } from 'lucide-react';
+import PullToRefresh from '@/components/PullToRefresh';
 
 export default function NetworkPage() {
   const [users, setUsers] = useState([]);
@@ -61,7 +62,13 @@ export default function NetworkPage() {
     setFilteredUsers(filtered);
   };
 
+  const handleRefresh = async () => {
+    console.log('🔄 Refreshing profile...');
+    await fetchUsers();
+  };
+
   return (
+        <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-6">
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-6">
@@ -150,6 +157,7 @@ export default function NetworkPage() {
         )}
       </div>
     </div>
+        </PullToRefresh>
   );
 }
 

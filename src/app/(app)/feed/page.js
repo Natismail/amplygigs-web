@@ -7,12 +7,24 @@ import { useSocial } from "@/context/SocialContext";
 import SocialFeed from "@/components/social/SocialFeed";
 import CreatePostModal from "@/components/social/CreatePostModal";
 import { Plus, TrendingUp, Users, Compass } from "lucide-react";
+import PullToRefresh from '@/components/PullToRefresh';
 
 export default function FeedPage() {
   const router = useRouter();
   const { user } = useSocial();
   const [activeTab, setActiveTab] = useState("feed"); // feed | discover | following
   const [showCreatePost, setShowCreatePost] = useState(false);
+const { posts, fetchFeed } = useSocial();
+
+  useEffect(() => {
+    fetchFeed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRefresh = async () => {
+    console.log('🔄 Refreshing feed...');
+    await fetchFeed();
+  };
 
   const tabs = [
     { id: "feed", label: "Feed", icon: TrendingUp, description: "Posts from people you follow" },
@@ -21,6 +33,7 @@ export default function FeedPage() {
   ];
 
   return (
+        <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
@@ -111,6 +124,7 @@ export default function FeedPage() {
         <CreatePostModal onClose={() => setShowCreatePost(false)} />
       )}
     </div>
+        </PullToRefresh>
   );
 }
 

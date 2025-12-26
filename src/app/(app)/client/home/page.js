@@ -12,6 +12,8 @@ import SearchFilterBar from "@/components/SearchFilterBar";
 import { Plus, Calendar, Users, TrendingUp, Eye, Trash2, RefreshCw, MapPin } from "lucide-react";
 import LoadingSpinner, { SkeletonCard } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
+import PullToRefresh from '@/components/PullToRefresh';
+
 
 export default function ClientHome() {
   const { user, loading: authLoading } = useAuth();
@@ -202,7 +204,15 @@ export default function ClientHome() {
     );
   }
 
+
+   const handleRefresh = async () => {
+    console.log('🔄 Refreshing profile...');
+    await fetchClientEvents();
+    await fetchMusicians();
+  };
+
   return (
+        <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
@@ -479,6 +489,7 @@ export default function ClientHome() {
         </div>
       )}
     </div>
+        </PullToRefresh>
   );
 }
 
