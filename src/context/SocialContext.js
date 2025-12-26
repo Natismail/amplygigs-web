@@ -1,7 +1,7 @@
 // src/context/SocialContext.js
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -38,12 +38,6 @@ export const SocialProvider = ({ children }) => {
     conversations: false,
   });
 
-useEffect(() => {
-  if (user?.id) {
-    fetchNotifications();
-    fetchConversations();
-  }
-}, [user?.id, fetchNotifications, fetchConversations]);
 
 
   // =====================================================
