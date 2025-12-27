@@ -1,4 +1,4 @@
-// src/components/UpdateProfileForm.js
+// src/components/UpdateProfileForm.js - COMPLETE WITH ALL FIELDS
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -21,8 +21,20 @@ const EMPTY_FORM = {
     whatsapp: "",
     availableLine: "",
   },
-  available: false,
+  available: true,
+  // ⭐ NEW FIELDS
+  experience_years: "",
+  hourly_rate: "",
+  genres: [],
 };
+
+/* ------------------ Available Genres ------------------ */
+
+const GENRES = [
+  "Afrobeats", "Hip Hop", "R&B", "Jazz", "Gospel", 
+  "Highlife", "Reggae", "Pop", "Rock", "Classical", 
+  "Electronic", "Fuji", "Juju", "Apala"
+];
 
 /* ------------------ Helpers ------------------ */
 
@@ -47,7 +59,7 @@ export default function UpdateProfileForm() {
 
     const { data, error } = await supabase
       .from("user_profiles")
-      .select("name, bio, youtube, socials, contact, available")
+      .select("name, bio, youtube, socials, contact, available, experience_years, hourly_rate, genres")
       .eq("id", user.id)
       .single();
 
@@ -67,7 +79,10 @@ export default function UpdateProfileForm() {
           whatsapp: data.contact?.whatsapp ?? "",
           availableLine: data.contact?.availableLine ?? "",
         },
-        available: data.available ?? false,
+        available: data.available ?? true,
+        experience_years: data.experience_years ?? "",
+        hourly_rate: data.hourly_rate ?? "",
+        genres: data.genres ?? [],
       });
     }
 
@@ -79,6 +94,17 @@ export default function UpdateProfileForm() {
       fetchProfile();
     }
   }, [user, authLoading, fetchProfile]);
+
+  /* ------------------ Genre Toggle ------------------ */
+
+  const toggleGenre = (genre) => {
+    setForm((f) => ({
+      ...f,
+      genres: f.genres.includes(genre)
+        ? f.genres.filter((g) => g !== genre)
+        : [...f.genres, genre],
+    }));
+  };
 
   /* ------------------ Submit ------------------ */
 
@@ -104,10 +130,15 @@ export default function UpdateProfileForm() {
         ...form.contact,
         whatsapp: normalizePhone(form.contact.whatsapp),
       },
-      is_available: form.available, // <-- changed from 'available' to 'is_available'
-      // Set verification status to 'unverified' when becoming a musician
+      available: form.available,
       verification_status: "unverified",
+      // ⭐ NEW FIELDS
+      experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
+      hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
+      genres: form.genres,
     };
+
+    console.log('💾 Saving musician profile:', payload);
 
     const { error } = await supabase
       .from("user_profiles")
@@ -117,13 +148,14 @@ export default function UpdateProfileForm() {
     setFormLoading(false);
 
     if (error) {
+      console.error('❌ Error saving profile:', error);
       setError(error.message);
       return;
     }
 
+    console.log('✅ Profile saved successfully');
     setSuccess(true);
     
-    // Show success message for 2 seconds, then redirect
     setTimeout(() => {
       router.push("/musician/dashboard");
     }, 2000);
@@ -155,6 +187,13 @@ export default function UpdateProfileForm() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             Welcome to AmplyGigs Musicians! 
           </p>
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+            <p className="text-sm text-green-800 dark:text-green-200">
+              ✅ You are now <span className="font-semibold">
+                {form.available ? 'AVAILABLE' : 'UNAVAILABLE'}
+              </span> for bookings
+            </p>
+          </div>
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               ⚡ Next Step: Complete your <span className="font-semibold">KYC Verification</span> to start receiving bookings!
@@ -174,7 +213,7 @@ export default function UpdateProfileForm() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 py-8 px-4">
       <form
         onSubmit={handleSubmit}
-        className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-lg space-y-4"
+        className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-2xl space-y-4"
       >
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -200,9 +239,7 @@ export default function UpdateProfileForm() {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             placeholder="e.g., DJ Spinall, Wizkid"
             value={form.name}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, name: e.target.value }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             required
           />
         </div>
@@ -217,10 +254,75 @@ export default function UpdateProfileForm() {
             placeholder="Tell clients about your music style, experience, and what makes you unique..."
             rows={4}
             value={form.bio}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, bio: e.target.value }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
           />
+        </div>
+
+        {/* ⭐ NEW: Experience & Rate Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+              Years of Experience *
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max="50"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="5"
+              value={form.experience_years}
+              onChange={(e) => setForm((f) => ({ ...f, experience_years: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+              Hourly Rate (₦) *
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="15000"
+              value={form.hourly_rate}
+              onChange={(e) => setForm((f) => ({ ...f, hourly_rate: e.target.value }))}
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Minimum rate per hour
+            </p>
+          </div>
+        </div>
+
+        {/* ⭐ NEW: Genres Selection */}
+        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+            Music Genres (Select all that apply) *
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {GENRES.map((genre) => (
+              <button
+                key={genre}
+                type="button"
+                onClick={() => toggleGenre(genre)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  form.genres.includes(genre)
+                    ? "bg-purple-600 text-white shadow-md"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                }`}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+          {form.genres.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              {form.genres.length} genre{form.genres.length > 1 ? 's' : ''} selected
+            </p>
+          )}
         </div>
 
         {/* YouTube */}
@@ -232,9 +334,7 @@ export default function UpdateProfileForm() {
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             placeholder="https://youtube.com/..."
             value={form.youtube}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, youtube: e.target.value }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, youtube: e.target.value }))}
           />
         </div>
 
@@ -244,58 +344,60 @@ export default function UpdateProfileForm() {
             Social Media
           </h3>
           
-          {/* Instagram */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Instagram
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="@username"
-              value={form.socials.instagram}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  socials: { ...f.socials, instagram: e.target.value },
-                }))
-              }
-            />
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Instagram */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Instagram
+              </label>
+              <input
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="@username"
+                value={form.socials.instagram}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    socials: { ...f.socials, instagram: e.target.value },
+                  }))
+                }
+              />
+            </div>
 
-          {/* Twitter */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Twitter / X
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="@username"
-              value={form.socials.twitter}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  socials: { ...f.socials, twitter: e.target.value },
-                }))
-              }
-            />
-          </div>
+            {/* Twitter */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Twitter / X
+              </label>
+              <input
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="@username"
+                value={form.socials.twitter}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    socials: { ...f.socials, twitter: e.target.value },
+                  }))
+                }
+              />
+            </div>
 
-          {/* TikTok */}
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              TikTok
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="@username"
-              value={form.socials.tiktok}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  socials: { ...f.socials, tiktok: e.target.value },
-                }))
-              }
-            />
+            {/* TikTok */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                TikTok
+              </label>
+              <input
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="@username"
+                value={form.socials.tiktok}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    socials: { ...f.socials, tiktok: e.target.value },
+                  }))
+                }
+              />
+            </div>
           </div>
         </div>
 
@@ -351,21 +453,31 @@ export default function UpdateProfileForm() {
 
         {/* Availability Toggle */}
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
             <input
               type="checkbox"
               checked={form.available}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, available: e.target.checked }))
-              }
-              className="w-5 h-5 text-purple-600 focus:ring-purple-500 rounded"
+              onChange={(e) => {
+                console.log('📌 Availability toggled:', e.target.checked);
+                setForm((f) => ({ ...f, available: e.target.checked }));
+              }}
+              className="w-5 h-5 text-purple-600 focus:ring-purple-500 rounded cursor-pointer"
             />
-            <div>
-              <span className="font-medium text-gray-900 dark:text-white">
-                Available for booking
-              </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Clients can request to book you for events
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  Available for booking
+                </span>
+                {form.available && (
+                  <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {form.available 
+                  ? "Clients can request to book you for events" 
+                  : "You won't appear in search results for new bookings"}
               </p>
             </div>
           </label>
@@ -394,5 +506,3 @@ export default function UpdateProfileForm() {
     </div>
   );
 }
-
-

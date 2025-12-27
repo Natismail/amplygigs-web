@@ -1,3 +1,5 @@
+//src/app/(app)/musician/earnings/page.js
+
 "use client"
 
 import { useState, useEffect, useCallback } from 'react';
@@ -6,73 +8,6 @@ import { supabase } from '@/lib/supabaseClient';
 import WithdrawalRequest from '@/components/WithdrawalRequest';
 import BankAccountManager from '@/components/BankAccountManager';
 
-// export default function MusicianEarningsPage() {
-//   const { user, loading: authLoading, session } = useAuth();
-//   const [wallet, setWallet] = useState(null);
-//   const [withdrawals, setWithdrawals] = useState([]);
-//   const [transactions, setTransactions] = useState([]);
-//   const [activeTab, setActiveTab] = useState('overview');
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     if (user && !authLoading) {
-//       fetchWalletData();
-//       fetchWithdrawals();
-//       fetchTransactions();
-//     }
-//   }, [user, authLoading, fetchWalletData, fetchWithdrawals, fetchTransactions]);
-
-//   // eslint-disable-next-line react-hooks/exhaustive-deps
-//   const fetchWalletData = useCallback(async () => {
-//     try {
-//       const response = await fetch('/api/earnings', {
-//         headers: {
-//           'Authorization': `Bearer ${session.access_token}`,
-//           'Content-Type': 'application/json',
-//         },
-//       });
-      
-//       const data = await response.json();
-//       setWallet({
-//         available_balance: data.available || 0,
-//         ledger_balance: data.ledger || 0,
-//         total_earnings: data.totalEarnings || 0,
-//         currency: data.currency || 'NGN'
-//       });
-//     } catch (error) {
-//       console.error('Failed to fetch wallet:', error);
-//     } finally {
-//       setLoading(false);
-//     }
-//   });
-
-//   // eslint-disable-next-line react-hooks/exhaustive-deps
-//   const fetchWithdrawals = useCallback(async () => {
-//     const { data, error } = await supabase
-//       .from('withdrawals')
-//       .select('*, bank_accounts(*)')
-//       .eq('musician_id', user?.id)
-//       .order('created_at', { ascending: false })
-//       .limit(10);
-
-//     if (!error) {
-//       setWithdrawals(data || []);
-//     }
-//   });
-
-//   // eslint-disable-next-line react-hooks/exhaustive-deps
-//   const fetchTransactions = useCallback(async () => {
-//     const { data, error } = await supabase
-//       .from('transactions')
-//       .select('*')
-//       .eq('musician_id', user?.id)
-//       .order('created_at', { ascending: false })
-//       .limit(20);
-
-//     if (!error) {
-//       setTransactions(data || []);
-//     }
-//   });
 
 
 
