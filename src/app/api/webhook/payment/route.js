@@ -1,4 +1,4 @@
-// src/app/api/webhook/payment/route.js
+// src/app/api/webhook/payment/route.js - UPDATED WITH ESCROW INTEGRATION
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,18 +34,20 @@ async function handlePaystackWebhook(body, signature) {
       .digest('hex');
 
     if (hash !== signature) {
-      console.error('Invalid Paystack signature');
+      console.error('❌ Invalid Paystack signature');
       return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     const payload = JSON.parse(body);
-    console.log('Paystack webhook received:', payload.event);
+    console.log('📨 Paystack webhook received:', payload.event);
 
     // Handle successful charge
     if (payload.event === 'charge.success') {
       const { data } = payload;
       const txRef = data.reference;
       const bookingId = data.metadata?.booking_id;
+
+      console.log('💳 Processing payment:', { txRef, bookingId });
 
       // Find transaction
       const { data: transaction, error: txError } = await supabase
@@ -55,12 +57,13 @@ async function handlePaystackWebhook(body, signature) {
         .single();
 
       if (txError || !transaction) {
-        console.error('Transaction not found:', txRef);
+        console.error('❌ Transaction not found:', txRef);
         return Response.json({ error: 'Transaction not found' }, { status: 404 });
       }
 
       // Prevent duplicate processing
       if (transaction.payment_status === 'successful') {
+        console.log('⚠️ Already processed:', txRef);
         return Response.json({ message: 'Already processed' }, { status: 200 });
       }
 
@@ -83,29 +86,35 @@ async function handlePaystackWebhook(body, signature) {
         })
         .eq('id', transaction.id);
 
+      console.log('✅ Transaction updated');
+
       // Update booking
       await supabase
         .from('bookings')
         .update({
           payment_status: 'paid',
           transaction_id: transaction.id,
-          escrow_amount: transaction.net_amount,
-          payment_verified_at: new Date().toISOString()
+          payment_reference: txRef,
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      // Add to musician's ledger
-      await updateMusicianLedger(transaction.musician_id, transaction.net_amount);
+      console.log('✅ Booking updated');
 
-      console.log(`✅ Paystack payment processed: ${txRef}`);
+      // ⭐ ADD TO ESCROW (UPDATED FUNCTION)
+      await addToEscrow(transaction, txRef);
+
+      console.log('🎉 Paystack payment processed successfully:', txRef);
       
-      // TODO: Send notifications
       return Response.json({ success: true, message: 'Payment processed' });
     }
 
     // Handle failed charges
     if (payload.event === 'charge.failed') {
       const txRef = payload.data.reference;
+      
+      console.log('❌ Payment failed:', txRef);
       
       await supabase
         .from('transactions')
@@ -117,12 +126,12 @@ async function handlePaystackWebhook(body, signature) {
         })
         .eq('transaction_ref', txRef);
 
-      console.log(`❌ Paystack payment failed: ${txRef}`);
+      console.log('Transaction marked as failed');
     }
 
     return Response.json({ success: true });
   } catch (error) {
-    console.error('Paystack webhook error:', error);
+    console.error('❌ Paystack webhook error:', error);
     return Response.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
@@ -134,17 +143,19 @@ async function handleFlutterwaveWebhook(body, signature) {
     const secretHash = process.env.FLUTTERWAVE_SECRET_HASH;
     
     if (signature !== secretHash) {
-      console.error('Invalid Flutterwave signature');
+      console.error('❌ Invalid Flutterwave signature');
       return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     const payload = JSON.parse(body);
-    console.log('Flutterwave webhook received:', payload.event);
+    console.log('📨 Flutterwave webhook received:', payload.event);
 
     if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
-      const { data, meta } = payload;
+      const { data } = payload;
       const txRef = data.tx_ref;
-      const bookingId = meta?.booking_id;
+      const bookingId = data.meta?.booking_id;
+
+      console.log('💳 Processing payment:', { txRef, bookingId });
 
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
@@ -153,11 +164,12 @@ async function handleFlutterwaveWebhook(body, signature) {
         .single();
 
       if (txError || !transaction) {
-        console.error('Transaction not found:', txRef);
+        console.error('❌ Transaction not found:', txRef);
         return Response.json({ error: 'Transaction not found' }, { status: 404 });
       }
 
       if (transaction.payment_status === 'successful') {
+        console.log('⚠️ Already processed:', txRef);
         return Response.json({ message: 'Already processed' }, { status: 200 });
       }
 
@@ -176,24 +188,32 @@ async function handleFlutterwaveWebhook(body, signature) {
         })
         .eq('id', transaction.id);
 
+      console.log('✅ Transaction updated');
+
       await supabase
         .from('bookings')
         .update({
           payment_status: 'paid',
           transaction_id: transaction.id,
-          escrow_amount: transaction.net_amount,
-          payment_verified_at: new Date().toISOString()
+          payment_reference: txRef,
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', bookingId);
 
-      await updateMusicianLedger(transaction.musician_id, transaction.net_amount);
+      console.log('✅ Booking updated');
 
-      console.log(`✅ Flutterwave payment processed: ${txRef}`);
+      // ⭐ ADD TO ESCROW (UPDATED FUNCTION)
+      await addToEscrow(transaction, txRef);
+
+      console.log('🎉 Flutterwave payment processed successfully:', txRef);
       return Response.json({ success: true, message: 'Payment processed' });
     }
 
     if (payload.event === 'charge.completed' && payload.data.status === 'failed') {
       const txRef = payload.data.tx_ref;
+      
+      console.log('❌ Payment failed:', txRef);
       
       await supabase
         .from('transactions')
@@ -205,34 +225,81 @@ async function handleFlutterwaveWebhook(body, signature) {
         })
         .eq('transaction_ref', txRef);
 
-      console.log(`❌ Flutterwave payment failed: ${txRef}`);
+      console.log('Transaction marked as failed');
     }
 
     return Response.json({ success: true });
   } catch (error) {
-    console.error('Flutterwave webhook error:', error);
+    console.error('❌ Flutterwave webhook error:', error);
     return Response.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
 
-// Helper function to update musician ledger
-async function updateMusicianLedger(musicianId, amount) {
-  const { data: wallet, error: walletError } = await supabase
-    .from('musician_wallets')
-    .select('*')
-    .eq('musician_id', musicianId)
-    .single();
+// ⭐ UPDATED FUNCTION - Add to escrow instead of direct wallet update
+async function addToEscrow(transaction, paymentReference) {
+  try {
+    console.log('💰 Adding to escrow:', {
+      booking_id: transaction.booking_id,
+      musician_id: transaction.musician_id,
+      amount: transaction.amount,
+      net_amount: transaction.net_amount
+    });
+    
+    // ⭐ Use the database function to add to ledger balance
+    const { data, error } = await supabase
+      .rpc('add_to_ledger_balance', {
+        p_booking_id: transaction.booking_id,
+        p_musician_id: transaction.musician_id,
+        p_client_id: transaction.client_id,
+        p_gross_amount: transaction.amount,
+        p_platform_fee: transaction.platform_fee || 0,
+        p_paystack_reference: paymentReference
+      });
 
-  if (!walletError && wallet) {
-    const newLedgerBalance = parseFloat(wallet.ledger_balance) + parseFloat(amount);
-    const newTotalEarnings = parseFloat(wallet.total_earnings) + parseFloat(amount);
+    if (error) {
+      console.error('❌ Escrow error:', error);
+      throw error;
+    }
 
+    console.log('✅ Added to escrow. Transaction ID:', data);
+    
+    // Update transaction with escrow info
     await supabase
-      .from('musician_wallets')
+      .from('transactions')
       .update({
-        ledger_balance: newLedgerBalance,
-        total_earnings: newTotalEarnings
+        metadata: {
+          ...transaction.metadata,
+          escrow_transaction_id: data,
+          escrow_added: true,
+          escrow_added_at: new Date().toISOString()
+        }
       })
-      .eq('musician_id', musicianId);
+      .eq('id', transaction.id);
+
+    return { success: true, escrow_transaction_id: data };
+    
+  } catch (error) {
+    console.error('❌ Failed to add to escrow:', error);
+    
+    // Update transaction to indicate escrow failure
+    await supabase
+      .from('transactions')
+      .update({
+        metadata: {
+          ...transaction.metadata,
+          escrow_error: error.message,
+          escrow_failed_at: new Date().toISOString()
+        }
+      })
+      .eq('id', transaction.id);
+    
+    throw error;
   }
 }
+
+// Disable body parsing for raw body access
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};

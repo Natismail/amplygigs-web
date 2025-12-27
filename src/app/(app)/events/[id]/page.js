@@ -62,7 +62,7 @@ export default function EventDetailsPage() {
               hourly_rate,
               genres,
               location,
-              is_available
+              available
             )
           )
         `)

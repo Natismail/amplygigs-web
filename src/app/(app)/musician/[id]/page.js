@@ -67,7 +67,7 @@ export default function MusicianProfilePage() {
         display_name,
         bio,
         role,
-        is_available,
+        available,
         profile_picture_url,
         gadget_specs,
         average_rating,
@@ -344,12 +344,12 @@ export default function MusicianProfilePage() {
               <div className="flex flex-wrap gap-4 mt-4">
                 <span
                   className={`px-4 py-2 rounded-lg font-medium ${
-                    musician.is_available
+                    musician.available
                       ? "bg-green-500/20 text-green-100"
                       : "bg-red-500/20 text-red-100"
                   }`}
                 >
-                  {musician.is_available ? "Available for Bookings" : "Currently Unavailable"}
+                  {musician.available ? "Available for Bookings" : "Currently Unavailable"}
                 </span>
                 {musician.hourly_rate && (
                   <span className="px-4 py-2 bg-white/20 backdrop-blur rounded-lg font-medium">

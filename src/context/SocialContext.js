@@ -1030,71 +1030,91 @@ const fetchNotifications = useCallback(async () => {
 
 
   const markNotificationAsRead = useCallback(async (notificationId) => {
-    if (!user) return { error: 'Not authenticated' };
+  if (!user) return { error: 'Not authenticated' };
 
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId)
-        .eq('user_id', user.id);
+  try {
+    // ⭐ Call API instead of direct Supabase
+    const response = await fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationId, userId: user.id })
+    });
 
-      if (error) throw error;
-
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-      );
-      setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
-
-      return { error: null };
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      return { error };
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to mark as read');
     }
-  }, [user]);
 
-  const markAllNotificationsAsRead = useCallback(async () => {
-    if (!user) return { error: 'Not authenticated' };
+    // Update local state
+    setNotifications(prev => 
+      prev.map(n => n.id === notificationId 
+        ? { ...n, is_read: true, read_at: new Date().toISOString() } 
+        : n
+      )
+    );
+    setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
 
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
+    return { error: null };
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return { error };
+  }
+}, [user]);
 
-      if (error) throw error;
+const markAllNotificationsAsRead = useCallback(async () => {
+  if (!user) return { error: 'Not authenticated' };
 
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadNotificationsCount(0);
+  try {
+    // ⭐ Call API instead of direct Supabase
+    const response = await fetch('/api/notifications/mark-read', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id })
+    });
 
-      return { error: null };
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      return { error };
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to mark all as read');
     }
-  }, [user]);
 
-  const deleteNotification = useCallback(async (notificationId) => {
-    if (!user) return { error: 'Not authenticated' };
+    // Update local state
+    setNotifications(prev => 
+      prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
+    );
+    setUnreadNotificationsCount(0);
 
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId)
-        .eq('user_id', user.id);
+    return { error: null };
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return { error };
+  }
+}, [user]);
 
-      if (error) throw error;
+const deleteNotification = useCallback(async (notificationId) => {
+  if (!user) return { error: 'Not authenticated' };
 
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  try {
+    // ⭐ Call API instead of direct Supabase
+    const response = await fetch(
+      `/api/notifications/mark-read?id=${notificationId}&userId=${user.id}`,
+      { method: 'DELETE' }
+    );
 
-      return { error: null };
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-      return { error };
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to delete notification');
     }
-  }, [user]);
+
+    // Update local state
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
+    return { error: null };
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return { error };
+  }
+}, [user]);
+
 
   const createNotification = useCallback(async ({ 
     userId, 

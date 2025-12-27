@@ -22,7 +22,7 @@ export default function MusicianCard({ musician }) {
     last_name,
     display_name,
     primary_role,
-    is_available,
+    available,
     bio,
     location,
     youtube,
@@ -84,11 +84,11 @@ export default function MusicianCard({ musician }) {
         {/* Availability Badge */}
         <div className="absolute top-3 left-3">
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
-            is_available 
+            available 
               ? 'bg-green-500/90 text-white'
               : 'bg-gray-500/90 text-white'
           }`}>
-            {is_available ? (
+            {available ? (
               <>
                 <CheckCircle className="w-3 h-3" />
                 Available

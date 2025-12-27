@@ -1,4 +1,4 @@
-// src/components/social/ChatWindow.js - IMPROVED UX
+// src/components/social/ChatWindow.js - IMPROVED MOBILE UX
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,6 +7,7 @@ import { useSocial } from '@/context/SocialContext';
 import { useAuth } from '@/context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import Avatar from '@/components/Avatar';
+import { useMarkMessagesRead } from '@/hooks/useMarkMessagesRead';
 
 export default function ChatWindow({ conversation, onBack }) {
   const { user } = useAuth();
@@ -17,10 +18,15 @@ export default function ChatWindow({ conversation, onBack }) {
   const [mediaPreview, setMediaPreview] = useState(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  // ⭐ Auto-mark messages as read
+  useMarkMessagesRead(conversation?.otherUser?.id);
 
   useEffect(() => {
     if (conversation) {
@@ -33,6 +39,7 @@ export default function ChatWindow({ conversation, onBack }) {
         channel?.unsubscribe();
       };
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id]);
 
   useEffect(() => {
@@ -40,16 +47,34 @@ export default function ChatWindow({ conversation, onBack }) {
     scrollToBottom();
   }, [messages]);
 
-  // Auto-resize textarea
+  // ⭐ Detect keyboard open/close on mobile
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
-    }
-  }, [messageText]);
+    if (typeof window === 'undefined') return;
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const handleResize = () => {
+      // On mobile, when keyboard opens, window height decreases
+      const isMobile = window.innerWidth < 1024;
+      if (isMobile) {
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const windowHeight = window.innerHeight;
+        setIsKeyboardOpen(viewportHeight < windowHeight * 0.8);
+      }
+    };
+
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ 
+      behavior: smooth ? 'smooth' : 'auto',
+      block: 'end'
+    });
   };
 
   const handleFileSelect = (e) => {
@@ -91,24 +116,21 @@ export default function ChatWindow({ conversation, onBack }) {
     setError(null);
     
     try {
-      console.log('🚀 Sending message from ChatWindow...');
-      
       const result = await sendMessage(conversation.id, trimmedText, mediaFile);
       
       if (result.error) {
-        console.error('❌ Send failed:', result.error);
         setError(result.error.message || 'Failed to send message');
       } else {
-        console.log('✅ Message sent successfully');
         setMessageText('');
         setMediaFile(null);
         setMediaPreview(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
+        // Scroll immediately after sending
+        setTimeout(() => scrollToBottom(false), 100);
       }
     } catch (err) {
-      console.error('❌ Exception in handleSend:', err);
       setError('An unexpected error occurred');
     } finally {
       setSending(false);
@@ -141,20 +163,20 @@ export default function ChatWindow({ conversation, onBack }) {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+      {/* ⭐ FIXED HEADER - Stays visible even when keyboard opens */}
+      <div className="flex-shrink-0 sticky top-0 z-10 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <button
           onClick={onBack}
-          className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
+          className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition flex-shrink-0"
           aria-label="Back to conversations"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <Avatar user={conversation.otherUser} size="md" />
+        <Avatar user={conversation.otherUser} size="sm" className="flex-shrink-0" />
 
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 dark:text-white truncate">
+          <p className="font-semibold text-sm lg:text-base text-gray-900 dark:text-white truncate">
             {conversation.otherUser?.first_name} {conversation.otherUser?.last_name}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 capitalize truncate">
@@ -163,15 +185,24 @@ export default function ChatWindow({ conversation, onBack }) {
         </div>
 
         <button 
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
+          className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
           aria-label="More options"
         >
           <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
+      {/* ⭐ MESSAGES - Flexible height, handles keyboard */}
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4 bg-gray-50 dark:bg-gray-950"
+        style={{
+          // ⭐ This ensures messages area shrinks when keyboard opens
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center p-8">
@@ -193,11 +224,11 @@ export default function ChatWindow({ conversation, onBack }) {
                 >
                   {!isOwn && (
                     <div className="flex-shrink-0 mt-auto">
-                      <Avatar user={message.sender || conversation.otherUser} size="sm" />
+                      <Avatar user={message.sender || conversation.otherUser} size="xs" className="lg:w-8 lg:h-8" />
                     </div>
                   )}
 
-                  <div className={`flex flex-col max-w-[75%] sm:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] lg:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
                     {/* Media */}
                     {message.media_url && (
                       <div className="mb-2 rounded-lg overflow-hidden shadow-md">
@@ -205,14 +236,14 @@ export default function ChatWindow({ conversation, onBack }) {
                           <img
                             src={message.media_url}
                             alt="Message media"
-                            className="max-w-full max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition"
+                            className="max-w-full max-h-48 lg:max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition"
                             onClick={() => window.open(message.media_url, '_blank')}
                           />
                         ) : (
                           <video
                             src={message.media_url}
                             controls
-                            className="max-w-full max-h-64 rounded-lg"
+                            className="max-w-full max-h-48 lg:max-h-64 rounded-lg"
                           />
                         )}
                       </div>
@@ -221,7 +252,7 @@ export default function ChatWindow({ conversation, onBack }) {
                     {/* Text */}
                     {message.content && (
                       <div
-                        className={`px-4 py-2 rounded-2xl shadow-sm ${
+                        className={`px-3 py-2 lg:px-4 lg:py-2 rounded-2xl shadow-sm ${
                           isOwn
                             ? 'bg-purple-600 text-white rounded-br-none'
                             : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-200 dark:border-gray-700'
@@ -245,15 +276,15 @@ export default function ChatWindow({ conversation, onBack }) {
         )}
       </div>
 
-      {/* Error Message */}
+      {/* ⭐ ERROR MESSAGE - Compact on mobile */}
       {error && (
-        <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
+        <div className="flex-shrink-0 px-3 py-2 lg:px-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+          <div className="flex items-center gap-2 text-xs lg:text-sm text-red-800 dark:text-red-200">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{error}</span>
+            <span className="flex-1 truncate">{error}</span>
             <button
               onClick={() => setError(null)}
-              className="ml-auto text-red-600 hover:text-red-700 dark:text-red-400"
+              className="flex-shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
             >
               <X className="w-4 h-4" />
             </button>
@@ -261,27 +292,30 @@ export default function ChatWindow({ conversation, onBack }) {
         </div>
       )}
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        {/* Media Preview */}
+      {/* ⭐ INPUT AREA - Fixed at bottom, compact on mobile */}
+      <form 
+        onSubmit={handleSend} 
+        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+      >
+        {/* Media Preview - More compact on mobile */}
         {mediaPreview && (
-          <div className="mb-3 relative inline-block animate-fade-in">
+          <div className="mb-2 relative inline-block animate-fade-in">
             <div className="relative">
               <img
                 src={mediaPreview}
                 alt="Preview"
-                className="max-w-32 max-h-32 rounded-lg border-2 border-purple-200 dark:border-purple-800"
+                className="max-w-24 max-h-24 lg:max-w-32 lg:max-h-32 rounded-lg border-2 border-purple-200 dark:border-purple-800"
               />
               <button
                 type="button"
                 onClick={removeMedia}
-                className="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-lg transition"
+                className="absolute -top-1 -right-1 lg:-top-2 lg:-right-2 p-1 lg:p-1.5 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-lg transition"
                 aria-label="Remove media"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3 lg:w-4 lg:h-4" />
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-32">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-24 lg:max-w-32">
               {mediaFile?.name}
             </p>
           </div>
@@ -296,55 +330,53 @@ export default function ChatWindow({ conversation, onBack }) {
             className="hidden"
           />
           
+          {/* ⭐ Attachment button - Slightly smaller on mobile */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending}
-            className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition disabled:opacity-50"
+            className="flex-shrink-0 p-2 lg:p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition disabled:opacity-50"
             aria-label="Attach media"
           >
-            <Paperclip className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <Paperclip className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600 dark:text-gray-400" />
           </button>
 
+          {/* ⭐ Text input - Single line on mobile */}
           <div className="flex-1 relative">
-            <textarea
+            <input
               ref={textareaRef}
+              type="text"
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message... (Press Enter to send)"
+              placeholder="Type a message..."
               disabled={sending}
-              rows={1}
-              className="w-full px-4 py-2.5 pr-12 bg-gray-100 dark:bg-gray-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none disabled:opacity-50 transition"
-              style={{ maxHeight: '120px' }}
+              maxLength={1000}
+              className="w-full px-3 py-2 lg:px-4 lg:py-2.5 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm lg:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 transition"
             />
-            <div className="absolute bottom-2 right-2 text-xs text-gray-400">
-              {messageText.length > 0 && (
-                <span className={messageText.length > 1000 ? 'text-red-500' : ''}>
-                  {messageText.length}/1000
-                </span>
-              )}
-            </div>
           </div>
 
+          {/* ⭐ Send button */}
           <button
             type="submit"
             disabled={(!messageText.trim() && !mediaFile) || sending || messageText.length > 1000}
-            className="p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+            className="flex-shrink-0 p-2 lg:p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
             aria-label="Send message"
           >
             {sending ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
             ) : (
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4 lg:w-5 lg:h-5" />
             )}
           </button>
         </div>
 
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-          Press <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> to send, 
-          <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs ml-1">Shift+Enter</kbd> for new line
-        </p>
+        {/* ⭐ Hide keyboard hint when keyboard is open on mobile */}
+        {!isKeyboardOpen && (
+          <p className="hidden lg:block text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+            Press <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> to send
+          </p>
+        )}
       </form>
     </div>
   );
