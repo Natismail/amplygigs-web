@@ -1,4 +1,4 @@
-// src/components/social/ChatWindow.js - FINAL MOBILE FIX
+// src/components/social/ChatWindow.js - WORKING VERSION
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -21,7 +21,7 @@ export default function ChatWindow({ conversation, onBack }) {
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const containerRef = useRef(null);
+  const textareaRef = useRef(null);
 
   // ⭐ Auto-mark messages as read
   useMarkMessagesRead(conversation?.otherUser?.id);
@@ -38,27 +38,13 @@ export default function ChatWindow({ conversation, onBack }) {
     scrollToBottom();
   }, [messages]);
 
-  // ⭐ CRITICAL: Prevent body scroll when keyboard opens
+  // ⭐ Auto-resize textarea
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const preventScroll = (e) => {
-      if (containerRef.current?.contains(e.target)) {
-        e.preventDefault();
-      }
-    };
-
-    // Lock body scroll on mobile
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.overflow = '';
-    };
-  }, []);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [messageText]);
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ 
@@ -119,10 +105,12 @@ export default function ChatWindow({ conversation, onBack }) {
   };
 
   const handleKeyDown = (e) => {
+    // ⭐ CRITICAL: Allow Shift+Enter for new lines
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
     }
+    // ⭐ If Shift+Enter, do nothing - let browser handle line break
   };
 
   if (!conversation) {
@@ -142,18 +130,10 @@ export default function ChatWindow({ conversation, onBack }) {
   }
 
   return (
-    // ⭐ CRITICAL FIX: Use dvh (dynamic viewport height) + flex
-    <div 
-      ref={containerRef}
-      className="flex flex-col bg-white dark:bg-gray-900"
-      style={{
-        height: '100dvh', // ⭐ Dynamic viewport height (mobile-safe)
-        maxHeight: '100dvh',
-        overflow: 'hidden',
-      }}
-    >
-      {/* ⭐ HEADER - Fixed position */}
-      <div className="flex-shrink-0 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm z-10">
+    // ⭐ FIXED: Use h-full instead of 100dvh
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+      {/* ⭐ HEADER - Sticky at top */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <button
           onClick={onBack}
           className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
@@ -177,14 +157,8 @@ export default function ChatWindow({ conversation, onBack }) {
         </button>
       </div>
 
-      {/* ⭐ MESSAGES - Scrollable area */}
-      <div 
-        className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-gray-50 dark:bg-gray-950"
-        style={{
-          overscrollBehavior: 'contain',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
+      {/* ⭐ MESSAGES - Flexible scrollable area */}
+      <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-gray-50 dark:bg-gray-950">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center p-8">
@@ -217,7 +191,7 @@ export default function ChatWindow({ conversation, onBack }) {
                           <img
                             src={message.media_url}
                             alt="Message media"
-                            className="max-w-full max-h-48 rounded-lg"
+                            className="max-w-full max-h-48 rounded-lg cursor-pointer"
                             onClick={() => window.open(message.media_url, '_blank')}
                           />
                         ) : (
@@ -244,7 +218,7 @@ export default function ChatWindow({ conversation, onBack }) {
                       </div>
                     )}
 
-                    <span className="text-xs text-gray-500 mt-1 px-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-2">
                       {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                     </span>
                   </div>
@@ -258,7 +232,7 @@ export default function ChatWindow({ conversation, onBack }) {
 
       {/* ERROR */}
       {error && (
-        <div className="flex-shrink-0 px-3 py-2 bg-red-50 dark:bg-red-900/20">
+        <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
           <div className="flex items-center gap-2 text-xs text-red-800 dark:text-red-200">
             <AlertCircle className="w-4 h-4" />
             <span className="flex-1">{error}</span>
@@ -269,13 +243,10 @@ export default function ChatWindow({ conversation, onBack }) {
         </div>
       )}
 
-      {/* ⭐ INPUT - Fixed at bottom */}
+      {/* ⭐ INPUT - Always visible at bottom */}
       <form 
         onSubmit={handleSend} 
-        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom, 12px)',
-        }}
+        className="p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
       >
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
@@ -307,31 +278,37 @@ export default function ChatWindow({ conversation, onBack }) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
+            className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition disabled:opacity-50"
           >
             <Paperclip className="w-4 h-4 lg:w-5 lg:h-5" />
           </button>
 
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={sending}
             maxLength={1000}
-            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            rows={1}
+            className="flex-1 px-3 py-2 lg:px-4 lg:py-2.5 bg-gray-100 dark:bg-gray-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm lg:text-base resize-none"
+            style={{
+              minHeight: '40px',
+              maxHeight: '128px',
+              overflowY: 'auto',
+            }}
           />
 
           <button
             type="submit"
             disabled={(!messageText.trim() && !mediaFile) || sending}
-            className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50"
+            className="flex-shrink-0 p-2 lg:p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50 shadow-lg"
           >
             {sending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
             ) : (
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 lg:w-5 lg:h-5" />
             )}
           </button>
         </div>

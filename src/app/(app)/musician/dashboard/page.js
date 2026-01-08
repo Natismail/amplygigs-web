@@ -135,11 +135,11 @@ useEffect(() => {
       {/* Mobile Header - Sticky */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-4 safe-top">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+          <div> 
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-4 px-4">
               🎵 Dashboard
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400 px-8">
               Welcome back, {profile.first_name}!
             </p>
           </div>
