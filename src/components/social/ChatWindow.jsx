@@ -1,4 +1,4 @@
-// src/components/social/ChatWindow.js - FIXED MOBILE LAYOUT
+// src/components/social/ChatWindow.js - FINAL MOBILE FIX
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -21,7 +21,7 @@ export default function ChatWindow({ conversation, onBack }) {
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const textareaRef = useRef(null);
+  const containerRef = useRef(null);
 
   // ⭐ Auto-mark messages as read
   useMarkMessagesRead(conversation?.otherUser?.id);
@@ -29,20 +29,36 @@ export default function ChatWindow({ conversation, onBack }) {
   useEffect(() => {
     if (conversation) {
       fetchMessages(conversation.id);
-      
-      // Subscribe to realtime messages
       const channel = subscribeToMessages(conversation.id);
-      
-      return () => {
-        channel?.unsubscribe();
-      };
+      return () => channel?.unsubscribe();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id]);
+  }, [conversation?.id, fetchMessages, subscribeToMessages]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // ⭐ CRITICAL: Prevent body scroll when keyboard opens
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const preventScroll = (e) => {
+      if (containerRef.current?.contains(e.target)) {
+        e.preventDefault();
+      }
+    };
+
+    // Lock body scroll on mobile
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ 
@@ -64,25 +80,20 @@ export default function ChatWindow({ conversation, onBack }) {
     setError(null);
     
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setMediaPreview(reader.result);
-    };
+    reader.onloadend = () => setMediaPreview(reader.result);
     reader.readAsDataURL(file);
   };
 
   const removeMedia = () => {
     setMediaFile(null);
     setMediaPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSend = async (e) => {
     e.preventDefault();
     
     const trimmedText = messageText.trim();
-    
     if (!trimmedText && !mediaFile) return;
 
     setSending(true);
@@ -97,9 +108,7 @@ export default function ChatWindow({ conversation, onBack }) {
         setMessageText('');
         setMediaFile(null);
         setMediaPreview(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setTimeout(() => scrollToBottom(false), 100);
       }
     } catch (err) {
@@ -133,19 +142,26 @@ export default function ChatWindow({ conversation, onBack }) {
   }
 
   return (
-    // ⭐ CRITICAL FIX: Use fixed height instead of h-full to prevent pushing
-    <div className="fixed inset-0 lg:relative lg:h-full flex flex-col bg-white dark:bg-gray-900">
-      {/* ⭐ HEADER - Always visible, never pushed away */}
-      <div className="flex-shrink-0 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+    // ⭐ CRITICAL FIX: Use dvh (dynamic viewport height) + flex
+    <div 
+      ref={containerRef}
+      className="flex flex-col bg-white dark:bg-gray-900"
+      style={{
+        height: '100dvh', // ⭐ Dynamic viewport height (mobile-safe)
+        maxHeight: '100dvh',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ⭐ HEADER - Fixed position */}
+      <div className="flex-shrink-0 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm z-10">
         <button
           onClick={onBack}
-          className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition flex-shrink-0"
-          aria-label="Back to conversations"
+          className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <Avatar user={conversation.otherUser} size="sm" className="flex-shrink-0" />
+        <Avatar user={conversation.otherUser} size="sm" />
 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm lg:text-base text-gray-900 dark:text-white truncate">
@@ -156,21 +172,17 @@ export default function ChatWindow({ conversation, onBack }) {
           </p>
         </div>
 
-        <button 
-          className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
-          aria-label="More options"
-        >
-          <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
+          <MoreVertical className="w-5 h-5" />
         </button>
       </div>
 
-      {/* ⭐ MESSAGES - Flexible, scrollable area */}
+      {/* ⭐ MESSAGES - Scrollable area */}
       <div 
-        className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4 bg-gray-50 dark:bg-gray-950"
+        className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-gray-50 dark:bg-gray-950"
         style={{
-          // ⭐ Critical for mobile keyboard
-          height: '1px', // Forces flex-1 to work correctly
-          minHeight: 0,
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {messages.length === 0 ? (
@@ -190,51 +202,49 @@ export default function ChatWindow({ conversation, onBack }) {
               return (
                 <div
                   key={message.id}
-                  className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                  className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isOwn && (
                     <div className="flex-shrink-0 mt-auto">
-                      <Avatar user={message.sender || conversation.otherUser} size="xs" className="lg:w-8 lg:h-8" />
+                      <Avatar user={message.sender || conversation.otherUser} size="xs" />
                     </div>
                   )}
 
-                  <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] lg:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {/* Media */}
+                  <div className={`flex flex-col max-w-[80%] sm:max-w-[75%] ${isOwn ? 'items-end' : 'items-start'}`}>
                     {message.media_url && (
-                      <div className="mb-2 rounded-lg overflow-hidden shadow-md">
+                      <div className="mb-2 rounded-lg overflow-hidden">
                         {message.media_type === 'image' ? (
                           <img
                             src={message.media_url}
                             alt="Message media"
-                            className="max-w-full max-h-48 lg:max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition"
+                            className="max-w-full max-h-48 rounded-lg"
                             onClick={() => window.open(message.media_url, '_blank')}
                           />
                         ) : (
                           <video
                             src={message.media_url}
                             controls
-                            className="max-w-full max-h-48 lg:max-h-64 rounded-lg"
+                            className="max-w-full max-h-48 rounded-lg"
                           />
                         )}
                       </div>
                     )}
 
-                    {/* Text */}
                     {message.content && (
                       <div
-                        className={`px-3 py-2 lg:px-4 lg:py-2 rounded-2xl shadow-sm ${
+                        className={`px-3 py-2 rounded-2xl ${
                           isOwn
                             ? 'bg-purple-600 text-white rounded-br-none'
                             : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-200 dark:border-gray-700'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                        <p className="text-sm whitespace-pre-wrap break-words">
                           {message.content}
                         </p>
                       </div>
                     )}
 
-                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-2">
+                    <span className="text-xs text-gray-500 mt-1 px-2">
                       {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
                     </span>
                   </div>
@@ -246,48 +256,41 @@ export default function ChatWindow({ conversation, onBack }) {
         )}
       </div>
 
-      {/* ERROR MESSAGE */}
+      {/* ERROR */}
       {error && (
-        <div className="flex-shrink-0 px-3 py-2 lg:px-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 text-xs lg:text-sm text-red-800 dark:text-red-200">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1 truncate">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="flex-shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
-            >
+        <div className="flex-shrink-0 px-3 py-2 bg-red-50 dark:bg-red-900/20">
+          <div className="flex items-center gap-2 text-xs text-red-800 dark:text-red-200">
+            <AlertCircle className="w-4 h-4" />
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError(null)}>
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* ⭐ INPUT - Fixed at bottom, safe area aware */}
+      {/* ⭐ INPUT - Fixed at bottom */}
       <form 
         onSubmit={handleSend} 
-        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pb-safe"
+        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 12px)',
+        }}
       >
-        {/* Media Preview */}
         {mediaPreview && (
-          <div className="mb-2 relative inline-block animate-fade-in">
-            <div className="relative">
-              <img
-                src={mediaPreview}
-                alt="Preview"
-                className="max-w-24 max-h-24 lg:max-w-32 lg:max-h-32 rounded-lg border-2 border-purple-200 dark:border-purple-800"
-              />
-              <button
-                type="button"
-                onClick={removeMedia}
-                className="absolute -top-1 -right-1 lg:-top-2 lg:-right-2 p-1 lg:p-1.5 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-lg transition"
-                aria-label="Remove media"
-              >
-                <X className="w-3 h-3 lg:w-4 lg:h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-24 lg:max-w-32">
-              {mediaFile?.name}
-            </p>
+          <div className="mb-2 relative inline-block">
+            <img
+              src={mediaPreview}
+              alt="Preview"
+              className="max-w-24 max-h-24 rounded-lg border-2 border-purple-200"
+            />
+            <button
+              type="button"
+              onClick={removeMedia}
+              className="absolute -top-1 -right-1 p-1 bg-red-500 rounded-full text-white"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
         )}
 
@@ -304,36 +307,31 @@ export default function ChatWindow({ conversation, onBack }) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending}
-            className="flex-shrink-0 p-2 lg:p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition disabled:opacity-50"
-            aria-label="Attach media"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
           >
-            <Paperclip className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600 dark:text-gray-400" />
+            <Paperclip className="w-4 h-4 lg:w-5 lg:h-5" />
           </button>
 
-          <div className="flex-1 relative">
-            <input
-              ref={textareaRef}
-              type="text"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              disabled={sending}
-              maxLength={1000}
-              className="w-full px-3 py-2 lg:px-4 lg:py-2.5 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm lg:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 transition"
-            />
-          </div>
+          <input
+            type="text"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message..."
+            disabled={sending}
+            maxLength={1000}
+            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+          />
 
           <button
             type="submit"
             disabled={(!messageText.trim() && !mediaFile) || sending}
-            className="flex-shrink-0 p-2 lg:p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-            aria-label="Send message"
+            className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50"
           >
             {sending ? (
-              <Loader2 className="w-4 h-4 lg:w-5 lg:h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Send className="w-4 h-4 lg:w-5 lg:h-5" />
+              <Send className="w-4 h-4" />
             )}
           </button>
         </div>

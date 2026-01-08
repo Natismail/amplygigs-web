@@ -1,4 +1,4 @@
-// src/app/api/messages/mark-read/route.js
+// src/app/api/messages/mark-read/route.js - UPDATED VERSION
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -17,28 +17,30 @@ export async function POST(req) {
       );
     }
 
-    // Mark single message as read
+    // ⭐ CRITICAL: Mark single message as read (update BOTH fields)
     const { error } = await supabase
       .from('messages')
       .update({ 
-        is_read: true,
+        read: true,        // ⭐ Primary read field
+        is_read: true,     // ⭐ Compatibility field
         read_at: new Date().toISOString()
       })
       .eq('id', messageId)
-      .eq('receiver_id', userId); // Only receiver can mark as read
+      .eq('receiver_id', userId);
 
     if (error) {
-      console.error('Error marking message as read:', error);
+      console.error('❌ Error marking message as read:', error);
       return Response.json(
         { error: 'Failed to mark message as read' },
         { status: 500 }
       );
     }
 
+    console.log('✅ Message marked as read:', messageId);
     return Response.json({ success: true });
 
   } catch (error) {
-    console.error('Mark message as read error:', error);
+    console.error('❌ Mark message as read error:', error);
     return Response.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -46,7 +48,7 @@ export async function POST(req) {
   }
 }
 
-// Mark all messages in a conversation as read
+// ⭐ Mark all messages in a conversation as read
 export async function PUT(req) {
   try {
     const { conversationPartnerId, userId } = await req.json();
@@ -58,29 +60,39 @@ export async function PUT(req) {
       );
     }
 
-    // Mark all messages from the partner as read
-    const { error } = await supabase
+    console.log('📨 Marking all messages as read:', { conversationPartnerId, userId });
+
+    // ⭐ CRITICAL: Mark all unread messages from partner (update BOTH fields)
+    const { data, error } = await supabase
       .from('messages')
       .update({ 
-        is_read: true,
+        read: true,        // ⭐ Primary read field
+        is_read: true,     // ⭐ Compatibility field
         read_at: new Date().toISOString()
       })
       .eq('sender_id', conversationPartnerId)
       .eq('receiver_id', userId)
-      .eq('is_read', false); // Only update unread messages
+      .eq('read', false)  // Only unread messages
+      .select();          // ⭐ Return updated rows
 
     if (error) {
-      console.error('Error marking conversation as read:', error);
+      console.error('❌ Error marking conversation as read:', error);
       return Response.json(
         { error: 'Failed to mark messages as read' },
         { status: 500 }
       );
     }
 
-    return Response.json({ success: true });
+    console.log('✅ Marked messages as read:', data?.length || 0);
+    
+    // ⭐ CRITICAL: Trigger event to refresh unread count
+    return Response.json({ 
+      success: true,
+      count: data?.length || 0
+    });
 
   } catch (error) {
-    console.error('Mark conversation as read error:', error);
+    console.error('❌ Mark conversation as read error:', error);
     return Response.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -110,17 +122,18 @@ export async function DELETE(req) {
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
 
     if (error) {
-      console.error('Error deleting message:', error);
+      console.error('❌ Error deleting message:', error);
       return Response.json(
         { error: 'Failed to delete message' },
         { status: 500 }
       );
     }
 
+    console.log('✅ Message deleted:', messageId);
     return Response.json({ success: true });
 
   } catch (error) {
-    console.error('Delete message error:', error);
+    console.error('❌ Delete message error:', error);
     return Response.json(
       { error: 'Internal server error' },
       { status: 500 }
