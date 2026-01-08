@@ -29,6 +29,8 @@ export const SocialProvider = ({ children }) => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+   const [unreadCount, setUnreadCount] = useState(0);
+  
 
   const [loading, setLoading] = useState({
     posts: false,
@@ -38,6 +40,8 @@ export const SocialProvider = ({ children }) => {
     conversations: false,
   });
 
+
+  
 
 
   // =====================================================
@@ -925,6 +929,187 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
 }, [user, conversations, setMessages]);
 
 
+
+  // ⭐ Fetch unread message count
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user?.id) {
+      console.log('⏸️ No user, skipping unread count fetch');
+      return;
+    }
+
+    try {
+      console.log('🔔 Fetching unread message count for user:', user.id);
+      
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('read', false);
+
+      if (error) {
+        console.error('❌ Error fetching unread count:', error);
+        return;
+      }
+
+      console.log('✅ Unread count:', count);
+      setUnreadCount(count || 0);
+    } catch (err) {
+      console.error('❌ Exception fetching unread count:', err);
+    }
+  }, [user?.id]);
+
+  // // ⭐ Fetch conversations
+  // const fetchConversations = useCallback(async () => {
+  //   if (!user?.id) return;
+
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('conversations')
+  //       .select(`
+  //         *,
+  //         messages (
+  //           id,
+  //           content,
+  //           created_at,
+  //           read,
+  //           sender_id
+  //         )
+  //       `)
+  //       .or(`participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
+  //       .order('updated_at', { ascending: false });
+
+  //     if (error) throw error;
+  //     setConversations(data || []);
+  //   } catch (error) {
+  //     console.error('Error fetching conversations:', error);
+  //   }
+  // }, [user?.id]);
+
+  // // ⭐ Fetch messages for a conversation
+  // const fetchMessages = useCallback(async (conversationId) => {
+  //   if (!conversationId) return;
+
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('messages')
+  //       .select(`
+  //         *,
+  //         sender:sender_id (
+  //           id,
+  //           first_name,
+  //           last_name,
+  //           profile_picture_url,
+  //           role
+  //         )
+  //       `)
+  //       .eq('conversation_id', conversationId)
+  //       .order('created_at', { ascending: true });
+
+  //     if (error) throw error;
+  //     setMessages(data || []);
+  //   } catch (error) {
+  //     console.error('Error fetching messages:', error);
+  //   }
+  // }, []);
+
+  // // ⭐ Send a message
+  // const sendMessage = useCallback(async (conversationId, content, mediaFile = null) => {
+  //   if (!user?.id) return { error: { message: 'Not authenticated' } };
+
+  //   try {
+  //     let mediaUrl = null;
+  //     let mediaType = null;
+
+  //     // Upload media if provided
+  //     if (mediaFile) {
+  //       const fileExt = mediaFile.name.split('.').pop();
+  //       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+  //       const { data: uploadData, error: uploadError } = await supabase.storage
+  //         .from('message-media')
+  //         .upload(fileName, mediaFile);
+
+  //       if (uploadError) throw uploadError;
+
+  //       const { data: { publicUrl } } = supabase.storage
+  //         .from('message-media')
+  //         .getPublicUrl(fileName);
+
+  //       mediaUrl = publicUrl;
+  //       mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
+  //     }
+
+  //     // Insert message
+  //     const { data, error } = await supabase
+  //       .from('messages')
+  //       .insert({
+  //         conversation_id: conversationId,
+  //         sender_id: user.id,
+  //         content: content || null,
+  //         media_url: mediaUrl,
+  //         media_type: mediaType,
+  //       })
+  //       .select()
+  //       .single();
+
+  //     if (error) throw error;
+
+  //     // Update conversation timestamp
+  //     await supabase
+  //       .from('conversations')
+  //       .update({ updated_at: new Date().toISOString() })
+  //       .eq('id', conversationId);
+
+  //     return { data, error: null };
+  //   } catch (error) {
+  //     console.error('Error sending message:', error);
+  //     return { data: null, error };
+  //   }
+  // }, [user?.id]);
+
+  // // ⭐ Subscribe to messages for a conversation
+  // const subscribeToMessages = useCallback((conversationId) => {
+  //   const channel = supabase
+  //     .channel(`messages:${conversationId}`)
+  //     .on(
+  //       'postgres_changes',
+  //       {
+  //         event: 'INSERT',
+  //         schema: 'public',
+  //         table: 'messages',
+  //         filter: `conversation_id=eq.${conversationId}`,
+  //       },
+  //       (payload) => {
+  //         console.log('📨 New message received:', payload.new);
+  //         setMessages((prev) => [...prev, payload.new]);
+  //       }
+  //     )
+  //     .subscribe();
+
+  //   return channel;
+  // }, []);
+
+  // ⭐ Listen for messagesRead events to refresh unread count
+  useEffect(() => {
+    const handleMessagesRead = () => {
+      console.log('🔄 Messages marked as read - refreshing unread count');
+      fetchUnreadCount();
+    };
+
+    window.addEventListener('messagesRead', handleMessagesRead);
+
+    return () => {
+      window.removeEventListener('messagesRead', handleMessagesRead);
+    };
+  }, [fetchUnreadCount]);
+
+  // ⭐ Fetch unread count on mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchUnreadCount();
+    }
+  }, [user?.id, fetchUnreadCount])
+
   const deleteMessage = useCallback(async (messageId) => {
     if (!user) return { error: 'Not authenticated' };
 
@@ -1323,7 +1508,18 @@ const deleteNotification = useCallback(async (notificationId) => {
     deleteMessage,
     subscribeToMessages,
     setActiveConversation,
+    // State
+    conversations,
+    messages,
+    unreadCount,
     
+    // Functions
+    fetchConversations,
+    fetchMessages,
+    sendMessage,
+    subscribeToMessages,
+    fetchUnreadCount,
+
     // Notification functions
     fetchNotifications,
     markNotificationAsRead,

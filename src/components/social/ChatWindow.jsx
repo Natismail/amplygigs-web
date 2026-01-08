@@ -1,4 +1,4 @@
-// src/components/social/ChatWindow.js - IMPROVED MOBILE UX
+// src/components/social/ChatWindow.js - FIXED MOBILE LAYOUT
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -18,12 +18,10 @@ export default function ChatWindow({ conversation, onBack }) {
   const [mediaPreview, setMediaPreview] = useState(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
-  const messagesContainerRef = useRef(null);
 
   // ⭐ Auto-mark messages as read
   useMarkMessagesRead(conversation?.otherUser?.id);
@@ -43,32 +41,8 @@ export default function ChatWindow({ conversation, onBack }) {
   }, [conversation?.id]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     scrollToBottom();
   }, [messages]);
-
-  // ⭐ Detect keyboard open/close on mobile
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleResize = () => {
-      // On mobile, when keyboard opens, window height decreases
-      const isMobile = window.innerWidth < 1024;
-      if (isMobile) {
-        const viewportHeight = window.visualViewport?.height || window.innerHeight;
-        const windowHeight = window.innerHeight;
-        setIsKeyboardOpen(viewportHeight < windowHeight * 0.8);
-      }
-    };
-
-    window.visualViewport?.addEventListener('resize', handleResize);
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ 
@@ -81,7 +55,6 @@ export default function ChatWindow({ conversation, onBack }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
       setError('File size must be less than 10MB');
       return;
@@ -127,7 +100,6 @@ export default function ChatWindow({ conversation, onBack }) {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-        // Scroll immediately after sending
         setTimeout(() => scrollToBottom(false), 100);
       }
     } catch (err) {
@@ -137,7 +109,6 @@ export default function ChatWindow({ conversation, onBack }) {
     }
   };
 
-  // Handle Enter key (send on Enter, new line on Shift+Enter)
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -162,9 +133,10 @@ export default function ChatWindow({ conversation, onBack }) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      {/* ⭐ FIXED HEADER - Stays visible even when keyboard opens */}
-      <div className="flex-shrink-0 sticky top-0 z-10 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+    // ⭐ CRITICAL FIX: Use fixed height instead of h-full to prevent pushing
+    <div className="fixed inset-0 lg:relative lg:h-full flex flex-col bg-white dark:bg-gray-900">
+      {/* ⭐ HEADER - Always visible, never pushed away */}
+      <div className="flex-shrink-0 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <button
           onClick={onBack}
           className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition flex-shrink-0"
@@ -192,15 +164,13 @@ export default function ChatWindow({ conversation, onBack }) {
         </button>
       </div>
 
-      {/* ⭐ MESSAGES - Flexible height, handles keyboard */}
+      {/* ⭐ MESSAGES - Flexible, scrollable area */}
       <div 
-        ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4 bg-gray-50 dark:bg-gray-950"
         style={{
-          // ⭐ This ensures messages area shrinks when keyboard opens
+          // ⭐ Critical for mobile keyboard
+          height: '1px', // Forces flex-1 to work correctly
           minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch'
         }}
       >
         {messages.length === 0 ? (
@@ -276,7 +246,7 @@ export default function ChatWindow({ conversation, onBack }) {
         )}
       </div>
 
-      {/* ⭐ ERROR MESSAGE - Compact on mobile */}
+      {/* ERROR MESSAGE */}
       {error && (
         <div className="flex-shrink-0 px-3 py-2 lg:px-4 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
           <div className="flex items-center gap-2 text-xs lg:text-sm text-red-800 dark:text-red-200">
@@ -292,12 +262,12 @@ export default function ChatWindow({ conversation, onBack }) {
         </div>
       )}
 
-      {/* ⭐ INPUT AREA - Fixed at bottom, compact on mobile */}
+      {/* ⭐ INPUT - Fixed at bottom, safe area aware */}
       <form 
         onSubmit={handleSend} 
-        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+        className="flex-shrink-0 p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pb-safe"
       >
-        {/* Media Preview - More compact on mobile */}
+        {/* Media Preview */}
         {mediaPreview && (
           <div className="mb-2 relative inline-block animate-fade-in">
             <div className="relative">
@@ -330,7 +300,6 @@ export default function ChatWindow({ conversation, onBack }) {
             className="hidden"
           />
           
-          {/* ⭐ Attachment button - Slightly smaller on mobile */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -341,7 +310,6 @@ export default function ChatWindow({ conversation, onBack }) {
             <Paperclip className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600 dark:text-gray-400" />
           </button>
 
-          {/* ⭐ Text input - Single line on mobile */}
           <div className="flex-1 relative">
             <input
               ref={textareaRef}
@@ -356,10 +324,9 @@ export default function ChatWindow({ conversation, onBack }) {
             />
           </div>
 
-          {/* ⭐ Send button */}
           <button
             type="submit"
-            disabled={(!messageText.trim() && !mediaFile) || sending || messageText.length > 1000}
+            disabled={(!messageText.trim() && !mediaFile) || sending}
             className="flex-shrink-0 p-2 lg:p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
             aria-label="Send message"
           >
@@ -370,13 +337,6 @@ export default function ChatWindow({ conversation, onBack }) {
             )}
           </button>
         </div>
-
-        {/* ⭐ Hide keyboard hint when keyboard is open on mobile */}
-        {!isKeyboardOpen && (
-          <p className="hidden lg:block text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-            Press <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Enter</kbd> to send
-          </p>
-        )}
       </form>
     </div>
   );
