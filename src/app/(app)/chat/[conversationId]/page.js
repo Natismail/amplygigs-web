@@ -1,3 +1,5 @@
+//src/app/(app)/chat/[conversationId]/page.js
+
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
