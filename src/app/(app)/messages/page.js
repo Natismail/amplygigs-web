@@ -29,8 +29,6 @@ export default function MessagesPage() {
 
   return (
       <PullToRefresh onRefresh={handleRefresh}>
-
-    // ⭐ CRITICAL: Use h-full instead of fixed positioning
     <div className="h-full flex overflow-hidden bg-gray-50 dark:bg-gray-950">
       {/* Conversation List */}
       <div className={`${
