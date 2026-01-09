@@ -1,4 +1,4 @@
-// src/app/(app)/layout.js - COMPLETE WITH HEIGHT FIX + PULL-TO-REFRESH
+// src/app/(app)/layout.js - RESTORE YOUR WORKING VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,12 +16,10 @@ export default function AppLayout({ children }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      // Redirect to login if not authenticated
       router.replace(`/login?redirectedFrom=${pathname}`);
     }
   }, [user, loading, router, pathname]);
 
-  // Show loading while checking auth
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
@@ -33,25 +31,15 @@ export default function AppLayout({ children }) {
     );
   }
 
-  // Don't render if no user (will redirect)
   if (!user) {
     return null;
   }
 
   return (
-    // ⭐ CRITICAL: h-screen + flex-col for proper mobile layout
-    <div className="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
-      {/* Navbar - Fixed height */}
-      <div className="flex-none">
-        <Navbar onMenuClick={() => setSidebarOpen(true)} />
-      </div>
-      
-      {/* Sidebar - Overlay */}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <Navbar onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
-      {/* Main Content - Takes remaining height */}
-      <main className="flex-1 overflow-hidden">
-        {/* ⭐ Pull-to-refresh wrapper */}
+      <main className="transition-all duration-300">
         <GlobalPullToRefresh>
           {children}
         </GlobalPullToRefresh>
@@ -59,8 +47,6 @@ export default function AppLayout({ children }) {
     </div>
   );
 }
-
-
 
 
 
