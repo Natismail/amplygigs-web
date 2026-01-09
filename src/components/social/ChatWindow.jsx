@@ -1,4 +1,4 @@
-// src/components/social/ChatWindow.js - WORKING VERSION
+// src/components/social/ChatWindow.js - SIMPLE & PROVEN SOLUTION
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -23,7 +23,7 @@ export default function ChatWindow({ conversation, onBack }) {
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // ⭐ Auto-mark messages as read
+  // Auto-mark messages as read
   useMarkMessagesRead(conversation?.otherUser?.id);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function ChatWindow({ conversation, onBack }) {
     scrollToBottom();
   }, [messages]);
 
-  // ⭐ Auto-resize textarea
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -105,12 +105,10 @@ export default function ChatWindow({ conversation, onBack }) {
   };
 
   const handleKeyDown = (e) => {
-    // ⭐ CRITICAL: Allow Shift+Enter for new lines
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
     }
-    // ⭐ If Shift+Enter, do nothing - let browser handle line break
   };
 
   if (!conversation) {
@@ -130,10 +128,9 @@ export default function ChatWindow({ conversation, onBack }) {
   }
 
   return (
-    // ⭐ FIXED: Use h-full instead of 100dvh
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      {/* ⭐ HEADER - Sticky at top */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+      {/* HEADER */}
+      <div className="flex-none flex items-center gap-3 p-3 lg:p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <button
           onClick={onBack}
           className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition"
@@ -157,7 +154,7 @@ export default function ChatWindow({ conversation, onBack }) {
         </button>
       </div>
 
-      {/* ⭐ MESSAGES - Flexible scrollable area */}
+      {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 bg-gray-50 dark:bg-gray-950">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
@@ -232,7 +229,7 @@ export default function ChatWindow({ conversation, onBack }) {
 
       {/* ERROR */}
       {error && (
-        <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
+        <div className="flex-none px-3 py-2 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
           <div className="flex items-center gap-2 text-xs text-red-800 dark:text-red-200">
             <AlertCircle className="w-4 h-4" />
             <span className="flex-1">{error}</span>
@@ -243,10 +240,10 @@ export default function ChatWindow({ conversation, onBack }) {
         </div>
       )}
 
-      {/* ⭐ INPUT - Always visible at bottom */}
+      {/* INPUT */}
       <form 
         onSubmit={handleSend} 
-        className="p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+        className="flex-none p-3 lg:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
       >
         {mediaPreview && (
           <div className="mb-2 relative inline-block">
@@ -316,3 +313,7 @@ export default function ChatWindow({ conversation, onBack }) {
     </div>
   );
 }
+
+
+
+
