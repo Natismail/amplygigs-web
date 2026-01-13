@@ -1,4 +1,7 @@
-// src/app/(app)/layout.js - RESTORE YOUR WORKING VERSION
+
+
+
+// src/app/(app)/layout.js - WITH GLOBAL PULL-TO-REFRESH
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
-import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";
+import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";  // ⭐ ADD THIS
 
 export default function AppLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,10 +19,12 @@ export default function AppLayout({ children }) {
 
   useEffect(() => {
     if (!loading && !user) {
+      // Redirect to login if not authenticated
       router.replace(`/login?redirectedFrom=${pathname}`);
     }
   }, [user, loading, router, pathname]);
 
+  // Show loading while checking auth
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
@@ -31,6 +36,7 @@ export default function AppLayout({ children }) {
     );
   }
 
+  // Don't render if no user (will redirect)
   if (!user) {
     return null;
   }
@@ -40,6 +46,7 @@ export default function AppLayout({ children }) {
       <Navbar onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="transition-all duration-300">
+        {/* ⭐ WRAP CHILDREN WITH GLOBAL PULL-TO-REFRESH */}
         <GlobalPullToRefresh>
           {children}
         </GlobalPullToRefresh>
@@ -50,7 +57,7 @@ export default function AppLayout({ children }) {
 
 
 
-// // src/app/(app)/layout.js - WITH GLOBAL PULL-TO-REFRESH
+// // src/app/(app)/layout.js - RESTORE YOUR WORKING VERSION
 // "use client";
 
 // import { useState, useEffect } from "react";
@@ -58,7 +65,7 @@ export default function AppLayout({ children }) {
 // import { useRouter, usePathname } from "next/navigation";
 // import Navbar from "@/components/Navbar";
 // import Sidebar from "@/components/Sidebar";
-// import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";  // ⭐ ADD THIS
+// import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";
 
 // export default function AppLayout({ children }) {
 //   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,12 +75,10 @@ export default function AppLayout({ children }) {
 
 //   useEffect(() => {
 //     if (!loading && !user) {
-//       // Redirect to login if not authenticated
 //       router.replace(`/login?redirectedFrom=${pathname}`);
 //     }
 //   }, [user, loading, router, pathname]);
 
-//   // Show loading while checking auth
 //   if (loading) {
 //     return (
 //       <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
@@ -85,7 +90,6 @@ export default function AppLayout({ children }) {
 //     );
 //   }
 
-//   // Don't render if no user (will redirect)
 //   if (!user) {
 //     return null;
 //   }
@@ -95,7 +99,6 @@ export default function AppLayout({ children }) {
 //       <Navbar onMenuClick={() => setSidebarOpen(true)} />
 //       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 //       <main className="transition-all duration-300">
-//         {/* ⭐ WRAP CHILDREN WITH GLOBAL PULL-TO-REFRESH */}
 //         <GlobalPullToRefresh>
 //           {children}
 //         </GlobalPullToRefresh>
@@ -103,6 +106,3 @@ export default function AppLayout({ children }) {
 //     </div>
 //   );
 // }
-
-
-
