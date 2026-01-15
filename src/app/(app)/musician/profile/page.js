@@ -1,4 +1,4 @@
-// src/app/(app)/musician/profile/page.js - FULLY MOBILE OPTIMIZED
+// src/app/(app)/musician/profile/page.js - WITH VIDEO UPLOAD TAB
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +14,12 @@ import {
   Share2, 
   CheckCircle, 
   AlertCircle,
-  Loader
+  Loader,
+  Video,
+  Upload as UploadIcon,
+  X,
+  Play,
+  Trash2
 } from 'lucide-react';
 
 export default function MusicianProfilePage() {
@@ -25,6 +30,11 @@ export default function MusicianProfilePage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
+  
+  // ⭐ NEW: Video upload states
+  const [videos, setVideos] = useState([]);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoError, setVideoError] = useState(null);
 
   const musicRoles = [
     "Singer", "Guitarist", "Drummer", "DJ", "Keyboardist", 
@@ -41,6 +51,7 @@ export default function MusicianProfilePage() {
       setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
+        display_name: user.display_name || '', // ⭐ NEW: Stage name
         bio: user.bio || '',
         phone: user.phone || '',
         location: user.location || '',
@@ -55,8 +66,122 @@ export default function MusicianProfilePage() {
         twitter: user.twitter || '',
         tiktok: user.tiktok || '',
       });
+      
+      // ⭐ Fetch videos
+      fetchVideos();
     }
   }, [user]);
+
+  // ⭐ NEW: Fetch musician's videos
+  const fetchVideos = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('musician_videos')
+        .select('*')
+        .eq('musician_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setVideos(data || []);
+    } catch (err) {
+      console.error('Error fetching videos:', err);
+    }
+  };
+
+  // ⭐ NEW: Upload video
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    if (!file.type.startsWith('video/')) {
+      setVideoError('Please select a video file');
+      return;
+    }
+
+    // 100MB limit
+    if (file.size > 100 * 1024 * 1024) {
+      setVideoError('Video must be less than 100MB');
+      return;
+    }
+
+    setUploadingVideo(true);
+    setVideoError(null);
+
+    try {
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('musician-videos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('musician-videos')
+        .getPublicUrl(fileName);
+
+      // Create database record
+      const { error: dbError } = await supabase
+        .from('musician_videos')
+        .insert({
+          musician_id: user.id,
+          video_url: publicUrl,
+          title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          description: '',
+        });
+
+      if (dbError) throw dbError;
+
+      // Refresh videos
+      await fetchVideos();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Video upload error:', err);
+      setVideoError(err.message || 'Failed to upload video');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  // ⭐ NEW: Delete video
+  const handleDeleteVideo = async (videoId, videoUrl) => {
+    if (!confirm('Are you sure you want to delete this video?')) return;
+
+    try {
+      // Extract file path from URL
+      const urlParts = videoUrl.split('/');
+      const filePath = urlParts.slice(-2).join('/'); // user_id/filename.ext
+
+      // Delete from storage
+      await supabase.storage
+        .from('musician-videos')
+        .remove([filePath]);
+
+      // Delete from database
+      const { error } = await supabase
+        .from('musician_videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) throw error;
+
+      // Refresh videos
+      await fetchVideos();
+    } catch (err) {
+      console.error('Delete error:', err);
+      setVideoError('Failed to delete video');
+    }
+  };
 
   if (loading || !formData) {
     return (
@@ -89,10 +214,10 @@ export default function MusicianProfilePage() {
     setError(null);
 
     try {
-      // Sanitize and prepare payload
       const payload = {
         first_name: formData.first_name,
         last_name: formData.last_name,
+        display_name: formData.display_name, // ⭐ Save stage name
         bio: formData.bio,
         phone: formData.phone,
         location: formData.location,
@@ -128,16 +253,16 @@ export default function MusicianProfilePage() {
   const tabs = [
     { id: 'basic', label: 'Basic', icon: User, emoji: '👤' },
     { id: 'music', label: 'Music', icon: Music, emoji: '🎵' },
+    { id: 'videos', label: 'Videos', icon: Video, emoji: '🎬' }, // ⭐ NEW TAB
     { id: 'equipment', label: 'Equipment', icon: Guitar, emoji: '🎸' },
     { id: 'social', label: 'Social', icon: Share2, emoji: '📱' },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Sticky Header - Mobile Optimized */}
+      {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
-          {/* Back Button - Large touch target */}
           <button
             onClick={() => router.back()}
             className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
@@ -146,12 +271,10 @@ export default function MusicianProfilePage() {
             <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300" />
           </button>
 
-          {/* Title */}
           <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
             Edit Profile
           </h1>
 
-          {/* Save Button - Desktop */}
           <button
             onClick={handleSave}
             disabled={saving}
@@ -167,7 +290,6 @@ export default function MusicianProfilePage() {
             )}
           </button>
 
-          {/* Save Icon - Mobile */}
           <button
             onClick={handleSave}
             disabled={saving}
@@ -218,7 +340,7 @@ export default function MusicianProfilePage() {
           />
         </div>
 
-        {/* Tabs - Horizontal Scroll on Mobile */}
+        {/* Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 overflow-x-auto scrollbar-hide">
           <div className="flex gap-2 min-w-max">
             {tabs.map(tab => {
@@ -251,7 +373,23 @@ export default function MusicianProfilePage() {
                 Basic Information
               </h3>
               
-              {/* Name Fields - Stack on mobile */}
+              {/* ⭐ NEW: Stage Name */}
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Stage Name / Display Name
+                </label>
+                <input
+                  name="display_name"
+                  value={formData.display_name}
+                  onChange={handleChange}
+                  placeholder="e.g., DJ KoolBreeze, MC Smooth"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This will be displayed on your public profile
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -428,6 +566,131 @@ export default function MusicianProfilePage() {
             </div>
           )}
 
+          {/* ⭐ NEW: VIDEOS TAB */}
+          {activeTab === 'videos' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                  Your Performance Videos
+                </h3>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {videos.length} video{videos.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {/* Upload Section */}
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center">
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  disabled={uploadingVideo}
+                  className="hidden"
+                  id="video-upload"
+                />
+                <label
+                  htmlFor="video-upload"
+                  className={`cursor-pointer ${uploadingVideo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex flex-col items-center">
+                    {uploadingVideo ? (
+                      <Loader className="w-12 h-12 text-purple-600 animate-spin mb-3" />
+                    ) : (
+                      <UploadIcon className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-3" />
+                    )}
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {uploadingVideo ? 'Uploading video...' : 'Click to upload a video'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      MP4, MOV, AVI (max 100MB)
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {videoError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-500 rounded-lg p-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <p className="text-sm text-red-800 dark:text-red-200">{videoError}</p>
+                </div>
+              )}
+
+              {/* Videos Grid */}
+              {videos.length === 0 ? (
+                <div className="text-center py-12">
+                  <Video className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 mb-2">
+                    No videos uploaded yet
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    Upload videos to showcase your talent
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {videos.map((video) => (
+                    <div
+                      key={video.id}
+                      className="bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="relative aspect-video bg-black group">
+                        <video
+                          src={video.video_url}
+                          className="w-full h-full object-contain"
+                          controls
+                        />
+                        <button
+                          onClick={() => handleDeleteVideo(video.id, video.video_url)}
+                          className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="p-3">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">
+                          {video.title}
+                        </p>
+                        {video.description && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                            {video.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                          {new Date(video.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tips */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 text-sm">
+                  📹 Video Tips
+                </h4>
+                <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1.5">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400">•</span>
+                    <span>Upload high-quality performance videos</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400">•</span>
+                    <span>Show different styles and genres you perform</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400">•</span>
+                    <span>Good lighting and clear audio increase bookings</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400">•</span>
+                    <span>Videos help clients see your talent before booking</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* EQUIPMENT */}
           {activeTab === 'equipment' && (
             <div className="space-y-4 animate-fadeIn">
@@ -519,7 +782,6 @@ export default function MusicianProfilePage() {
                 />
               </div>
 
-              {/* Benefits Card */}
               <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
                 <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2 text-sm">
                   📱 Why add social links?

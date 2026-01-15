@@ -1,4 +1,4 @@
-// src/hooks/useKYC.js
+// src/hooks/useKYC.js - UPDATED TO MATCH YOUR COLUMN NAMES
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
@@ -10,7 +10,7 @@ export function useKYC() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch verification status
+  // ⭐ Fetch verification status - FIXED to prevent infinite loop
   const fetchVerification = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -23,7 +23,7 @@ export function useKYC() {
         .from('musician_verifications')
         .select('*')
         .eq('musician_id', user.id)
-        .single();
+        .maybeSingle(); // ⭐ Changed from .single() to .maybeSingle()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
         throw error;
@@ -36,15 +36,17 @@ export function useKYC() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user]); // ⭐ Only depends on user, not user.id
 
   useEffect(() => {
     fetchVerification();
   }, [fetchVerification]);
 
-  // Upload document to Supabase Storage
+  // ⭐ Upload document to Supabase Storage - IMPROVED error handling
   const uploadDocument = async (file, documentType) => {
-    if (!user || !file) return null;
+    if (!user || !file) {
+      throw new Error('User or file is missing');
+    }
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -52,7 +54,10 @@ export function useKYC() {
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('verification-documents')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
       if (uploadError) throw uploadError;
 
@@ -68,7 +73,7 @@ export function useKYC() {
     }
   };
 
-  // Submit ID verification
+  // ⭐ Submit ID verification - IMPROVED
   const submitIDVerification = async ({ idType, idNumber, idFront, idBack }) => {
     if (!user) return { success: false, error: 'Not authenticated' };
 
@@ -99,7 +104,10 @@ export function useKYC() {
 
       const { data: verificationData, error: verificationError } = await supabase
         .from('musician_verifications')
-        .upsert(payload, { onConflict: 'musician_id' })
+        .upsert(payload, { 
+          onConflict: 'musician_id',
+          ignoreDuplicates: false 
+        })
         .select()
         .single();
 
@@ -109,14 +117,15 @@ export function useKYC() {
       return { success: true, data: verificationData };
     } catch (err) {
       console.error('ID verification error:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+      const errorMessage = err.message || 'Failed to submit ID verification';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setUploading(false);
     }
   };
 
-  // Submit selfie verification
+  // ⭐ Submit selfie verification
   const submitSelfieVerification = async (selfieFile) => {
     if (!user) return { success: false, error: 'Not authenticated' };
 
@@ -131,6 +140,7 @@ export function useKYC() {
         .from('musician_verifications')
         .update({
           selfie_image_url: selfieUrl,
+          status: 'under_review', // ⭐ Update status when selfie is submitted
           updated_at: new Date().toISOString(),
         })
         .eq('musician_id', user.id)
@@ -143,14 +153,15 @@ export function useKYC() {
       return { success: true, data };
     } catch (err) {
       console.error('Selfie verification error:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+      const errorMessage = err.message || 'Failed to submit selfie';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setUploading(false);
     }
   };
 
-  // Submit phone verification
+  // ⭐ Submit phone verification
   const submitPhoneVerification = async (phoneNumber, otp) => {
     if (!user) return { success: false, error: 'Not authenticated' };
 
@@ -186,21 +197,22 @@ export function useKYC() {
       return { success: true, data };
     } catch (err) {
       console.error('Phone verification error:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+      const errorMessage = err.message || 'Failed to verify phone';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setUploading(false);
     }
   };
 
-  // Calculate completion percentage
+  // ⭐ Calculate completion percentage - IMPROVED
   const getCompletionPercentage = useCallback(() => {
     if (!verification) return 0;
 
     let completed = 0;
     const total = 4; // ID, Phone, Selfie, Basic Info
 
-    if (verification.id_verified || verification.id_front_image_url) completed++;
+    if (verification.id_front_image_url && verification.id_back_image_url) completed++;
     if (verification.phone_verified) completed++;
     if (verification.selfie_image_url) completed++;
     if (verification.id_number) completed++;
@@ -208,9 +220,9 @@ export function useKYC() {
     return Math.round((completed / total) * 100);
   }, [verification]);
 
-  // Status checks
+  // ⭐ Status checks
   const isVerified = verification?.status === 'approved';
-  const isPending = verification?.status === 'under_review';
+  const isPending = verification?.status === 'under_review' || verification?.status === 'pending';
   const isRejected = verification?.status === 'rejected';
   const isUnverified = !verification || verification?.status === 'pending' || !verification?.status;
 

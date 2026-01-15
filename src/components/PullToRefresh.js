@@ -80,7 +80,11 @@ export default function PullToRefresh({ onRefresh, children }) {
   const opacity = Math.min(pullDistance / PULL_THRESHOLD, 1);
 
   return (
-    <div ref={containerRef} className="relative min-h-screen">
+    <div
+  ref={containerRef}
+  className="relative h-full overflow-hidden touch-pan-y"
+>
+
       {/* Pull indicator */}
       <div
         className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none"

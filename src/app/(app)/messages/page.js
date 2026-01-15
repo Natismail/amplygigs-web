@@ -1,4 +1,4 @@
-// src/app/(app)/messages/page.js - MOBILE-SAFE LAYOUT
+// src/app/(app)/messages/page.js - FINAL FIX
 "use client";
 
 import { useState } from 'react';
@@ -6,7 +6,6 @@ import ConversationList from '@/components/social/ConversationList';
 import ChatWindow from '@/components/social/ChatWindow';
 import { useSocial } from '@/context/SocialContext';
 import PullToRefresh from '@/components/PullToRefresh';
-
 
 export default function MessagesPage() {
   const { fetchConversations } = useSocial();
@@ -28,31 +27,39 @@ export default function MessagesPage() {
   };
 
   return (
-      <PullToRefresh onRefresh={handleRefresh}>
-    <div className="h-full flex overflow-hidden bg-gray-50 dark:bg-gray-950">
-      {/* Conversation List */}
-      <div className={`${
-        showChat ? 'hidden lg:block' : 'block'
-      } w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col h-full overflow-hidden`}>
-        <div className="flex-none p-4 border-b border-gray-200 dark:border-gray-800">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Messages</h1>
+    <PullToRefresh onRefresh={handleRefresh}>
+      {/* ⭐ FIX 1: Added "absolute" - was missing! */}
+      <div className="absolute inset-0 flex bg-gray-50 dark:bg-gray-950 overflow-hidden">
+        
+        {/* CONVERSATION LIST */}
+        <div 
+          className={`${
+            showChat ? 'hidden lg:flex' : 'flex'
+          } w-full lg:w-96 flex-shrink-0 flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-hidden`}
+        >
+          <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              Messages
+            </h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <ConversationList onSelectConversation={handleSelectConversation} />
+          </div>
         </div>
-        <div className="flex-1 overflow-hidden">
-          <ConversationList onSelectConversation={handleSelectConversation} />
+
+        {/* CHAT WINDOW */}
+        <div 
+          className={`${
+            showChat ? 'flex' : 'hidden lg:flex'
+          } flex-1 flex-col bg-white dark:bg-gray-900 overflow-hidden`}
+        >
+          <ChatWindow 
+            conversation={selectedConversation} 
+            onBack={handleBack} 
+          />
         </div>
       </div>
-
-      {/* Chat Window */}
-      <div className={`${
-        showChat ? 'block' : 'hidden lg:block'
-      } flex-1 bg-white dark:bg-gray-900 h-full overflow-hidden`}>
-        <ChatWindow conversation={selectedConversation} onBack={handleBack} />
-      </div>
-    </div>
-     </PullToRefresh>
-
+    </PullToRefresh>
   );
 }
-
-
-
