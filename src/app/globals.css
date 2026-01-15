@@ -28,6 +28,135 @@ select:focus {
   @apply outline-none ring-2 ring-purple-500 border-purple-500;
 }
 
+
+/* Add to your global CSS or Tailwind config */
+
+/* ========== PWA SAFE AREA SUPPORT ========== */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ========== SMOOTH ANIMATIONS ========== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* ========== MOBILE OPTIMIZATIONS ========== */
+@media (max-width: 1023px) {
+  /* Prevent zoom on input focus (iOS) */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Better scrolling on mobile */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent pull-to-refresh interference */
+  .overscroll-contain {
+    overscroll-behavior: contain;
+  }
+
+  /* Hide scrollbar on mobile for cleaner look */
+  .overflow-y-auto::-webkit-scrollbar {
+    width: 0;
+    display: none;
+  }
+
+  /* Active states for better touch feedback */
+  button:active {
+    opacity: 0.8;
+  }
+}
+
+/* ========== DARK MODE IMPROVEMENTS ========== */
+@media (prefers-color-scheme: dark) {
+  /* Improve contrast */
+  input::placeholder {
+    opacity: 0.6;
+  }
+}
+
+/* ========== ACCESSIBILITY ========== */
+/* Focus visible for keyboard navigation */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgb(147, 51, 234);
+  outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========== CUSTOM SCROLLBAR (Desktop) ========== */
+@media (min-width: 1024px) {
+  .overflow-y-auto::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-thumb {
+    background: rgb(209, 213, 219);
+    border-radius: 4px;
+  }
+
+  .dark .overflow-y-auto::-webkit-scrollbar-thumb {
+    background: rgb(55, 65, 81);
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: rgb(156, 163, 175);
+  }
+
+  .dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: rgb(75, 85, 99);
+  }
+}
+
+/* ========== TYPING INDICATOR ANIMATION ========== */
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+
+
 /* ===============================================
    DARK MODE OVERRIDES
    =============================================== */
