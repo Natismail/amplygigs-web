@@ -188,43 +188,131 @@ export const SocialProvider = ({ children }) => {
   // POST FUNCTIONS
   // =====================================================
 
-  const fetchFeed = useCallback(async () => {
-    if (!user) return { data: null, error: 'Not authenticated' };
+  // const fetchFeed = useCallback(async () => {
+  //   if (!user) return { data: null, error: 'Not authenticated' };
 
-    setLoading(prev => ({ ...prev, posts: true }));
+  //   setLoading(prev => ({ ...prev, posts: true }));
 
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          user:user_id (
-            id,
-            first_name,
-            last_name,
-            role,
-            profile_picture_url
-          ),
-          likes:post_likes(count),
-          comments:post_comments(count),
-          user_liked:post_likes!inner(user_id)
-        `)
-        .or(`user_id.eq.${user.id},user_id.in.(SELECT following_id FROM user_follows WHERE follower_id = ${user.id})`)
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
-        .limit(50);
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from('posts')
+  //       .select(`
+  //         *,
+  //         user:user_id (
+  //           id,
+  //           first_name,
+  //           last_name,
+  //           role,
+  //           profile_picture_url
+  //         ),
+  //         likes:post_likes(count),
+  //         comments:post_comments(count),
+  //         user_liked:post_likes!inner(user_id)
+  //       `)
+  //       .or(`user_id.eq.${user.id},user_id.in.(SELECT following_id FROM user_follows WHERE follower_id = ${user.id})`)
+  //       .eq('is_public', true)
+  //       .order('created_at', { ascending: false })
+  //       .limit(50);
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-      setPosts(data || []);
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error fetching feed:', error);
-      return { data: null, error };
-    } finally {
-      setLoading(prev => ({ ...prev, posts: false }));
+  //     setPosts(data || []);
+  //     return { data, error: null };
+  //   } catch (error) {
+  //     console.error('Error fetching feed:', error);
+  //     return { data: null, error };
+  //   } finally {
+  //     setLoading(prev => ({ ...prev, posts: false }));
+  //   }
+  // }, [user]);
+
+
+// Replace your current fetchFeed with this:
+
+const fetchFeed = useCallback(async () => {
+  if (!user) return { data: null, error: 'Not authenticated' };
+
+  setLoading(prev => ({ ...prev, posts: true }));
+
+  try {
+    console.log('📥 Fetching feed for user:', user.id);
+    
+    // ✅ FIXED: Get ALL public posts, not just followed users
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        user:user_id (
+          id,
+          first_name,
+          last_name,
+          role,
+          profile_picture_url
+        )
+      `)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('❌ Error fetching posts:', error);
+      throw error;
     }
-  }, [user]);
+
+    console.log('✅ Fetched posts:', data?.length || 0);
+
+    // ✅ FIXED: Get likes count and user's like status separately
+    const postsWithDetails = await Promise.all(
+      (data || []).map(async (post) => {
+        // Get likes count
+        const { count: likesCount } = await supabase
+          .from('post_likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('post_id', post.id);
+
+        // Check if current user liked this post
+        const { data: userLike } = await supabase
+          .from('post_likes')
+          .select('id')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .single();
+
+        // Get comments count
+        const { count: commentsCount } = await supabase
+          .from('post_comments')
+          .select('*', { count: 'exact', head: true })
+          .eq('post_id', post.id);
+
+        // Get shares count
+        const { count: sharesCount } = await supabase
+          .from('post_shares')
+          .select('*', { count: 'exact', head: true })
+          .eq('post_id', post.id);
+
+        return {
+          ...post,
+          likes_count: likesCount || 0,
+          comments_count: commentsCount || 0,
+          shares_count: sharesCount || 0,
+          user_liked: !!userLike,
+        };
+      })
+    );
+
+    console.log('✅ Posts with details:', postsWithDetails.length);
+
+    setPosts(postsWithDetails);
+    return { data: postsWithDetails, error: null };
+  } catch (error) {
+    console.error('❌ Error fetching feed:', error);
+    return { data: null, error };
+  } finally {
+    setLoading(prev => ({ ...prev, posts: false }));
+  }
+}, [user]);
+
+
 
   const uploadMedia = useCallback(async (file, userId) => {
     try {
@@ -250,6 +338,8 @@ export const SocialProvider = ({ children }) => {
       return { url: null, error };
     }
   }, []);
+
+
 
   const createPost = useCallback(async ({ caption, mediaFile, mediaType }) => {
     if (!user) return { error: 'Not authenticated' };
@@ -958,136 +1048,9 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
     }
   }, [user?.id]);
 
-  // // ⭐ Fetch conversations
-  // const fetchConversations = useCallback(async () => {
-  //   if (!user?.id) return;
+  
 
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from('conversations')
-  //       .select(`
-  //         *,
-  //         messages (
-  //           id,
-  //           content,
-  //           created_at,
-  //           read,
-  //           sender_id
-  //         )
-  //       `)
-  //       .or(`participant1_id.eq.${user.id},participant2_id.eq.${user.id}`)
-  //       .order('updated_at', { ascending: false });
 
-  //     if (error) throw error;
-  //     setConversations(data || []);
-  //   } catch (error) {
-  //     console.error('Error fetching conversations:', error);
-  //   }
-  // }, [user?.id]);
-
-  // // ⭐ Fetch messages for a conversation
-  // const fetchMessages = useCallback(async (conversationId) => {
-  //   if (!conversationId) return;
-
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from('messages')
-  //       .select(`
-  //         *,
-  //         sender:sender_id (
-  //           id,
-  //           first_name,
-  //           last_name,
-  //           profile_picture_url,
-  //           role
-  //         )
-  //       `)
-  //       .eq('conversation_id', conversationId)
-  //       .order('created_at', { ascending: true });
-
-  //     if (error) throw error;
-  //     setMessages(data || []);
-  //   } catch (error) {
-  //     console.error('Error fetching messages:', error);
-  //   }
-  // }, []);
-
-  // // ⭐ Send a message
-  // const sendMessage = useCallback(async (conversationId, content, mediaFile = null) => {
-  //   if (!user?.id) return { error: { message: 'Not authenticated' } };
-
-  //   try {
-  //     let mediaUrl = null;
-  //     let mediaType = null;
-
-  //     // Upload media if provided
-  //     if (mediaFile) {
-  //       const fileExt = mediaFile.name.split('.').pop();
-  //       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
-  //       const { data: uploadData, error: uploadError } = await supabase.storage
-  //         .from('message-media')
-  //         .upload(fileName, mediaFile);
-
-  //       if (uploadError) throw uploadError;
-
-  //       const { data: { publicUrl } } = supabase.storage
-  //         .from('message-media')
-  //         .getPublicUrl(fileName);
-
-  //       mediaUrl = publicUrl;
-  //       mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
-  //     }
-
-  //     // Insert message
-  //     const { data, error } = await supabase
-  //       .from('messages')
-  //       .insert({
-  //         conversation_id: conversationId,
-  //         sender_id: user.id,
-  //         content: content || null,
-  //         media_url: mediaUrl,
-  //         media_type: mediaType,
-  //       })
-  //       .select()
-  //       .single();
-
-  //     if (error) throw error;
-
-  //     // Update conversation timestamp
-  //     await supabase
-  //       .from('conversations')
-  //       .update({ updated_at: new Date().toISOString() })
-  //       .eq('id', conversationId);
-
-  //     return { data, error: null };
-  //   } catch (error) {
-  //     console.error('Error sending message:', error);
-  //     return { data: null, error };
-  //   }
-  // }, [user?.id]);
-
-  // // ⭐ Subscribe to messages for a conversation
-  // const subscribeToMessages = useCallback((conversationId) => {
-  //   const channel = supabase
-  //     .channel(`messages:${conversationId}`)
-  //     .on(
-  //       'postgres_changes',
-  //       {
-  //         event: 'INSERT',
-  //         schema: 'public',
-  //         table: 'messages',
-  //         filter: `conversation_id=eq.${conversationId}`,
-  //       },
-  //       (payload) => {
-  //         console.log('📨 New message received:', payload.new);
-  //         setMessages((prev) => [...prev, payload.new]);
-  //       }
-  //     )
-  //     .subscribe();
-
-  //   return channel;
-  // }, []);
 
   // ⭐ Listen for messagesRead events to refresh unread count
   useEffect(() => {

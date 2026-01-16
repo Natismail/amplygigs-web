@@ -1,9 +1,10 @@
-// src/app/(app)/client/settings/page.js
+// src/app/(app)/client/settings/page.js - WITH OAUTH SYNC
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
 import ProfilePictureUpload from "@/components/ProfilePictureUpload";
-import { User, Mail, Phone, MapPin } from "lucide-react";
+import ProfileSyncButton from "@/components/ProfileSyncButton";
+import { User, Mail, Phone, MapPin, RefreshCw } from "lucide-react";
 
 export default function ClientSettingsPage() {
   const { user } = useAuth();
@@ -18,6 +19,12 @@ export default function ClientSettingsPage() {
     );
   }
 
+  // Check if user might need OAuth sync
+  const needsSync = user.first_name === 'User' || 
+                    !user.first_name || 
+                    !user.last_name ||
+                    (!user.profile_picture_url && user.email?.includes('@gmail.com'));
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -30,6 +37,34 @@ export default function ClientSettingsPage() {
             Manage your profile information and preferences
           </p>
         </div>
+
+        {/* OAuth Sync Section - Show if profile incomplete */}
+        {needsSync && (
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl shadow-lg p-6 border border-purple-200 dark:border-purple-800">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+                  <RefreshCw className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                  Sync Your Profile
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  It looks like you signed in with Google or Facebook. Click below to sync your 
+                  name and profile picture from your account.
+                </p>
+                <ProfileSyncButton 
+                  onSyncComplete={() => {
+                    // Reload to show updated data
+                    window.location.reload();
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Profile Picture Section */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
@@ -113,4 +148,3 @@ export default function ClientSettingsPage() {
     </div>
   );
 }
-

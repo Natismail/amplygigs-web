@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import ProfilePictureUpload from '@/components/ProfilePictureUpload';
 import { useRouter } from 'next/navigation';
+import ProfileSyncButton from '@/components/ProfileSyncButton';
 import { 
   ArrowLeft, 
   User, 
@@ -304,6 +305,15 @@ export default function MusicianProfilePage() {
           </button>
         </div>
       </div>
+
+{/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+  <h3 className="font-semibold mb-2">Sync Profile from Google</h3>
+  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+    If you signed up with Google and your name/picture isn't showing,
+    click here to sync your profile.
+  </p>
+  <ProfileSyncButton />
+</div> */}
 
       <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-6">
         {/* Success Message */}
