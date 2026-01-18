@@ -1,4 +1,4 @@
-// src/components/RatingForm.js
+// src/components/RatingForm.js - FIXED
 "use client";
 
 import { useState } from "react";
@@ -31,13 +31,17 @@ export default function RatingForm({ musicianId, onSuccess }) {
     setError("");
 
     try {
+      // ⭐ SEND user_id IN THE REQUEST BODY
       const res = await fetch("/api/ratings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           musician_id: musicianId,
+          user_id: user.id, // ⭐ THIS WAS MISSING!
           rating,
-          comment: comment.trim(),
+          comment: comment.trim() || null,
         }),
       });
 
@@ -59,6 +63,7 @@ export default function RatingForm({ musicianId, onSuccess }) {
         setSuccess(false);
       }, 3000);
     } catch (err) {
+      console.error('Rating submission error:', err);
       setError(err.message);
     } finally {
       setSubmitting(false);
@@ -72,8 +77,8 @@ export default function RatingForm({ musicianId, onSuccess }) {
         <p className="text-gray-600 dark:text-gray-400 mb-4">
           Login to leave a review for this musician
         </p>
-        <a
-          href="/login"
+        
+          <a href="/login"
           className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
         >
           Login to Review

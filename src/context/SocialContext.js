@@ -1128,10 +1128,9 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
   }, [user]);
 
   // =====================================================
-  // NOTIFICATION FUNCTIONS
-  // =====================================================
+// NOTIFICATION FUNCTIONS - FIXED WITH AUTH HEADERS
+// =====================================================
 
-  
 const fetchNotifications = useCallback(async () => {
   if (!user) return { error: 'Not authenticated' };
 
@@ -1163,7 +1162,7 @@ const fetchNotifications = useCallback(async () => {
 
     setNotifications(data || []);
     
-    // ⭐ UPDATED: Check both is_read and read
+    // Check both is_read and read
     const unreadCount = data?.filter(n => !n.is_read && !n.read).length || 0;
     setUnreadNotificationsCount(unreadCount);
 
@@ -1176,16 +1175,25 @@ const fetchNotifications = useCallback(async () => {
   }
 }, [user]);
 
-
-  const markNotificationAsRead = useCallback(async (notificationId) => {
+const markNotificationAsRead = useCallback(async (notificationId) => {
   if (!user) return { error: 'Not authenticated' };
 
   try {
-    // ⭐ Call API instead of direct Supabase
+    // ⭐ GET SESSION TOKEN
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error('Not authenticated');
+    }
+
+    // ⭐ INCLUDE AUTH HEADER
     const response = await fetch('/api/notifications/mark-read', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notificationId, userId: user.id })
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`, // ⭐ THIS WAS MISSING
+      },
+      body: JSON.stringify({ notificationId })
     });
 
     if (!response.ok) {
@@ -1213,11 +1221,21 @@ const markAllNotificationsAsRead = useCallback(async () => {
   if (!user) return { error: 'Not authenticated' };
 
   try {
-    // ⭐ Call API instead of direct Supabase
+    // ⭐ GET SESSION TOKEN
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error('Not authenticated');
+    }
+
+    // ⭐ INCLUDE AUTH HEADER
     const response = await fetch('/api/notifications/mark-read', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id })
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`, // ⭐ THIS WAS MISSING
+      },
+      body: JSON.stringify({}) // Empty body is fine
     });
 
     if (!response.ok) {
@@ -1242,10 +1260,22 @@ const deleteNotification = useCallback(async (notificationId) => {
   if (!user) return { error: 'Not authenticated' };
 
   try {
-    // ⭐ Call API instead of direct Supabase
+    // ⭐ GET SESSION TOKEN
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error('Not authenticated');
+    }
+
+    // ⭐ INCLUDE AUTH HEADER
     const response = await fetch(
-      `/api/notifications/mark-read?id=${notificationId}&userId=${user.id}`,
-      { method: 'DELETE' }
+      `/api/notifications/mark-read?id=${notificationId}`,
+      { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`, // ⭐ THIS WAS MISSING
+        },
+      }
     );
 
     if (!response.ok) {
@@ -1255,6 +1285,7 @@ const deleteNotification = useCallback(async (notificationId) => {
 
     // Update local state
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
 
     return { error: null };
   } catch (error) {
@@ -1263,92 +1294,90 @@ const deleteNotification = useCallback(async (notificationId) => {
   }
 }, [user]);
 
+const createNotification = useCallback(async ({ 
+  userId, 
+  type, 
+  title, 
+  message, 
+  relatedUserId = null,
+  relatedPostId = null,
+  actionUrl = null 
+}) => {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        type,
+        title,
+        message,
+        related_user_id: relatedUserId,
+        related_post_id: relatedPostId,
+        action_url: actionUrl,
+      })
+      .select()
+      .single();
 
-  const createNotification = useCallback(async ({ 
-    userId, 
-    type, 
-    title, 
-    message, 
-    relatedUserId = null,
-    relatedPostId = null,
-    actionUrl = null 
-  }) => {
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          type,
-          title,
-          message,
-          related_user_id: relatedUserId,
-          related_post_id: relatedPostId,
-          action_url: actionUrl,
-        })
-        .select()
-        .single();
+    if (error) throw error;
 
-      if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    return { data: null, error };
+  }
+}, []);
 
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      return { data: null, error };
-    }
-  }, []);
+const subscribeToNotifications = useCallback(() => {
+  if (!user) return null;
 
-  const subscribeToNotifications = useCallback(() => {
-    if (!user) return null;
+  const channel = supabase
+    .channel(`notifications:${user.id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`,
+      },
+      async (payload) => {
+        const { data: relatedUser } = payload.new.related_user_id 
+          ? await supabase
+              .from('user_profiles')
+              .select('id, first_name, last_name, profile_picture_url, role')
+              .eq('id', payload.new.related_user_id)
+              .single()
+          : { data: null };
 
-    const channel = supabase
-      .channel(`notifications:${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          const { data: relatedUser } = payload.new.related_user_id 
-            ? await supabase
-                .from('user_profiles')
-                .select('id, first_name, last_name, profile_picture_url, role')
-                .eq('id', payload.new.related_user_id)
-                .single()
-            : { data: null };
+        const { data: relatedPost } = payload.new.related_post_id
+          ? await supabase
+              .from('posts')
+              .select('id, caption, media_url')
+              .eq('id', payload.new.related_post_id)
+              .single()
+          : { data: null };
 
-          const { data: relatedPost } = payload.new.related_post_id
-            ? await supabase
-                .from('posts')
-                .select('id, caption, media_url')
-                .eq('id', payload.new.related_post_id)
-                .single()
-            : { data: null };
+        const newNotification = {
+          ...payload.new,
+          related_user: relatedUser,
+          related_post: relatedPost,
+        };
 
-          const newNotification = {
-            ...payload.new,
-            related_user: relatedUser,
-            related_post: relatedPost,
-          };
+        setNotifications(prev => [newNotification, ...prev]);
+        setUnreadNotificationsCount(prev => prev + 1);
 
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadNotificationsCount(prev => prev + 1);
-
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(newNotification.title, {
-              body: newNotification.message,
-              icon: relatedUser?.profile_picture_url || '/icons/icon-192.png',
-            });
-          }
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(newNotification.title, {
+            body: newNotification.message,
+            icon: relatedUser?.profile_picture_url || '/icons/icon-192.png',
+          });
         }
-      )
-      .subscribe();
+      }
+    )
+    .subscribe();
 
-    return channel;
-  }, [user]);
-
+  return channel;
+}, [user]);
 
 
   // =============================================

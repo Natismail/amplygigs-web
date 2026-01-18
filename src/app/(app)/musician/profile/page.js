@@ -1,12 +1,15 @@
-// src/app/(app)/musician/profile/page.js - WITH VIDEO UPLOAD TAB
+// src/app/(app)/musician/profile/page.js - WITH URL TAB SUPPORT
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import ProfilePictureUpload from '@/components/ProfilePictureUpload';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ProfileSyncButton from '@/components/ProfileSyncButton';
+//import ProfileSyncButton from '@/components/ProfileSyncButton';
+
+
 import { 
   ArrowLeft, 
   User, 
@@ -26,16 +29,27 @@ import {
 export default function MusicianProfilePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('basic');
   
-  // ⭐ NEW: Video upload states
+  // Get tab from URL or default to 'basic'
+  const urlTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(urlTab || 'basic');
+  
+  // Video upload states
   const [videos, setVideos] = useState([]);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoError, setVideoError] = useState(null);
+
+  // Update active tab when URL changes
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
 
   const musicRoles = [
     "Singer", "Guitarist", "Drummer", "DJ", "Keyboardist", 
@@ -52,7 +66,7 @@ export default function MusicianProfilePage() {
       setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
-        display_name: user.display_name || '', // ⭐ NEW: Stage name
+        display_name: user.display_name || '',
         bio: user.bio || '',
         phone: user.phone || '',
         location: user.location || '',
@@ -68,12 +82,10 @@ export default function MusicianProfilePage() {
         tiktok: user.tiktok || '',
       });
       
-      // ⭐ Fetch videos
       fetchVideos();
     }
   }, [user]);
 
-  // ⭐ NEW: Fetch musician's videos
   const fetchVideos = async () => {
     if (!user?.id) return;
 
@@ -91,18 +103,15 @@ export default function MusicianProfilePage() {
     }
   };
 
-  // ⭐ NEW: Upload video
   const handleVideoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
     if (!file.type.startsWith('video/')) {
       setVideoError('Please select a video file');
       return;
     }
 
-    // 100MB limit
     if (file.size > 100 * 1024 * 1024) {
       setVideoError('Video must be less than 100MB');
       return;
@@ -112,7 +121,6 @@ export default function MusicianProfilePage() {
     setVideoError(null);
 
     try {
-      // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
@@ -125,24 +133,21 @@ export default function MusicianProfilePage() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('musician-videos')
         .getPublicUrl(fileName);
 
-      // Create database record
       const { error: dbError } = await supabase
         .from('musician_videos')
         .insert({
           musician_id: user.id,
           video_url: publicUrl,
-          title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          title: file.name.replace(/\.[^/.]+$/, ''),
           description: '',
         });
 
       if (dbError) throw dbError;
 
-      // Refresh videos
       await fetchVideos();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -154,21 +159,17 @@ export default function MusicianProfilePage() {
     }
   };
 
-  // ⭐ NEW: Delete video
   const handleDeleteVideo = async (videoId, videoUrl) => {
     if (!confirm('Are you sure you want to delete this video?')) return;
 
     try {
-      // Extract file path from URL
       const urlParts = videoUrl.split('/');
-      const filePath = urlParts.slice(-2).join('/'); // user_id/filename.ext
+      const filePath = urlParts.slice(-2).join('/');
 
-      // Delete from storage
       await supabase.storage
         .from('musician-videos')
         .remove([filePath]);
 
-      // Delete from database
       const { error } = await supabase
         .from('musician_videos')
         .delete()
@@ -176,7 +177,6 @@ export default function MusicianProfilePage() {
 
       if (error) throw error;
 
-      // Refresh videos
       await fetchVideos();
     } catch (err) {
       console.error('Delete error:', err);
@@ -218,7 +218,7 @@ export default function MusicianProfilePage() {
       const payload = {
         first_name: formData.first_name,
         last_name: formData.last_name,
-        display_name: formData.display_name, // ⭐ Save stage name
+        display_name: formData.display_name,
         bio: formData.bio,
         phone: formData.phone,
         location: formData.location,
@@ -254,7 +254,7 @@ export default function MusicianProfilePage() {
   const tabs = [
     { id: 'basic', label: 'Basic', icon: User, emoji: '👤' },
     { id: 'music', label: 'Music', icon: Music, emoji: '🎵' },
-    { id: 'videos', label: 'Videos', icon: Video, emoji: '🎬' }, // ⭐ NEW TAB
+    { id: 'videos', label: 'Videos', icon: Video, emoji: '🎬' },
     { id: 'equipment', label: 'Equipment', icon: Guitar, emoji: '🎸' },
     { id: 'social', label: 'Social', icon: Share2, emoji: '📱' },
   ];
@@ -306,15 +306,6 @@ export default function MusicianProfilePage() {
         </div>
       </div>
 
-{/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
-  <h3 className="font-semibold mb-2">Sync Profile from Google</h3>
-  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-    If you signed up with Google and your name/picture isn't showing,
-    click here to sync your profile.
-  </p>
-  <ProfileSyncButton />
-</div> */}
-
       <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-6">
         {/* Success Message */}
         {success && (
@@ -337,6 +328,17 @@ export default function MusicianProfilePage() {
           </div>
         )}
 
+        {/* OAuth Sync Section */}
+        {user?.first_name === 'User' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Sync Profile from Google</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              If you signed up with Google and your name/picture isn't showing, click here to sync your profile.
+            </p>
+            <ProfileSyncButton />
+          </div>
+        )}
+
         {/* Profile Picture Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold mb-4 text-gray-900 dark:text-white">
@@ -349,6 +351,15 @@ export default function MusicianProfilePage() {
             }}
           />
         </div>
+
+         {/* <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
+  <h3 className="font-semibold mb-2">Sync Profile from Google</h3>
+  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+    If you signed up with Google and your name/picture isn't showing,
+    click here to sync your profile.
+  </p>
+  <ProfileSyncButton />
+</div>  */}
 
         {/* Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-2 overflow-x-auto scrollbar-hide">
@@ -383,7 +394,7 @@ export default function MusicianProfilePage() {
                 Basic Information
               </h3>
               
-              {/* ⭐ NEW: Stage Name */}
+              {/* Stage Name */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Stage Name / Display Name
@@ -576,7 +587,7 @@ export default function MusicianProfilePage() {
             </div>
           )}
 
-          {/* ⭐ NEW: VIDEOS TAB */}
+          {/* VIDEOS TAB */}
           {activeTab === 'videos' && (
             <div className="space-y-6 animate-fadeIn">
               <div className="flex items-center justify-between">

@@ -1,125 +1,214 @@
 // src/app/api/notifications/mark-read/route.js
 import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
 
-const supabase = createClient(
+// Create admin client for operations
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { notificationId, userId } = await req.json();
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
 
-    if (!notificationId || !userId) {
-      return Response.json(
-        { error: 'Missing required fields' },
+    // Create client with user's token for auth
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const { notificationId } = await request.json();
+
+    if (!notificationId) {
+      return NextResponse.json(
+        { error: 'Missing notificationId' },
         { status: 400 }
       );
     }
 
-    // Mark single notification as read
-    const { error } = await supabase
+    // Use admin client to update
+    const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ 
         is_read: true,
         read_at: new Date().toISOString()
       })
       .eq('id', notificationId)
-      .eq('user_id', userId); // Security: ensure user owns the notification
+      .eq('user_id', user.id)
+      .select()
+      .single();
 
     if (error) {
       console.error('Error marking notification as read:', error);
-      return Response.json(
-        { error: 'Failed to mark notification as read' },
+      return NextResponse.json(
+        { error: 'Failed to mark notification as read', details: error.message },
         { status: 500 }
       );
     }
 
-    return Response.json({ success: true });
+    return NextResponse.json({ success: true, notification: data });
 
   } catch (error) {
     console.error('Mark notification as read error:', error);
-    return Response.json(
-      { error: 'Internal server error' },
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
 }
 
-// Mark all notifications as read for a user
-export async function PUT(req) {
+// Mark all notifications as read
+export async function PUT(request) {
   try {
-    const { userId } = await req.json();
-
-    if (!userId) {
-      return Response.json(
-        { error: 'Missing userId' },
-        { status: 400 }
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
-    const { error } = await supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Use admin client to update all
+    const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ 
         is_read: true,
         read_at: new Date().toISOString()
       })
-      .eq('user_id', userId)
-      .eq('is_read', false); // Only update unread ones
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+      .select();
 
     if (error) {
       console.error('Error marking all notifications as read:', error);
-      return Response.json(
-        { error: 'Failed to mark notifications as read' },
+      return NextResponse.json(
+        { error: 'Failed to mark notifications as read', details: error.message },
         { status: 500 }
       );
     }
 
-    return Response.json({ success: true });
+    return NextResponse.json({ 
+      success: true, 
+      count: data?.length || 0,
+      notifications: data 
+    });
 
   } catch (error) {
     console.error('Mark all notifications as read error:', error);
-    return Response.json(
-      { error: 'Internal server error' },
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }
 }
 
 // Delete a notification
-export async function DELETE(req) {
+export async function DELETE(request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const notificationId = searchParams.get('id');
-    const userId = searchParams.get('userId');
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
 
-    if (!notificationId || !userId) {
-      return Response.json(
-        { error: 'Missing required parameters' },
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const notificationId = searchParams.get('id');
+
+    if (!notificationId) {
+      return NextResponse.json(
+        { error: 'Missing notification id' },
         { status: 400 }
       );
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('notifications')
       .delete()
       .eq('id', notificationId)
-      .eq('user_id', userId); // Security: ensure user owns the notification
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting notification:', error);
-      return Response.json(
-        { error: 'Failed to delete notification' },
+      return NextResponse.json(
+        { error: 'Failed to delete notification', details: error.message },
         { status: 500 }
       );
     }
 
-    return Response.json({ success: true });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
     console.error('Delete notification error:', error);
-    return Response.json(
-      { error: 'Internal server error' },
+    return NextResponse.json(
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     );
   }

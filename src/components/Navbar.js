@@ -18,7 +18,7 @@ export default function Navbar({ onMenuClick }) {
   const pathname = usePathname();
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  // Determine if we should show back button
+  // Determine if we should show back but ton
   const shouldShowBack = pathname !== '/' && 
                          !pathname.startsWith('/login') && 
                          !pathname.startsWith('/signup') &&
