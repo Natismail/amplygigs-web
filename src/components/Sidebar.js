@@ -7,7 +7,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { 
   X, Home, User, Calendar, CheckCircle, MapPin, 
   DollarSign, Music, Settings, LogOut, Shield,
-  Users, CreditCard, Ticket, Crown, Wrench, MessageCircle, Bell, TrendingUp
+  Users, CreditCard, Ticket, Crown, Wrench, 
+  MessageCircle, Bell, TrendingUp, Instagram,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -291,9 +292,25 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/admin/payments" icon={CreditCard}>
                 Payments
               </NavLink>
-              <NavLink href="/admin/tickets" icon={Ticket}>
+              <NavLink href="/admin/network" icon={Users}>
+                Network
+              </NavLink>
+
+              <NavLink href="/admin/analytics" icon={TrendingUp}>
+      Analytics
+    </NavLink>
+    <NavLink href="/admin/finances" icon={DollarSign}>
+      Finances
+    </NavLink>
+    <NavLink href="/admin/social-media" icon={Instagram}>
+      Social Media
+    </NavLink>
+    <NavLink href="/admin/tickets" icon={Ticket}>
                 Support
               </NavLink>
+    <NavLink href="/admin/settings" icon={Settings}>
+      Settings
+    </NavLink>
               <div className="my-3 border-t border-gray-800" />
             </>
           )}

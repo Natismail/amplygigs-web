@@ -1,10 +1,11 @@
-// src/components/UpdateProfileForm.js - COMPLETE WITH ALL FIELDS
+// src/components/UpdateProfileForm.js - FIXED WITH VALIDATION
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { Metal } from "next/font/google";
 
 /* ------------------ Defaults ------------------ */
 
@@ -22,19 +23,87 @@ const EMPTY_FORM = {
     availableLine: "",
   },
   available: true,
-  // ⭐ NEW FIELDS
   experience_years: "",
   hourly_rate: "",
   genres: [],
 };
 
+
 /* ------------------ Available Genres ------------------ */
 
 const GENRES = [
-  "Afrobeats", "Hip Hop", "R&B", "Jazz", "Gospel", 
-  "Highlife", "Reggae", "Pop", "Rock", "Classical", 
-  "Electronic", "Fuji", "Juju", "Apala"
+  // 🌍 African & Afro-rooted
+  "Afrobeats",
+  "Afro Pop",
+  "Afro Fusion",
+  "Highlife",
+  "Fuji",
+  "Juju",
+  "Apala",
+  "Afro Soul",
+  "Afro Jazz",
+  "Amapiano",
+  "Afro House",
+
+  // 🎤 Urban / Contemporary
+  "Hip Hop",
+  "Trap",
+  //"Drill",
+  "R&B",
+  "Neo Soul",
+  "Pop",
+  "Dancehall",
+  "Reggae",
+  //"Grime",
+
+  // 🎸 Rock & Alternative
+  "Rock",
+  //"Alternative Rock",
+  //"Indie Rock",
+  //"Punk Rock",
+  "Heavy Metal",
+  "Hard Rock",
+
+  // 🎹 Electronic
+  "Electronic",
+  //"EDM",
+  "House",
+  //"Deep House",
+  "Techno",
+  //"Trance",
+  //"Dubstep",
+
+  // 🎼 Jazz / Blues / Classics
+  "Jazz",
+  //"Smooth Jazz",
+  "Swing",
+  "Blues",
+  "Classical",
+  "Opera",
+  "Orchestral",
+  "Fussion",
+
+  // 🎺 World / Traditional
+  "Gospel",
+  "Soul",
+  "Folk",
+  "Country",
+  "Latin",
+  "Bossa Nova",
+  "Salsa",
+  "Funk",
+  //"Flamenco",
+  //"World Music",
+
+  // 🎧 Niche / Modern
+  "Instrumental",
+  "Lo-fi",
+  //"Chillhop",
+  "Soundtrack",
+  //"Experimental"
 ];
+
+
 
 /* ------------------ Helpers ------------------ */
 
@@ -112,13 +181,33 @@ export default function UpdateProfileForm() {
     e.preventDefault();
     setError("");
     setSuccess(false);
-    setFormLoading(true);
 
     if (!user) {
       setError("You must be logged in.");
-      setFormLoading(false);
       return;
     }
+
+    // ✅ Validate at least one social media
+    const hasSocial = 
+      form.socials.instagram.trim() ||
+      form.socials.twitter.trim() ||
+      form.socials.tiktok.trim() ||
+      form.youtube.trim();
+
+    if (!hasSocial) {
+      setError("Please provide at least ONE social media handle (Instagram, Twitter, TikTok, or YouTube)");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // ✅ Validate genres
+    if (form.genres.length === 0) {
+      setError("Please select at least ONE music genre");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setFormLoading(true);
 
     const payload = {
       role: "MUSICIAN",
@@ -132,7 +221,6 @@ export default function UpdateProfileForm() {
       },
       available: form.available,
       verification_status: "unverified",
-      // ⭐ NEW FIELDS
       experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
       hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
       genres: form.genres,
@@ -149,7 +237,8 @@ export default function UpdateProfileForm() {
 
     if (error) {
       console.error('❌ Error saving profile:', error);
-      setError(error.message);
+      setError(error.message || 'Failed to save profile. Please try again.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -226,7 +315,10 @@ export default function UpdateProfileForm() {
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="flex items-start gap-2">
+              <span className="text-red-600 text-xl">⚠️</span>
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
           </div>
         )}
 
@@ -258,7 +350,7 @@ export default function UpdateProfileForm() {
           />
         </div>
 
-        {/* ⭐ NEW: Experience & Rate Row */}
+        {/* Experience & Rate Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -297,10 +389,10 @@ export default function UpdateProfileForm() {
           </div>
         </div>
 
-        {/* ⭐ NEW: Genres Selection */}
+        {/* Genres Selection */}
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
           <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
-            Music Genres (Select all that apply) *
+            Music Genres (Select at least one) *
           </label>
           <div className="flex flex-wrap gap-2">
             {GENRES.map((genre) => (
@@ -319,84 +411,89 @@ export default function UpdateProfileForm() {
             ))}
           </div>
           {form.genres.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              {form.genres.length} genre{form.genres.length > 1 ? 's' : ''} selected
+            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+              ✓ {form.genres.length} genre{form.genres.length > 1 ? 's' : ''} selected
             </p>
           )}
         </div>
 
-        {/* YouTube */}
-        <div>
-          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-            YouTube Channel / Video Link
-          </label>
-          <input
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            placeholder="https://youtube.com/..."
-            value={form.youtube}
-            onChange={(e) => setForm((f) => ({ ...f, youtube: e.target.value }))}
-          />
-        </div>
-
         {/* Social Media Section */}
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             Social Media
           </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Provide at least ONE social media handle *
+          </p>
           
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Instagram */}
+          <div className="space-y-3">
+            {/* YouTube */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                Instagram
+                YouTube Channel / Video Link
               </label>
               <input
                 className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="@username"
-                value={form.socials.instagram}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    socials: { ...f.socials, instagram: e.target.value },
-                  }))
-                }
+                placeholder="https://youtube.com/@yourhandle"
+                value={form.youtube}
+                onChange={(e) => setForm((f) => ({ ...f, youtube: e.target.value }))}
               />
             </div>
 
-            {/* Twitter */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                Twitter / X
-              </label>
-              <input
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="@username"
-                value={form.socials.twitter}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    socials: { ...f.socials, twitter: e.target.value },
-                  }))
-                }
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Instagram */}
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Instagram
+                </label>
+                <input
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="@username"
+                  value={form.socials.instagram}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      socials: { ...f.socials, instagram: e.target.value },
+                    }))
+                  }
+                />
+              </div>
 
-            {/* TikTok */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                TikTok
-              </label>
-              <input
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="@username"
-                value={form.socials.tiktok}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    socials: { ...f.socials, tiktok: e.target.value },
-                  }))
-                }
-              />
+              {/* Twitter */}
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Twitter / X
+                </label>
+                <input
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="@username"
+                  value={form.socials.twitter}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      socials: { ...f.socials, twitter: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+
+              {/* TikTok */}
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  TikTok
+                </label>
+                <input
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="@username"
+                  value={form.socials.tiktok}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      socials: { ...f.socials, tiktok: e.target.value },
+                    }))
+                  }
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -452,36 +549,52 @@ export default function UpdateProfileForm() {
         </div>
 
         {/* Availability Toggle */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <label className="flex items-center gap-3 cursor-pointer p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-            <input
-              type="checkbox"
-              checked={form.available}
-              onChange={(e) => {
-                console.log('📌 Availability toggled:', e.target.checked);
-                setForm((f) => ({ ...f, available: e.target.checked }));
-              }}
-              className="w-5 h-5 text-purple-600 focus:ring-purple-500 rounded cursor-pointer"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900 dark:text-white">
-                  Available for booking
-                </span>
-                {form.available && (
-                  <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
-                    Active
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {form.available 
-                  ? "Clients can request to book you for events" 
-                  : "You won't appear in search results for new bookings"}
-              </p>
-            </div>
-          </label>
-        </div>
+<div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+  <label
+    className={`flex items-center gap-3 cursor-pointer p-4 rounded-lg transition
+      ${
+        form.available
+          ? 'bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700'
+          : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+      }
+    `}
+  >
+    <input
+      type="checkbox"
+      checked={form.available}
+      onChange={(e) =>
+        setForm((f) => ({ ...f, available: e.target.checked }))
+      }
+      className="
+        w-5 h-5 rounded cursor-pointer
+        border-gray-300 dark:border-gray-600
+        text-green-600 focus:ring-purple-500
+        checked:bg-green-600 checked:border-green-600
+      "
+    />
+
+    <div className="flex-1">
+      <div className="flex items-center gap-2">
+        <span className="font-medium text-gray-900 dark:text-white">
+          Available for booking
+        </span>
+
+        {form.available && (
+          <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
+            Active
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        {form.available
+          ? "Clients can request to book you for events"
+          : "You won't appear in search results for new bookings"}
+      </p>
+    </div>
+  </label>
+</div>
+
 
         {/* Submit Button */}
         <button

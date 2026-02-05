@@ -1,33 +1,43 @@
-// src/app/api/webhook/payment/route.js - UPDATED WITH ESCROW INTEGRATION
+// src/app/api/webhook/payment/route.js
+// UNIFIED WEBHOOK HANDLER FOR STRIPE + PAYSTACK
+
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 export async function POST(req) {
   const body = await req.text();
-  const signature = req.headers.get('x-paystack-signature') || req.headers.get('verif-hash');
   
-  // Determine provider
-  const isPaystack = req.headers.get('x-paystack-signature') !== null;
-  const isFlutterwave = req.headers.get('verif-hash') !== null;
-
-  if (isPaystack) {
-    return await handlePaystackWebhook(body, signature);
-  } else if (isFlutterwave) {
-    return await handleFlutterwaveWebhook(body, signature);
+  // Determine provider by checking headers
+  const paystackSignature = req.headers.get('x-paystack-signature');
+  const stripeSignature = req.headers.get('stripe-signature');
+  
+  if (paystackSignature) {
+    console.log('📨 Received Paystack webhook');
+    return await handlePaystackWebhook(body, paystackSignature);
+  } else if (stripeSignature) {
+    console.log('📨 Received Stripe webhook');
+    return await handleStripeWebhook(body, stripeSignature);
   } else {
+    console.error('❌ Unknown payment provider');
     return Response.json({ error: 'Unknown payment provider' }, { status: 400 });
   }
 }
 
-// Paystack Webhook Handler
+// ============================================
+// PAYSTACK WEBHOOK HANDLER
+// ============================================
+
 async function handlePaystackWebhook(body, signature) {
   try {
-    // Verify Paystack signature
+    // 1. Verify Paystack signature
     const hash = crypto
       .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
       .update(body)
@@ -39,15 +49,15 @@ async function handlePaystackWebhook(body, signature) {
     }
 
     const payload = JSON.parse(body);
-    console.log('📨 Paystack webhook received:', payload.event);
+    console.log('📋 Paystack event:', payload.event);
 
-    // Handle successful charge
+    // 2. Handle successful charge
     if (payload.event === 'charge.success') {
       const { data } = payload;
       const txRef = data.reference;
       const bookingId = data.metadata?.booking_id;
 
-      console.log('💳 Processing payment:', { txRef, bookingId });
+      console.log('💳 Processing Paystack payment:', { txRef, bookingId });
 
       // Find transaction
       const { data: transaction, error: txError } = await supabase
@@ -61,13 +71,13 @@ async function handlePaystackWebhook(body, signature) {
         return Response.json({ error: 'Transaction not found' }, { status: 404 });
       }
 
-      // Prevent duplicate processing
+      // Idempotency check
       if (transaction.payment_status === 'successful') {
         console.log('⚠️ Already processed:', txRef);
         return Response.json({ message: 'Already processed' }, { status: 200 });
       }
 
-      // Update transaction
+      // 3. Update transaction
       await supabase
         .from('transactions')
         .update({
@@ -75,8 +85,8 @@ async function handlePaystackWebhook(body, signature) {
           metadata: {
             ...transaction.metadata,
             paystack_transaction_id: data.id,
-            payment_method: data.channel,
-            charged_amount: data.amount / 100, // Convert from kobo
+            channel: data.channel,
+            fees: data.fees,
             authorization_code: data.authorization?.authorization_code,
             card_type: data.authorization?.card_type,
             last4: data.authorization?.last4,
@@ -88,7 +98,7 @@ async function handlePaystackWebhook(body, signature) {
 
       console.log('✅ Transaction updated');
 
-      // Update booking
+      // 4. Update booking
       await supabase
         .from('bookings')
         .update({
@@ -102,11 +112,18 @@ async function handlePaystackWebhook(body, signature) {
 
       console.log('✅ Booking updated');
 
-      // ⭐ ADD TO ESCROW (UPDATED FUNCTION)
-      await addToEscrow(transaction, txRef);
+      // 5. 🌟 ADD TO ESCROW (CRITICAL STEP)
+      await addToEscrow(
+        transaction,
+        txRef,
+        'paystack',
+        data.id // paystack_transaction_id
+      );
 
-      console.log('🎉 Paystack payment processed successfully:', txRef);
-      
+      // 6. Send notifications
+      await sendPaymentNotifications(transaction, bookingId, 'paystack');
+
+      console.log('🎉 Paystack payment processed successfully');
       return Response.json({ success: true, message: 'Payment processed' });
     }
 
@@ -125,38 +142,55 @@ async function handlePaystackWebhook(body, signature) {
           }
         })
         .eq('transaction_ref', txRef);
-
-      console.log('Transaction marked as failed');
     }
 
     return Response.json({ success: true });
+
   } catch (error) {
     console.error('❌ Paystack webhook error:', error);
-    return Response.json({ error: 'Webhook processing failed' }, { status: 500 });
+    return Response.json({ 
+      error: 'Webhook processing failed', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
 
-// Flutterwave Webhook Handler
-async function handleFlutterwaveWebhook(body, signature) {
+// ============================================
+// STRIPE WEBHOOK HANDLER
+// ============================================
+
+async function handleStripeWebhook(body, signature) {
   try {
-    // Verify Flutterwave signature
-    const secretHash = process.env.FLUTTERWAVE_SECRET_HASH;
+    // 1. Verify Stripe signature
+    let event;
     
-    if (signature !== secretHash) {
-      console.error('❌ Invalid Flutterwave signature');
+    try {
+      event = stripe.webhooks.constructEvent(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error('❌ Invalid Stripe signature:', err.message);
       return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    const payload = JSON.parse(body);
-    console.log('📨 Flutterwave webhook received:', payload.event);
+    console.log('📋 Stripe event:', event.type);
 
-    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
-      const { data } = payload;
-      const txRef = data.tx_ref;
-      const bookingId = data.meta?.booking_id;
+    // 2. Handle payment intent succeeded
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      const txRef = paymentIntent.metadata?.tx_ref;
+      const bookingId = paymentIntent.metadata?.booking_id;
 
-      console.log('💳 Processing payment:', { txRef, bookingId });
+      console.log('💳 Processing Stripe payment:', { txRef, bookingId });
 
+      if (!txRef) {
+        console.error('❌ No tx_ref in metadata');
+        return Response.json({ error: 'Missing tx_ref' }, { status: 400 });
+      }
+
+      // Find transaction
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
         .select('*')
@@ -168,21 +202,24 @@ async function handleFlutterwaveWebhook(body, signature) {
         return Response.json({ error: 'Transaction not found' }, { status: 404 });
       }
 
+      // Idempotency check
       if (transaction.payment_status === 'successful') {
         console.log('⚠️ Already processed:', txRef);
         return Response.json({ message: 'Already processed' }, { status: 200 });
       }
 
+      // 3. Update transaction
       await supabase
         .from('transactions')
         .update({
           payment_status: 'successful',
           metadata: {
             ...transaction.metadata,
-            flutterwave_transaction_id: data.id,
-            payment_method: data.payment_type,
-            charged_amount: data.charged_amount,
-            app_fee: data.app_fee
+            stripe_payment_intent_id: paymentIntent.id,
+            stripe_charge_id: paymentIntent.latest_charge,
+            payment_method: paymentIntent.payment_method,
+            amount_received: paymentIntent.amount_received / 100,
+            currency: paymentIntent.currency.toUpperCase()
           },
           updated_at: new Date().toISOString()
         })
@@ -190,6 +227,7 @@ async function handleFlutterwaveWebhook(body, signature) {
 
       console.log('✅ Transaction updated');
 
+      // 4. Update booking
       await supabase
         .from('bookings')
         .update({
@@ -203,57 +241,78 @@ async function handleFlutterwaveWebhook(body, signature) {
 
       console.log('✅ Booking updated');
 
-      // ⭐ ADD TO ESCROW (UPDATED FUNCTION)
-      await addToEscrow(transaction, txRef);
+      // 5. 🌟 ADD TO ESCROW (CRITICAL STEP)
+      await addToEscrow(
+        transaction,
+        txRef,
+        'stripe',
+        paymentIntent.id // stripe_payment_intent_id
+      );
 
-      console.log('🎉 Flutterwave payment processed successfully:', txRef);
+      // 6. Send notifications
+      await sendPaymentNotifications(transaction, bookingId, 'stripe');
+
+      console.log('🎉 Stripe payment processed successfully');
       return Response.json({ success: true, message: 'Payment processed' });
     }
 
-    if (payload.event === 'charge.completed' && payload.data.status === 'failed') {
-      const txRef = payload.data.tx_ref;
-      
-      console.log('❌ Payment failed:', txRef);
-      
-      await supabase
-        .from('transactions')
-        .update({
-          payment_status: 'failed',
-          metadata: {
-            failure_reason: payload.data.processor_response
-          }
-        })
-        .eq('transaction_ref', txRef);
+    // Handle payment intent failed
+    if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object;
+      const txRef = paymentIntent.metadata?.tx_ref;
 
-      console.log('Transaction marked as failed');
+      console.log('❌ Stripe payment failed:', txRef);
+
+      if (txRef) {
+        await supabase
+          .from('transactions')
+          .update({
+            payment_status: 'failed',
+            metadata: {
+              failure_reason: paymentIntent.last_payment_error?.message
+            }
+          })
+          .eq('transaction_ref', txRef);
+      }
     }
 
     return Response.json({ success: true });
+
   } catch (error) {
-    console.error('❌ Flutterwave webhook error:', error);
-    return Response.json({ error: 'Webhook processing failed' }, { status: 500 });
+    console.error('❌ Stripe webhook error:', error);
+    return Response.json({ 
+      error: 'Webhook processing failed', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
 
-// ⭐ UPDATED FUNCTION - Add to escrow instead of direct wallet update
-async function addToEscrow(transaction, paymentReference) {
+// ============================================
+// 🌟 ADD TO ESCROW FUNCTION
+// This is where money goes into the company account
+// and musician sees it in their ledger balance
+// ============================================
+
+async function addToEscrow(transaction, paymentReference, provider, providerId) {
   try {
     console.log('💰 Adding to escrow:', {
       booking_id: transaction.booking_id,
       musician_id: transaction.musician_id,
-      amount: transaction.amount,
-      net_amount: transaction.net_amount
+      gross_amount: transaction.amount,
+      net_amount: transaction.net_amount,
+      provider: provider
     });
     
-    // ⭐ Use the database function to add to ledger balance
+    // Call database function to hold funds in escrow
     const { data, error } = await supabase
-      .rpc('add_to_ledger_balance', {
+      .rpc('hold_escrow_funds', {
         p_booking_id: transaction.booking_id,
-        p_musician_id: transaction.musician_id,
-        p_client_id: transaction.client_id,
         p_gross_amount: transaction.amount,
-        p_platform_fee: transaction.platform_fee || 0,
-        p_paystack_reference: paymentReference
+        p_payment_reference: paymentReference,
+        p_payment_provider: provider,
+        p_currency: transaction.currency || 'NGN',
+        p_stripe_payment_intent_id: provider === 'stripe' ? providerId : null,
+        p_paystack_transaction_id: provider === 'paystack' ? providerId : null
       });
 
     if (error) {
@@ -261,9 +320,9 @@ async function addToEscrow(transaction, paymentReference) {
       throw error;
     }
 
-    console.log('✅ Added to escrow. Transaction ID:', data);
+    console.log('✅ Escrow transaction created:', data);
     
-    // Update transaction with escrow info
+    // Update original transaction with escrow reference
     await supabase
       .from('transactions')
       .update({
@@ -281,23 +340,93 @@ async function addToEscrow(transaction, paymentReference) {
   } catch (error) {
     console.error('❌ Failed to add to escrow:', error);
     
-    // Update transaction to indicate escrow failure
+    // Log escrow failure but don't fail the webhook
+    // (Payment was successful, escrow can be handled manually if needed)
     await supabase
       .from('transactions')
       .update({
         metadata: {
           ...transaction.metadata,
           escrow_error: error.message,
-          escrow_failed_at: new Date().toISOString()
+          escrow_failed_at: new Date().toISOString(),
+          needs_manual_escrow: true
         }
       })
       .eq('id', transaction.id);
     
-    throw error;
+    // Don't throw - payment was successful
+    console.warn('⚠️ Payment received but escrow failed - flagged for manual processing');
   }
 }
 
-// Disable body parsing for raw body access
+// ============================================
+// SEND NOTIFICATIONS
+// ============================================
+
+async function sendPaymentNotifications(transaction, bookingId, provider) {
+  try {
+    console.log('📧 Sending notifications...');
+
+    // Get booking details
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        musician:musician_id(id, first_name, last_name, email),
+        client:client_id(id, first_name, last_name, email),
+        event:event_id(title)
+      `)
+      .eq('id', bookingId)
+      .single();
+
+    if (!booking) {
+      console.warn('⚠️ Booking not found for notifications');
+      return;
+    }
+
+    const currencySymbol = transaction.currency === 'NGN' ? '₦' : '$';
+
+    // Notify musician (funds in ledger)
+    await supabase.from('notifications').insert({
+      user_id: transaction.musician_id,
+      type: 'payment_received',
+      title: '💰 Payment Received!',
+      message: `You received ${currencySymbol}${transaction.net_amount.toLocaleString()} for "${booking.event?.title || 'upcoming gig'}". Funds are held in escrow and will be released after the event.`,
+      data: {
+        booking_id: bookingId,
+        transaction_id: transaction.id,
+        amount: transaction.net_amount,
+        currency: transaction.currency,
+        event_title: booking.event?.title,
+        payment_provider: provider
+      }
+    });
+
+    // Notify client (payment successful)
+    await supabase.from('notifications').insert({
+      user_id: transaction.client_id,
+      type: 'payment_success',
+      title: '✅ Payment Successful!',
+      message: `Your payment of ${currencySymbol}${transaction.amount.toLocaleString()} was successful. ${booking.musician?.first_name} ${booking.musician?.last_name} has been notified and your booking is confirmed.`,
+      data: {
+        booking_id: bookingId,
+        transaction_id: transaction.id,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        musician_name: `${booking.musician?.first_name} ${booking.musician?.last_name}`,
+        event_title: booking.event?.title,
+        payment_provider: provider
+      }
+    });
+
+    console.log('✅ Notifications sent');
+  } catch (error) {
+    console.error('⚠️ Notification error:', error);
+    // Don't throw - notifications are not critical
+  }
+}
+
+// Disable body parsing to get raw body for signature verification
 export const config = {
   api: {
     bodyParser: false,

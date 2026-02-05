@@ -1,11 +1,12 @@
+// src/components/WithdrawalRequest.js - FIXED
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from "next/navigation";
-
+import { useRouter } from 'next/navigation'; // ✅ ADDED THIS
 
 export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
   const { user } = useAuth();
+  const router = useRouter(); // ✅ ADDED THIS
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [amount, setAmount] = useState('');
@@ -109,7 +110,7 @@ export default function WithdrawalRequest({ wallet, onWithdrawalSuccess }) {
               Please add a bank account before you can withdraw funds.
             </p>
             <button
-              onClick={() => router.push = '/musician/settings/bank-accounts'}
+              onClick={() => router.push('/musician/settings/bank-accounts')}
               className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm"
             >
               Add Bank Account

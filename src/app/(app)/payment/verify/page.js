@@ -1,4 +1,4 @@
-// src/app/payment/verify/page.js
+// src/app/payment/verify/page.js - UPDATED WITH WALLET SUPPORT
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -14,12 +14,24 @@ export default function PaymentVerifyPage() {
   const provider = searchParams.get('provider');
   const reference = searchParams.get('reference'); // Paystack reference
   const transactionId = searchParams.get('transaction_id'); // Flutterwave transaction_id
+  const paymentType = searchParams.get('type'); // 'wallet' or 'direct'
 
   const [status, setStatus] = useState('verifying'); // verifying, success, failed
   const [message, setMessage] = useState('Verifying your payment...');
   const [details, setDetails] = useState(null);
 
   useEffect(() => {
+    // Handle wallet payments (instant, no verification needed)
+    if (paymentType === 'wallet') {
+      setStatus('success');
+      setMessage('Wallet payment successful!');
+      setTimeout(() => {
+        router.push(`/client/bookings/${bookingId}`);
+      }, 2000);
+      return;
+    }
+
+    // Handle direct payments (requires verification)
     if (txRef && bookingId && provider) {
       verifyPayment();
     } else {
@@ -27,7 +39,7 @@ export default function PaymentVerifyPage() {
       setMessage('Invalid payment verification parameters');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txRef, bookingId, provider]);
+  }, [txRef, bookingId, provider, paymentType]);
 
   const verifyPayment = async () => {
     try {
@@ -89,7 +101,21 @@ export default function PaymentVerifyPage() {
               {message}
             </p>
             
-            {details && (
+            {/* Wallet Payment Success */}
+            {paymentType === 'wallet' && (
+              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-center gap-2 text-purple-900 dark:text-purple-100 mb-2">
+                  <span className="text-2xl">💰</span>
+                  <h3 className="font-semibold">Paid from AmplyGigs Wallet</h3>
+                </div>
+                <p className="text-sm text-purple-800 dark:text-purple-200">
+                  Your booking is confirmed! Funds are held securely in escrow.
+                </p>
+              </div>
+            )}
+
+            {/* Direct Payment Success */}
+            {details && paymentType !== 'wallet' && (
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6 text-left">
                 <h3 className="font-semibold text-green-900 dark:text-green-100 mb-3">
                   Payment Details
@@ -117,6 +143,17 @@ export default function PaymentVerifyPage() {
               </div>
             )}
 
+            {/* Escrow Notice */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-6">
+              <div className="flex items-start gap-2 text-xs text-blue-800 dark:text-blue-200">
+                <span className="text-lg">🔒</span>
+                <div className="text-left">
+                  <p className="font-medium mb-1">Funds Protected in Escrow</p>
+                  <p>Payment held securely until gig completion. Release funds after the event or they auto-release in 24 hours.</p>
+                </div>
+              </div>
+            </div>
+
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Redirecting to your booking...
             </p>
@@ -132,6 +169,12 @@ export default function PaymentVerifyPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-6">
               {message}
             </p>
+
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                💡 <strong>Tip:</strong> Try paying from your AmplyGigs Wallet for instant confirmation!
+              </p>
+            </div>
 
             <div className="space-y-3">
               <button

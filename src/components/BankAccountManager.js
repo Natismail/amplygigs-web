@@ -1,3 +1,4 @@
+// src/components/BankAccountManager.js - COMPLETE WITH BANK LIST
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -9,11 +10,13 @@ export default function BankAccountManager({ onAccountAdded }) {
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [loadingBanks, setLoadingBanks] = useState(false);
   
   const [formData, setFormData] = useState({
     account_number: '',
     bank_code: '',
     bank_name: '',
+    account_name: '',
   });
   const [resolvedName, setResolvedName] = useState('');
   const [error, setError] = useState(null);
@@ -26,10 +29,10 @@ export default function BankAccountManager({ onAccountAdded }) {
 
   const fetchBankAccounts = async () => {
     const { data, error } = await supabase
-      .from('bank_accounts')
+      .from('musician_bank_accounts')
       .select('*')
       .eq('musician_id', user?.id)
-      .order('is_primary', { ascending: false });
+      .order('is_default', { ascending: false });
 
     if (!error) {
       setAccounts(data || []);
@@ -37,12 +40,22 @@ export default function BankAccountManager({ onAccountAdded }) {
   };
 
   const fetchNigerianBanks = async () => {
+    setLoadingBanks(true);
     try {
       const response = await fetch('/api/banks');
       const data = await response.json();
-      setBanks(data.banks || []);
+      
+      if (data.success) {
+        setBanks(data.banks || []);
+      } else {
+        console.error('Failed to fetch banks:', data.error);
+        setError('Failed to load banks. Please refresh the page.');
+      }
     } catch (err) {
       console.error('Failed to fetch banks:', err);
+      setError('Failed to load banks. Please refresh the page.');
+    } finally {
+      setLoadingBanks(false);
     }
   };
 
@@ -52,12 +65,17 @@ export default function BankAccountManager({ onAccountAdded }) {
       return;
     }
 
+    if (formData.account_number.length !== 10) {
+      setError('Account number must be exactly 10 digits');
+      return;
+    }
+
     setVerifying(true);
     setError(null);
     setResolvedName('');
 
     try {
-      const response = await fetch('/api/verify-account', {
+      const response = await fetch('/api/banks/verify-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,6 +94,7 @@ export default function BankAccountManager({ onAccountAdded }) {
       }
     } catch (err) {
       setError('Failed to verify account. Please try again.');
+      console.error('Verification error:', err);
     } finally {
       setVerifying(false);
     }
@@ -94,15 +113,21 @@ export default function BankAccountManager({ onAccountAdded }) {
       const selectedBank = banks.find(b => b.code === formData.bank_code);
       
       const { data, error: insertError } = await supabase
-        .from('bank_accounts')
+        .from('musician_bank_accounts')
         .insert({
           musician_id: user.id,
           account_number: formData.account_number,
           account_name: resolvedName,
           bank_name: selectedBank?.name || formData.bank_name,
           bank_code: formData.bank_code,
-          is_primary: accounts.length === 0,
+          country_code: 'NG',
+          currency: 'NGN',
+          payment_provider: 'paystack',
+          is_default: accounts.length === 0,
           is_verified: true,
+          verified_at: new Date().toISOString(),
+          verification_method: 'paystack',
+          status: 'active',
         })
         .select()
         .single();
@@ -111,25 +136,37 @@ export default function BankAccountManager({ onAccountAdded }) {
 
       setAccounts([...accounts, data]);
       setShowAddForm(false);
-      setFormData({ account_number: '', bank_code: '', bank_name: '' });
+      setFormData({ account_number: '', bank_code: '', bank_name: '', account_name: '' });
       setResolvedName('');
       
       if (onAccountAdded) onAccountAdded(data);
     } catch (err) {
       setError(err.message || 'Failed to add bank account');
+      console.error('Add account error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSetPrimary = async (accountId) => {
-    const { error } = await supabase
-      .from('bank_accounts')
-      .update({ is_primary: true })
-      .eq('id', accountId);
+  const handleSetDefault = async (accountId) => {
+    try {
+      // Remove default from all accounts
+      await supabase
+        .from('musician_bank_accounts')
+        .update({ is_default: false })
+        .eq('musician_id', user.id);
 
-    if (!error) {
-      fetchBankAccounts();
+      // Set new default
+      const { error } = await supabase
+        .from('musician_bank_accounts')
+        .update({ is_default: true })
+        .eq('id', accountId);
+
+      if (!error) {
+        fetchBankAccounts();
+      }
+    } catch (err) {
+      console.error('Set default error:', err);
     }
   };
 
@@ -137,7 +174,7 @@ export default function BankAccountManager({ onAccountAdded }) {
     if (!confirm('Are you sure you want to delete this bank account?')) return;
 
     const { error } = await supabase
-      .from('bank_accounts')
+      .from('musician_bank_accounts')
       .delete()
       .eq('id', accountId);
 
@@ -165,50 +202,85 @@ export default function BankAccountManager({ onAccountAdded }) {
           <h3 className="text-xl font-semibold mb-4">Add New Bank Account</h3>
           
           <div className="space-y-4">
+            {/* Bank Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Select Bank
+                Select Bank *
               </label>
-              <select
-                value={formData.bank_code}
-                onChange={(e) => setFormData({ ...formData, bank_code: e.target.value })}
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700"
-              >
-                <option value="">-- Select Bank --</option>
-                {banks.map(bank => (
-                  <option key={bank.code} value={bank.code}>
-                    {bank.name}
-                  </option>
-                ))}
-              </select>
+              {loadingBanks ? (
+                <div className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg">
+                  <div className="animate-spin h-5 w-5 border-2 border-purple-600 border-t-transparent rounded-full mr-2"></div>
+                  <span className="text-gray-600 dark:text-gray-400">Loading banks...</span>
+                </div>
+              ) : (
+                <select
+                  value={formData.bank_code}
+                  onChange={(e) => {
+                    const selectedBank = banks.find(b => b.code === e.target.value);
+                    setFormData({ 
+                      ...formData, 
+                      bank_code: e.target.value,
+                      bank_name: selectedBank?.name || ''
+                    });
+                    setResolvedName(''); // Reset verification
+                  }}
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700"
+                  disabled={loadingBanks}
+                >
+                  <option value="">-- Select Your Bank --</option>
+                  {banks.map(bank => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {banks.length === 0 && !loadingBanks && (
+                <p className="text-xs text-red-600 mt-1">
+                  Failed to load banks. Please refresh the page.
+                </p>
+              )}
             </div>
 
+            {/* Account Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Account Number
+                Account Number *
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={formData.account_number}
                   onChange={(e) => {
-                    setFormData({ ...formData, account_number: e.target.value });
-                    setResolvedName('');
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, account_number: value });
+                    setResolvedName(''); // Reset verification when number changes
                   }}
                   maxLength={10}
                   placeholder="0123456789"
-                  className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700"
+                  className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 font-mono"
                 />
                 <button
                   onClick={verifyAccountNumber}
-                  disabled={verifying || !formData.account_number || !formData.bank_code}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={verifying || !formData.account_number || !formData.bank_code || formData.account_number.length !== 10}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  {verifying ? 'Verifying...' : 'Verify'}
+                  {verifying ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Verifying...
+                    </span>
+                  ) : (
+                    'Verify'
+                  )}
                 </button>
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Enter your 10-digit account number
+              </p>
             </div>
 
+            {/* Verified Account Name */}
             {resolvedName && (
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div className="flex items-center gap-2">
@@ -225,17 +297,19 @@ export default function BankAccountManager({ onAccountAdded }) {
               </div>
             )}
 
+            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <p className="text-sm text-red-800">{error}</p>
               </div>
             )}
 
+            {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => {
                   setShowAddForm(false);
-                  setFormData({ account_number: '', bank_code: '', bank_name: '' });
+                  setFormData({ account_number: '', bank_code: '', bank_name: '', account_name: '' });
                   setResolvedName('');
                   setError(null);
                 }}
@@ -248,13 +322,21 @@ export default function BankAccountManager({ onAccountAdded }) {
                 disabled={loading || !resolvedName}
                 className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Adding...' : 'Add Account'}
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    Adding...
+                  </span>
+                ) : (
+                  'Add Account'
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Account List */}
       <div className="space-y-3">
         {accounts.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -266,7 +348,7 @@ export default function BankAccountManager({ onAccountAdded }) {
             <div
               key={account.id}
               className={`bg-white dark:bg-gray-800 rounded-lg shadow p-4 ${
-                account.is_primary ? 'border-2 border-purple-500' : 'border border-gray-200 dark:border-gray-700'
+                account.is_default ? 'border-2 border-purple-500' : 'border border-gray-200 dark:border-gray-700'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -275,9 +357,14 @@ export default function BankAccountManager({ onAccountAdded }) {
                     <h3 className="font-semibold text-gray-900 dark:text-white">
                       {account.bank_name}
                     </h3>
-                    {account.is_primary && (
+                    {account.is_default && (
                       <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
-                        Primary
+                        Default
+                      </span>
+                    )}
+                    {account.is_verified && (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded flex items-center gap-1">
+                        <span>✓</span> Verified
                       </span>
                     )}
                   </div>
@@ -290,12 +377,12 @@ export default function BankAccountManager({ onAccountAdded }) {
                 </div>
                 
                 <div className="flex gap-2">
-                  {!account.is_primary && (
+                  {!account.is_default && (
                     <button
-                      onClick={() => handleSetPrimary(account.id)}
+                      onClick={() => handleSetDefault(account.id)}
                       className="px-3 py-1 text-sm text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded"
                     >
-                      Set as Primary
+                      Set as Default
                     </button>
                   )}
                   <button
@@ -313,3 +400,5 @@ export default function BankAccountManager({ onAccountAdded }) {
     </div>
   );
 }
+
+

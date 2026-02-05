@@ -205,6 +205,78 @@ export function useKYC() {
     }
   };
 
+// Add to src/hooks/useKYC.js
+
+const submitVerification = async (data) => {
+  if (!user) return { success: false, error: 'Not authenticated' };
+
+  setUploading(true);
+  setError(null);
+
+  try {
+    // Upload all files
+    const uploads = {};
+    
+    if (data.idDocument) {
+      uploads.id_front_image_url = await uploadDocument(data.idDocument, 'id_document');
+    }
+    if (data.idFront) {
+      uploads.id_front_image_url = await uploadDocument(data.idFront, 'id_front');
+    }
+    if (data.idBack) {
+      uploads.id_back_image_url = await uploadDocument(data.idBack, 'id_back');
+    }
+    if (data.selfie) {
+      uploads.selfie_image_url = await uploadDocument(data.selfie, 'selfie');
+    }
+    if (data.selfieWithID) {
+      uploads.id_with_selfie_url = await uploadDocument(data.selfieWithID, 'selfie_with_id');
+    }
+    if (data.proofOfAddress) {
+      uploads.proof_of_address_url = await uploadDocument(data.proofOfAddress, 'address_proof');
+    }
+    if (data.visaDocument) {
+      // Create a unique filename for visa document
+      const visaUrl = await uploadDocument(data.visaDocument, 'visa');
+      uploads.visa_document_url = visaUrl;
+    }
+
+    // Create verification record
+    const { data: verificationData, error: verificationError } = await supabase
+      .from('musician_verifications')
+      .upsert({
+        musician_id: user.id,
+        country: data.country || 'Nigeria',
+        verification_type: data.verificationType || 'nigerian',
+        is_british_citizen: data.isBritishCitizen || false,
+        id_type: data.idType,
+        id_number: data.idNumber,
+        right_to_work_share_code: data.rightToWorkCode || null,
+        visa_status: data.visaDetails || null,
+        proof_of_address_type: data.proofOfAddressType || null,
+        status: 'pending',
+        submitted_at: new Date().toISOString(),
+        ...uploads
+      }, {
+        onConflict: 'musician_id'
+      })
+      .select()
+      .single();
+
+    if (verificationError) throw verificationError;
+
+    setVerification(verificationData);
+    return { success: true, data: verificationData };
+  } catch (err) {
+    console.error('Verification error:', err);
+    setError(err.message);
+    return { success: false, error: err.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
+
   // ⭐ Calculate completion percentage - IMPROVED
   const getCompletionPercentage = useCallback(() => {
     if (!verification) return 0;
@@ -239,6 +311,7 @@ export function useKYC() {
     submitIDVerification,
     submitSelfieVerification,
     submitPhoneVerification,
+    submitVerification,
     uploadDocument,
     refreshVerification: fetchVerification,
   };

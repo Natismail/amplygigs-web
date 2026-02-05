@@ -1,19 +1,26 @@
-// src/app/admin/dashboard/page.js
+// src/app/(app)/admin/dashboard/page.js - OPTIMIZED VERSION
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  Users, Calendar, DollarSign, TrendingUp, 
+  CheckCircle, Clock, AlertCircle, Wallet,
+  Music, UserCheck, Crown
+} from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   
   const [stats, setStats] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSupport, setIsSupport] = useState(false);
+  const [recentActivity, setRecentActivity] = useState([]);
 
   useEffect(() => {
     checkAdminAccess();
@@ -26,7 +33,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Check if user is admin
     const { data, error } = await supabase
       .from('user_profiles')
       .select('is_admin, is_support, role')
@@ -39,40 +45,111 @@ export default function AdminDashboard() {
       return;
     }
 
-    setIsAdmin(data.is_admin);
-    fetchStats();
+    setIsAdmin(data.is_admin || data.role === 'ADMIN');
+    setIsSupport(data.is_support);
+    await Promise.all([fetchStats(), fetchRecentActivity()]);
   };
 
   const fetchStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('admin_stats')
-        .select('*')
-        .single();
+      // Users
+      const { data: users } = await supabase
+        .from('user_profiles')
+        .select('role');
 
-      if (!error && data) {
-        setStats(data);
-      }
-    } catch (err) {
-      console.error('Error fetching stats:', err);
+      const totalUsers = users?.length || 0;
+      const totalMusicians = users?.filter(u => u.role === 'MUSICIAN').length || 0;
+      const totalClients = users?.filter(u => u.role === 'CLIENT').length || 0;
+      const totalAdmins = users?.filter(u => u.role === 'ADMIN' || u.is_admin).length || 0;
+
+      // Bookings
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('status, amount');
+
+      const totalBookings = bookings?.length || 0;
+      const pendingBookings = bookings?.filter(b => b.status === 'pending').length || 0;
+      const confirmedBookings = bookings?.filter(b => b.status === 'confirmed').length || 0;
+      const completedBookings = bookings?.filter(b => b.status === 'completed').length || 0;
+
+      // Financials
+      const { data: escrow } = await supabase
+        .from('escrow_transactions')
+        .select('gross_amount, platform_fee, status');
+
+      const totalRevenue = escrow?.reduce((sum, e) => sum + parseFloat(e.gross_amount || 0), 0) || 0;
+      const heldEscrow = escrow
+        ?.filter(e => e.status === 'held')
+        ?.reduce((sum, e) => sum + parseFloat(e.gross_amount || 0), 0) || 0;
+      const platformFees = escrow?.reduce((sum, e) => sum + parseFloat(e.platform_fee || 0), 0) || 0;
+
+      // Withdrawals
+      const { data: withdrawals } = await supabase
+        .from('withdrawals')
+        .select('amount, status');
+
+      const pendingWithdrawals = withdrawals?.filter(w => w.status === 'pending').length || 0;
+      const pendingWithdrawalAmount = withdrawals
+        ?.filter(w => w.status === 'pending')
+        ?.reduce((sum, w) => sum + parseFloat(w.amount || 0), 0) || 0;
+
+      // Verifications
+      const { data: verifications } = await supabase
+        .from('musician_verifications')
+        .select('status')
+        .in('status', ['pending', 'under_review']);
+
+      const pendingVerifications = verifications?.length || 0;
+
+      setStats({
+        totalUsers,
+        totalMusicians,
+        totalClients,
+        totalAdmins,
+        totalBookings,
+        pendingBookings,
+        confirmedBookings,
+        completedBookings,
+        totalRevenue,
+        heldEscrow,
+        platformFees,
+        pendingWithdrawals,
+        pendingWithdrawalAmount,
+        pendingVerifications
+      });
+
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const tabs = [
-    { id: 'overview', label: '📊 Overview', adminOnly: false },
-    { id: 'verifications', label: '✅ Verifications', adminOnly: false },
-    { id: 'users', label: '👥 Users', adminOnly: true },
-    { id: 'bookings', label: '📅 Bookings', adminOnly: false },
-    { id: 'flags', label: '🚩 Flagged Content', adminOnly: false },
-    { id: 'tickets', label: '🎫 Support Tickets', adminOnly: false },
-  ];
+  const fetchRecentActivity = async () => {
+    try {
+      const { data } = await supabase
+        .from('admin_actions')
+        .select(`
+          *,
+          admin:admin_id(first_name, last_name),
+          target_user:target_user_id(first_name, last_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setRecentActivity(data || []);
+    } catch (error) {
+      console.error('Error fetching activity:', error);
+    }
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -82,350 +159,286 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">
-            {isAdmin ? '👑 Admin Dashboard' : '🛠️ Support Dashboard'}
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            {isAdmin ? <Crown className="w-8 h-8" /> : <UserCheck className="w-8 h-8" />}
+            <h1 className="text-3xl font-bold">
+              {isAdmin ? 'Admin Dashboard' : 'Support Dashboard'}
+            </h1>
+          </div>
           <p className="text-purple-100">
-            {isAdmin ? 'Full system management and oversight' : 'Support ticket and verification management'}
+            {isAdmin 
+              ? 'Full system management and oversight' 
+              : 'Support ticket and verification management'}
           </p>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex overflow-x-auto space-x-1">
-            {tabs.map(tab => {
-              if (tab.adminOnly && !isAdmin) return null;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-6 py-4 font-medium text-sm whitespace-nowrap transition ${
-                    activeTab === tab.id
-                      ? 'border-b-4 border-purple-600 text-purple-600 dark:text-purple-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
       <div className="max-w-7xl mx-auto p-6">
-        {activeTab === 'overview' && stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Main Stats Grid */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <StatCard
-              icon="🎵"
-              label="Total Musicians"
-              value={stats.total_musicians}
-              color="purple"
-            />
-            <StatCard
-              icon="👤"
-              label="Total Clients"
-              value={stats.total_clients}
+              title="Total Users"
+              value={stats.totalUsers}
+              subtitle={`${stats.totalMusicians} musicians, ${stats.totalClients} clients`}
+              icon={<Users className="w-6 h-6" />}
               color="blue"
+              href="/admin/users"
             />
+
             <StatCard
-              icon="⏳"
-              label="Pending Verifications"
-              value={stats.pending_verifications}
+              title="Pending Verifications"
+              value={stats.pendingVerifications}
+              subtitle="Requires review"
+              icon={<CheckCircle className="w-6 h-6" />}
               color="yellow"
+              href="/admin/verifications"
+              badge={stats.pendingVerifications > 0}
             />
+
             <StatCard
-              icon="📅"
-              label="Pending Bookings"
-              value={stats.pending_bookings}
+              title="Total Bookings"
+              value={stats.totalBookings}
+              subtitle={`${stats.pendingBookings} pending`}
+              icon={<Calendar className="w-6 h-6" />}
+              color="purple"
+              href="/admin/bookings"
+            />
+
+            <StatCard
+              title="Total Revenue"
+              value={`₦${stats.totalRevenue.toLocaleString()}`}
+              subtitle={`₦${stats.platformFees.toLocaleString()} in fees`}
+              icon={<DollarSign className="w-6 h-6" />}
               color="green"
+              href="/admin/payments"
             />
+
             <StatCard
-              icon="💰"
-              label="Total Revenue"
-              value={`₦${stats.total_revenue?.toLocaleString() || 0}`}
-              color="green"
-            />
-            <StatCard
-              icon="✅"
-              label="Paid Bookings"
-              value={stats.paid_bookings}
-              color="green"
-            />
-            <StatCard
-              icon="🎫"
-              label="Open Tickets"
-              value={stats.open_tickets}
+              title="Escrow Held"
+              value={`₦${stats.heldEscrow.toLocaleString()}`}
+              subtitle="In escrow protection"
+              icon={<Wallet className="w-6 h-6" />}
               color="orange"
             />
+
             <StatCard
-              icon="🚩"
-              label="Pending Flags"
-              value={stats.pending_flags}
+              title="Pending Withdrawals"
+              value={stats.pendingWithdrawals}
+              subtitle={`₦${stats.pendingWithdrawalAmount.toLocaleString()}`}
+              icon={<Clock className="w-6 h-6" />}
               color="red"
+              badge={stats.pendingWithdrawals > 0}
+            />
+
+            <StatCard
+              title="Confirmed Bookings"
+              value={stats.confirmedBookings}
+              subtitle="Active bookings"
+              icon={<TrendingUp className="w-6 h-6" />}
+              color="indigo"
+            />
+
+            <StatCard
+              title="Completed Gigs"
+              value={stats.completedBookings}
+              subtitle="Successful events"
+              icon={<CheckCircle className="w-6 h-6" />}
+              color="green"
             />
           </div>
         )}
 
-        {activeTab === 'verifications' && (
-          <VerificationsPanel isAdmin={isAdmin} />
-        )}
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <ActionCard
+            title="Manage Users"
+            description="View and manage all platform users"
+            icon="👥"
+            href="/admin/users"
+            color="blue"
+          />
 
-        {activeTab === 'users' && isAdmin && (
-          <UsersPanel />
-        )}
+          <ActionCard
+            title="Verifications"
+            description="Review KYC submissions"
+            icon="✅"
+            href="/admin/verifications"
+            color="purple"
+            badge={stats?.pendingVerifications}
+          />
 
-        {activeTab === 'bookings' && (
-          <BookingsPanel isAdmin={isAdmin} />
-        )}
+          <ActionCard
+            title="Bookings"
+            description="Monitor all bookings"
+            icon="📅"
+            href="/admin/bookings"
+            color="green"
+          />
 
-        {activeTab === 'flags' && (
-          <FlagsPanel isAdmin={isAdmin} />
-        )}
+          <ActionCard
+            title="Payments"
+            description="Financial transactions"
+            icon="💰"
+            href="/admin/payments"
+            color="yellow"
+          />
 
-        {activeTab === 'tickets' && (
-          <TicketsPanel isAdmin={isAdmin} />
-        )}
+          <ActionCard
+            title="Support Tickets"
+            description="Handle user issues"
+            icon="🎫"
+            href="/admin/tickets"
+            color="red"
+          />
+
+          {isAdmin && (
+            <ActionCard
+              title="Platform Settings"
+              description="System configuration"
+              icon="⚙️"
+              href="/admin/settings"
+              color="gray"
+            />
+          )}
+        </div>
+
+        {/* Recent Admin Actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Recent Admin Actions
+          </h2>
+          
+          {recentActivity.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No recent activity</p>
+          ) : (
+            <div className="space-y-3">
+              {recentActivity.slice(0, 10).map((action) => (
+                <div 
+                  key={action.id}
+                  className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-0"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {action.admin?.first_name} {action.admin?.last_name}
+                      <span className="text-gray-500 dark:text-gray-400 mx-2">•</span>
+                      <span className="text-purple-600 dark:text-purple-400">
+                        {action.action_type.replace(/_/g, ' ')}
+                      </span>
+                    </p>
+                    {action.target_user && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Target: {action.target_user.first_name} {action.target_user.last_name}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400">
+                      {new Date(action.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <ActionTypeBadge type={action.action_type} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// Stat Card Component
-function StatCard({ icon, label, value, color }) {
+// Components
+function StatCard({ title, value, subtitle, icon, color, href, badge }) {
   const colorClasses = {
-    purple: 'from-purple-500 to-purple-600',
-    blue: 'from-blue-500 to-blue-600',
-    yellow: 'from-yellow-500 to-yellow-600',
-    green: 'from-green-500 to-green-600',
-    orange: 'from-orange-500 to-orange-600',
-    red: 'from-red-500 to-red-600',
+    blue: 'bg-blue-500',
+    purple: 'bg-purple-500',
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    red: 'bg-red-500',
+    yellow: 'bg-yellow-500',
+    indigo: 'bg-indigo-500'
   };
 
-  return (
-    <div className={`bg-gradient-to-br ${colorClasses[color]} text-white rounded-2xl p-6 shadow-lg`}>
-      <div className="text-4xl mb-3">{icon}</div>
-      <div className="text-3xl font-bold mb-1">{value}</div>
-      <div className="text-sm opacity-90">{label}</div>
-    </div>
-  );
-}
-
-// Verifications Panel
-function VerificationsPanel({ isAdmin }) {
-  const [verifications, setVerifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(null);
-
-  useEffect(() => {
-    fetchVerifications();
-  }, []);
-
-  const fetchVerifications = async () => {
-    const { data, error } = await supabase
-      .from('musician_verifications')
-      .select(`
-        *,
-        musician:musician_id(first_name, last_name, email, phone)
-      `)
-      .in('status', ['pending', 'under_review'])
-      .order('submitted_at', { ascending: false });
-
-    if (!error && data) {
-      setVerifications(data);
-    }
-    setLoading(false);
-  };
-
-  const handleAction = async (verificationId, action, reason = '') => {
-    setProcessing(verificationId);
-
-    try {
-      const { data: verification } = await supabase
-        .from('musician_verifications')
-        .select('musician_id')
-        .eq('id', verificationId)
-        .single();
-
-      // Update verification status
-      await supabase
-        .from('musician_verifications')
-        .update({
-          status: action === 'approve' ? 'approved' : 'rejected',
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: action === 'reject' ? reason : null,
-        })
-        .eq('id', verificationId);
-
-      // Log admin action
-      await supabase
-        .from('admin_actions')
-        .insert({
-          action_type: action === 'approve' ? 'verification_approve' : 'verification_reject',
-          target_user_id: verification.musician_id,
-          target_type: 'verification',
-          target_id: verificationId,
-          reason: reason,
-        });
-
-      // Send notification to musician
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: verification.musician_id,
-          type: action === 'approve' ? 'verification_approved' : 'verification_rejected',
-          title: action === 'approve' ? 'Verification Approved!' : 'Verification Rejected',
-          message: action === 'approve' 
-            ? 'Your profile has been verified. You can now receive bookings!'
-            : `Your verification was rejected. Reason: ${reason}`,
-        });
-
-      alert(action === 'approve' ? 'Verification approved!' : 'Verification rejected.');
-      fetchVerifications();
-    } catch (error) {
-      alert('Action failed: ' + error.message);
-    } finally {
-      setProcessing(null);
-    }
-  };
-
-  if (loading) return <div>Loading verifications...</div>;
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Pending Verifications</h2>
-      
-      {verifications.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center">
-          <div className="text-6xl mb-4">✅</div>
-          <p className="text-gray-600 dark:text-gray-400">No pending verifications</p>
+  const content = (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <div className={`${colorClasses[color]} p-3 rounded-lg text-white`}>
+          {icon}
         </div>
-      ) : (
-        verifications.map(verification => (
-          <div key={verification.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow border border-gray-200 dark:border-gray-700">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="font-bold text-lg">
-                  {verification.musician?.first_name} {verification.musician?.last_name}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {verification.musician?.email}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {verification.musician?.phone}
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                {verification.status}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div>
-                <p className="text-sm font-semibold mb-2">ID Type</p>
-                <p className="text-sm">{verification.id_type}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold mb-2">ID Number</p>
-                <p className="text-sm">{verification.id_number}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold mb-2">Submitted</p>
-                <p className="text-sm">
-                  {new Date(verification.submitted_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              {verification.id_front_image_url && (
-                <div>
-                  <p className="text-sm font-semibold mb-2">ID Front</p>
-                  <a 
-                    href={verification.id_front_image_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View Image →
-                  </a>
-                </div>
-              )}
-              {verification.id_back_image_url && (
-                <div>
-                  <p className="text-sm font-semibold mb-2">ID Back</p>
-                  <a 
-                    href={verification.id_back_image_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View Image →
-                  </a>
-                </div>
-              )}
-              {verification.selfie_image_url && (
-                <div>
-                  <p className="text-sm font-semibold mb-2">Selfie</p>
-                  <a 
-                    href={verification.selfie_image_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View Image →
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {isAdmin && (
-              <div className="flex gap-3 pt-4 border-t">
-                <button
-                  onClick={() => handleAction(verification.id, 'approve')}
-                  disabled={processing === verification.id}
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
-                >
-                  ✓ Approve
-                </button>
-                <button
-                  onClick={() => {
-                    const reason = prompt('Rejection reason:');
-                    if (reason) handleAction(verification.id, 'reject', reason);
-                  }}
-                  disabled={processing === verification.id}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
-                >
-                  ✗ Reject
-                </button>
-              </div>
-            )}
-          </div>
-        ))
+        {badge && (
+          <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+            !
+          </span>
+        )}
+      </div>
+      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+        {value}
+      </h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-1">
+        {title}
+      </p>
+      {subtitle && (
+        <p className="text-xs text-gray-500 dark:text-gray-500">
+          {subtitle}
+        </p>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href}>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-shadow cursor-pointer">
+          {content}
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      {content}
     </div>
   );
 }
 
-// Users Panel (Admin only)
-function UsersPanel() {
-  return <div>Users management coming soon...</div>;
+function ActionCard({ title, description, icon, href, color, badge }) {
+  const colorClasses = {
+    blue: 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700',
+    purple: 'from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700',
+    green: 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700',
+    red: 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
+    yellow: 'from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700',
+    gray: 'from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
+  };
+
+  return (
+    <Link href={href}>
+      <div className={`relative bg-gradient-to-r ${colorClasses[color]} text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all cursor-pointer`}>
+        {badge > 0 && (
+          <span className="absolute top-4 right-4 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+            {badge}
+          </span>
+        )}
+        <div className="text-4xl mb-4">{icon}</div>
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-sm opacity-90">{description}</p>
+      </div>
+    </Link>
+  );
 }
 
-// Bookings Panel
-function BookingsPanel() {
-  return <div>Bookings management coming soon...</div>;
-}
+function ActionTypeBadge({ type }) {
+  const getColor = (type) => {
+    if (type.includes('approve') || type.includes('grant')) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+    if (type.includes('reject') || type.includes('revoke') || type.includes('suspend') || type.includes('ban')) return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+    if (type.includes('cancel')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+    return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+  };
 
-// Flags Panel
-function FlagsPanel() {
-  return <div>Flagged content coming soon...</div>;
-}
-
-// Tickets Panel
-function TicketsPanel() {
-  return <div>Support tickets coming soon...</div>;
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getColor(type)}`}>
+      {type.replace(/_/g, ' ')}
+    </span>
+  );
 }

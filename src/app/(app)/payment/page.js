@@ -1,10 +1,11 @@
-// src/app/(app)/payment/page.js
+// src/app/(app)/payment/page.js - UPDATED WITH WALLET SUPPORT
 "use client";
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { Wallet, CreditCard, Building2, ArrowRight, Shield, Clock } from 'lucide-react';
 
 export default function PaymentPage() {
   const { user } = useAuth();
@@ -13,14 +14,17 @@ export default function PaymentPage() {
   const bookingId = searchParams.get('bookingId');
 
   const [booking, setBooking] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(null); // 'wallet' or 'direct'
   const [selectedProvider, setSelectedProvider] = useState('paystack');
 
   useEffect(() => {
     if (bookingId && user) {
       fetchBookingDetails();
+      fetchWalletBalance();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId, user]);
@@ -47,14 +51,67 @@ export default function PaymentPage() {
     }
   };
 
-  const handlePayment = async () => {
+  const fetchWalletBalance = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_client_wallet_balance', { p_client_id: user.id });
+
+      if (!error && data && data.length > 0) {
+        setWallet(data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch wallet:', err);
+    }
+  };
+
+  const handleWalletPayment = async () => {
+    if (!booking || !user) return;
+
+    // Check sufficient balance
+    if (wallet.balance < booking.amount) {
+      setError('Insufficient wallet balance. Please add funds or pay directly.');
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/booking/pay-from-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: user.id,
+          bookingId: booking.id,
+          amount: booking.amount,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Show success and redirect
+        alert('Payment successful! Your booking is confirmed.');
+        router.push(`/client/bookings/${booking.id}`);
+      } else {
+        throw new Error(result.error || 'Wallet payment failed');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Wallet payment error:', err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDirectPayment = async () => {
     if (!booking || !user) return;
 
     setProcessing(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/pay-paystack', {
+      const response = await fetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -62,6 +119,8 @@ export default function PaymentPage() {
           email: user.email,
           bookingId: booking.id,
           musicianId: booking.musician_id,
+          clientId: user.id,
+          countryCode: user.country_code || 'NG',
           paymentProvider: selectedProvider,
         }),
       });
@@ -79,6 +138,16 @@ export default function PaymentPage() {
       console.error('Payment error:', err);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handlePayment = () => {
+    if (paymentMethod === 'wallet') {
+      handleWalletPayment();
+    } else if (paymentMethod === 'direct') {
+      handleDirectPayment();
+    } else {
+      setError('Please select a payment method');
     }
   };
 
@@ -105,8 +174,14 @@ export default function PaymentPage() {
     );
   }
 
-  const platformFee = booking.amount * 0.05;
+  const platformFee = booking.amount * 0.10; // 10%
+  const vat = booking.amount * 0.075; // 7.5%
+  const totalFees = platformFee + vat;
   const totalAmount = booking.amount;
+  const musicianReceives = booking.amount - totalFees;
+  const hasWallet = wallet && wallet.balance > 0;
+  const hasSufficientBalance = wallet && wallet.balance >= booking.amount;
+  const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
@@ -124,11 +199,11 @@ export default function PaymentPage() {
           {/* Header Section */}
           <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 text-white">
             <h1 className="text-3xl font-bold mb-2">Complete Payment</h1>
-            <p className="text-purple-100">Secure payment for your booking</p>
+            <p className="text-purple-100">Choose your payment method</p>
           </div>
 
-          {/* Booking Details */}
           <div className="p-6 space-y-6">
+            {/* Booking Details */}
             <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
               <h3 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">
                 Booking Details
@@ -156,85 +231,228 @@ export default function PaymentPage() {
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Location</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {booking.event_location}
-                  </span>
-                </div>
               </div>
             </div>
 
-            {/* Payment Breakdown */}
+            {/* Payment Amount */}
             <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
-              <h3 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">
-                Payment Breakdown
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Booking Amount</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    ₦{booking.amount.toLocaleString()}
-                  </span>
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-semibold text-lg text-gray-900 dark:text-white">
+                  Total Amount
+                </span>
+                <span className="font-bold text-3xl text-blue-600 dark:text-blue-400">
+                  {currencySymbol}{totalAmount.toLocaleString()}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                <div className="flex justify-between">
+                  <span>Booking Amount:</span>
+                  <span>{currencySymbol}{booking.amount.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Platform Fee (5%)</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    ₦{platformFee.toLocaleString()}
-                  </span>
+                <div className="flex justify-between">
+                  <span>Platform Fee (10%):</span>
+                  <span>-{currencySymbol}{platformFee.toLocaleString()}</span>
                 </div>
-                <div className="pt-3 border-t-2 border-blue-200 dark:border-blue-700 flex justify-between">
-                  <span className="font-semibold text-lg text-gray-900 dark:text-white">
-                    Total Amount
-                  </span>
-                  <span className="font-bold text-2xl text-blue-600 dark:text-blue-400">
-                    ₦{totalAmount.toLocaleString()}
-                  </span>
+                <div className="flex justify-between">
+                  <span>VAT (7.5%):</span>
+                  <span>-{currencySymbol}{vat.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-blue-200 dark:border-blue-700 font-medium">
+                  <span>Musician Receives:</span>
+                  <span className="text-green-600">{currencySymbol}{musicianReceives.toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Payment Provider Selection */}
+            {/* Payment Method Selection */}
             <div>
-              <h3 className="font-semibold mb-3 text-gray-900 dark:text-white">
+              <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">
                 Select Payment Method
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="space-y-3">
+                {/* AmplyGigs Wallet Payment Option - PRIORITIZED */}
                 <button
-                  onClick={() => setSelectedProvider('paystack')}
-                  className={`p-4 border-2 rounded-xl transition-all ${
-                    selectedProvider === 'paystack'
-                      ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20'
+                  onClick={() => setPaymentMethod('wallet')}
+                  disabled={!hasWallet || !hasSufficientBalance}
+                  className={`w-full p-5 border-2 rounded-xl transition-all text-left ${
+                    paymentMethod === 'wallet'
+                      ? 'border-purple-600 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-900/20 shadow-lg'
+                      : hasWallet && hasSufficientBalance
+                      ? 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700'
+                      : 'border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        paymentMethod === 'wallet' 
+                          ? 'bg-purple-600' 
+                          : hasWallet && hasSufficientBalance 
+                          ? 'bg-purple-100 dark:bg-purple-900/30' 
+                          : 'bg-gray-100 dark:bg-gray-800'
+                      }`}>
+                        <Wallet className={`w-6 h-6 ${
+                          paymentMethod === 'wallet' 
+                            ? 'text-white' 
+                            : hasWallet && hasSufficientBalance 
+                            ? 'text-purple-600 dark:text-purple-400' 
+                            : 'text-gray-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-gray-900 dark:text-white">
+                            AmplyGigs Wallet
+                          </p>
+                          {hasWallet && hasSufficientBalance && (
+                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">
+                              Recommended
+                            </span>
+                          )}
+                        </div>
+                        {hasWallet ? (
+                          <>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Balance: <span className="font-semibold text-gray-900 dark:text-white">{currencySymbol}{wallet.balance.toLocaleString()}</span>
+                            </p>
+                            {!hasSufficientBalance && (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                <span>⚠️</span>
+                                Insufficient balance • Need {currencySymbol}{(booking.amount - wallet.balance).toLocaleString()} more
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            No wallet found • Create one in settings
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {paymentMethod === 'wallet' && (
+                      <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                        <span className="text-white text-lg">✓</span>
+                      </div>
+                    )}
+                  </div>
+                  {hasWallet && hasSufficientBalance && (
+                    <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-700/50">
+                      <div className="flex items-center gap-2 text-xs text-purple-700 dark:text-purple-300 font-medium">
+                        <Clock className="w-4 h-4" />
+                        <span>⚡ Instant payment • No extra fees • Secure escrow</span>
+                      </div>
+                    </div>
+                  )}
+                </button>
+
+                {/* OR Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-4 bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-400 font-medium">
+                      OR PAY WITH
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card/Bank Payment Option */}
+                <button
+                  onClick={() => setPaymentMethod('direct')}
+                  className={`w-full p-5 border-2 rounded-xl transition-all text-left ${
+                    paymentMethod === 'direct'
+                      ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 shadow-lg'
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-center">
-                    <div className="text-3xl mb-2">💳</div>
-                    <p className="font-semibold text-gray-900 dark:text-white">Paystack</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Card, Bank Transfer, USSD
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        paymentMethod === 'direct' ? 'bg-purple-600' : 'bg-gray-100 dark:bg-gray-800'
+                      }`}>
+                        <CreditCard className={`w-6 h-6 ${
+                          paymentMethod === 'direct' ? 'text-white' : 'text-gray-600 dark:text-gray-400'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white mb-1">
+                          Card / Bank Transfer
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Debit card, Bank transfer, USSD
+                        </p>
+                      </div>
+                    </div>
+                    {paymentMethod === 'direct' && (
+                      <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                        <span className="text-white text-lg">✓</span>
+                      </div>
+                    )}
                   </div>
                 </button>
 
-                <button
-                  onClick={() => setSelectedProvider('flutterwave')}
-                  className={`p-4 border-2 rounded-xl transition-all ${
-                    selectedProvider === 'flutterwave'
-                      ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-center">
-                    <div className="text-3xl mb-2">🦋</div>
-                    <p className="font-semibold text-gray-900 dark:text-white">Flutterwave</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Multiple payment options
+                {/* Provider Selection (if direct payment) */}
+                {paymentMethod === 'direct' && (
+                  <div className="ml-14 space-y-3 animate-fadeIn">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Choose payment provider:
                     </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setSelectedProvider('paystack')}
+                        className={`p-4 border-2 rounded-lg transition-all ${
+                          selectedProvider === 'paystack'
+                            ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 shadow-md'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-2xl mb-1">💳</div>
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white">Paystack</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Card • Bank • USSD</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setSelectedProvider('stripe')}
+                        className={`p-4 border-2 rounded-lg transition-all ${
+                          selectedProvider === 'stripe'
+                            ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 shadow-md'
+                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-2xl mb-1">🌍</div>
+                          <p className="font-semibold text-sm text-gray-900 dark:text-white">Stripe</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">International</p>
+                        </div>
+                      </button>
+                    </div>
                   </div>
-                </button>
+                )}
               </div>
             </div>
+
+            {/* Add Funds Link (if insufficient balance) */}
+            {hasWallet && !hasSufficientBalance && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Wallet className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+                      Need more funds?
+                    </p>
+                    <button
+                      onClick={() => router.push('/client/settings?tab=wallet')}
+                      className="text-sm text-yellow-700 dark:text-yellow-300 underline hover:no-underline"
+                    >
+                      Add funds to your wallet →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Error Display */}
             {error && (
@@ -246,16 +464,16 @@ export default function PaymentPage() {
             {/* Security Notice */}
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <span className="text-2xl">🔒</span>
+                <Shield className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <h4 className="font-semibold text-green-900 dark:text-green-100 mb-1 text-sm">
-                    Secure Payment
+                    Secure Escrow Protection
                   </h4>
                   <ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
-                    <li>• Funds held in escrow until gig completion</li>
+                    <li>• Funds held securely until gig completion</li>
                     <li>• Full refund if musician cancels</li>
-                    <li>• Secure encrypted payment processing</li>
-                    <li>• Release funds after gig completion</li>
+                    <li>• Release funds after successful event</li>
+                    <li>• Auto-release after 24 hours of completion</li>
                   </ul>
                 </div>
               </div>
@@ -264,16 +482,26 @@ export default function PaymentPage() {
             {/* Pay Button */}
             <button
               onClick={handlePayment}
-              disabled={processing}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={processing || !paymentMethod}
+              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {processing ? (
-                <span className="flex items-center justify-center gap-2">
+                <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Processing...
-                </span>
+                </>
+              ) : paymentMethod === 'wallet' ? (
+                <>
+                  Pay {currencySymbol}{totalAmount.toLocaleString()} from Wallet
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              ) : paymentMethod === 'direct' ? (
+                <>
+                  Pay {currencySymbol}{totalAmount.toLocaleString()} with {selectedProvider === 'paystack' ? 'Paystack' : 'Stripe'}
+                  <ArrowRight className="w-5 h-5" />
+                </>
               ) : (
-                `Pay ₦${totalAmount.toLocaleString()} with ${selectedProvider === 'paystack' ? 'Paystack' : 'Flutterwave'}`
+                'Select Payment Method'
               )}
             </button>
 

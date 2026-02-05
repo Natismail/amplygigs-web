@@ -1,12 +1,11 @@
-// //app/(app)/musician/bookings/page.js
-
-
- 'use client';
+// src/app/(app)/musician/bookings/page.js - ENHANCED
+'use client';
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
+import { CheckCircle, Clock, DollarSign, MapPin, Calendar, User } from 'lucide-react';
 
 export default function MusicianBookingsPage() {
   const { user } = useAuth();
@@ -69,7 +68,7 @@ export default function MusicianBookingsPage() {
 
         {/* Tabs - Horizontal Scroll on mobile */}
         <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex px-4 gap-2 min-w-max">
+          <div className="flex px-4 gap-2 min-w-max pb-3">
             <button
               onClick={() => setActiveTab('requests')}
               className={`min-h-[44px] px-5 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
@@ -111,10 +110,11 @@ export default function MusicianBookingsPage() {
           gigRequests.length > 0 ? (
             gigRequests.map(booking => (
               <Link href={`/musician/bookings/${booking.id}`} key={booking.id}>
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border-2 border-yellow-200 dark:border-yellow-800 active:scale-98 transition-transform">
-                  <div className="flex items-start justify-between mb-3">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-2 border-yellow-200 dark:border-yellow-800 hover:shadow-md active:scale-98 transition-all cursor-pointer">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full mb-2">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full mb-2">
+                        <Clock className="w-3 h-3" />
                         New Request
                       </span>
                       <h3 className="font-bold text-lg text-gray-900 dark:text-white">
@@ -123,28 +123,34 @@ export default function MusicianBookingsPage() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2 text-sm mb-3">
+                  <div className="space-y-2 text-sm mb-4">
                     <div className="flex items-center text-gray-600 dark:text-gray-400">
-                      <span className="w-5">👤</span>
+                      <User className="w-4 h-4 mr-2" />
                       <span>{booking.client?.first_name} {booking.client?.last_name}</span>
                     </div>
                     <div className="flex items-center text-gray-600 dark:text-gray-400">
-                      <span className="w-5">📍</span>
+                      <MapPin className="w-4 h-4 mr-2" />
                       <span className="truncate">{booking.event_location}</span>
                     </div>
                     <div className="flex items-center text-gray-600 dark:text-gray-400">
-                      <span className="w-5">📅</span>
+                      <Calendar className="w-4 h-4 mr-2" />
                       <span>{new Date(booking.event_date).toLocaleDateString('en-US', {
+                        weekday: 'short',
                         month: 'short',
                         day: 'numeric',
-                        year: 'numeric'
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
                       })}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <span className="text-sm text-gray-500">Offered Price</span>
-                    <span className="text-lg font-bold text-green-600">
+                    <span className="text-sm text-gray-500 flex items-center gap-1">
+                      <DollarSign className="w-4 h-4" />
+                      Offered Price
+                    </span>
+                    <span className="text-xl font-bold text-green-600">
                       ₦{booking.amount?.toLocaleString() || '0'}
                     </span>
                   </div>
@@ -152,7 +158,7 @@ export default function MusicianBookingsPage() {
                   {/* Action hint */}
                   <div className="mt-3 text-center">
                     <span className="text-xs text-blue-600 font-medium">
-                      Tap to view details →
+                      Tap to view details & respond →
                     </span>
                   </div>
                 </div>
@@ -175,46 +181,58 @@ export default function MusicianBookingsPage() {
         {activeTab === 'confirmed' && (
           confirmedGigs.length > 0 ? (
             confirmedGigs.map(booking => (
-              <div
-                key={booking.id}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <span className="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full mb-2">
-                      Confirmed
-                    </span>
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-                      {booking.events?.title || 'Confirmed Gig'}
-                    </h3>
+              <Link href={`/musician/bookings/${booking.id}`} key={booking.id}>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md active:scale-98 transition-all cursor-pointer">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full mb-2">
+                        <CheckCircle className="w-3 h-3" />
+                        Confirmed
+                      </span>
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                        {booking.events?.title || 'Confirmed Gig'}
+                      </h3>
+                    </div>
+                    {booking.payment_status === 'paid' && (
+                      <span className="text-2xl">💰</span>
+                    )}
                   </div>
-                  {booking.payment_status === 'paid' && (
-                    <span className="text-xl">💰</span>
-                  )}
-                </div>
-                
-                <div className="space-y-2 text-sm mb-3">
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">👤</span>
-                    <span>{booking.client?.first_name} {booking.client?.last_name}</span>
+                  
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <User className="w-4 h-4 mr-2" />
+                      <span>{booking.client?.first_name} {booking.client?.last_name}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span className="truncate">{booking.event_location}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      <span>{new Date(booking.event_date).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">📍</span>
-                    <span className="truncate">{booking.event_location}</span>
-                  </div>
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">📅</span>
-                    <span>{new Date(booking.event_date).toLocaleDateString()}</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-sm text-gray-500">Amount</span>
-                  <span className="text-lg font-bold text-green-600">
-                    ₦{booking.amount?.toLocaleString() || '0'}
-                  </span>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-500">Amount</span>
+                    <span className="text-xl font-bold text-green-600">
+                      ₦{booking.amount?.toLocaleString() || '0'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-center">
+                    <span className="text-xs text-blue-600 font-medium">
+                      Tap for details →
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
@@ -233,43 +251,55 @@ export default function MusicianBookingsPage() {
         {activeTab === 'past' && (
           pastGigs.length > 0 ? (
             pastGigs.map(booking => (
-              <div
-                key={booking.id}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 opacity-75"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full mb-2">
-                      Completed
-                    </span>
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-                      {booking.events?.title || 'Past Gig'}
-                    </h3>
+              <Link href={`/musician/bookings/${booking.id}`} key={booking.id}>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 opacity-90 hover:opacity-100 hover:shadow-md active:scale-98 transition-all cursor-pointer">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full mb-2">
+                        Completed
+                      </span>
+                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                        {booking.events?.title || 'Past Gig'}
+                      </h3>
+                    </div>
+                    {booking.funds_released_at && (
+                      <span className="text-2xl" title="Funds Released">✅</span>
+                    )}
                   </div>
-                </div>
-                
-                <div className="space-y-2 text-sm mb-3">
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">👤</span>
-                    <span>{booking.client?.first_name} {booking.client?.last_name}</span>
+                  
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <User className="w-4 h-4 mr-2" />
+                      <span>{booking.client?.first_name} {booking.client?.last_name}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span className="truncate">{booking.event_location}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600 dark:text-gray-400">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      <span>{new Date(booking.event_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">📍</span>
-                    <span className="truncate">{booking.event_location}</span>
-                  </div>
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <span className="w-5">📅</span>
-                    <span>{new Date(booking.event_date).toLocaleDateString()}</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-sm text-gray-500">Earned</span>
-                  <span className="text-lg font-bold text-gray-600">
-                    ₦{booking.escrow_amount?.toLocaleString() || '0'}
-                  </span>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <span className="text-sm text-gray-500">Earned</span>
+                    <span className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                      ₦{booking.escrow_amount?.toLocaleString() || booking.amount?.toLocaleString() || '0'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-center">
+                    <span className="text-xs text-gray-500">
+                      Tap for details →
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
@@ -290,5 +320,3 @@ export default function MusicianBookingsPage() {
     </div>
   );
 }
-
-
