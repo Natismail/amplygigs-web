@@ -7,7 +7,9 @@ import { supabase } from '@/lib/supabaseClient';
 import ProfilePictureUpload from '@/components/ProfilePictureUpload';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProfileSyncButton from '@/components/ProfileSyncButton';
-//import ProfileSyncButton from '@/components/ProfileSyncButton';
+import { getCategoryIcon, getAllSubcategoriesFlat } from '@/lib/constants/musicianCategories';
+import CategorySelector from '@/components/musician/CategorySelector';
+
 
 
 import { 
@@ -53,12 +55,81 @@ export default function MusicianProfilePage() {
 
   const musicRoles = [
     "Singer", "Guitarist", "Drummer", "DJ", "Keyboardist", 
-    "Bassist", "Saxophonist", "Trumpeter", "Violinist", "MC/Host"
+    "Bassist", "Saxophonist", "Trumpeter", "Violinist", "MC/Host",
+    "Live Band", "Choral Group", "Trombonist", "Percussionist", "Producer",
+
   ];
 
   const genres = [
-    "Afrobeats", "Hip Hop", "R&B", "Jazz", "Gospel", 
-    "Highlife", "Reggae", "Pop", "Rock", "Classical", "Electronic"
+     // 🌍 African & Afro-rooted
+  "Afrobeats",
+  "Afro Pop",
+  "Afro Fusion",
+  "Highlife",
+  "Fuji",
+  "Juju",
+  "Apala",
+  "Afro Soul",
+  "Afro Jazz",
+  "Amapiano",
+  //"Afro House",
+
+  // 🎤 Urban / Contemporary
+  "Hip Hop",
+  "Trap",
+  //"Drill",
+  "R&B",
+  "Neo Soul",
+  "Pop",
+  "Dancehall",
+  "Reggae",
+  //"Grime",
+
+  // 🎸 Rock & Alternative
+  "Rock",
+  //"Alternative Rock",
+  //"Indie Rock",
+  //"Punk Rock",
+  "Heavy Metal",
+  "Hard Rock",
+
+  // 🎹 Electronic
+  "Electronic",
+  //"EDM",
+  "House",
+  //"Deep House",
+  "Techno",
+  //"Trance",
+  //"Dubstep",
+
+  // 🎼 Jazz / Blues / Classics
+  "Jazz",
+  //"Smooth Jazz",
+  "Swing",
+  "Blues",
+  "Classical",
+  "Opera",
+  "Orchestral",
+  "Fussion",
+
+  // 🎺 World / Traditional
+  "Gospel",
+  "Soul",
+  "Folk",
+  "Country",
+  "Latin",
+  "Bossa Nova",
+  "Salsa",
+  "Funk",
+  //"Flamenco",
+  //"World Music",
+
+  // 🎧 Niche / Modern
+  "Instrumental",
+  //"Lo-fi",
+  //"Chillhop",
+  //"Soundtrack",
+  //"Experimental"
   ];
 
   useEffect(() => {
@@ -71,6 +142,7 @@ export default function MusicianProfilePage() {
         phone: user.phone || '',
         location: user.location || '',
         primary_role: user.primary_role || '',
+        categories: user.categories || [],
         genres: user.genres || [],
         experience_years: user.experience_years || '',
         hourly_rate: user.hourly_rate || '',
@@ -80,6 +152,7 @@ export default function MusicianProfilePage() {
         instagram: user.instagram || '',
         twitter: user.twitter || '',
         tiktok: user.tiktok || '',
+
       });
       
       fetchVideos();
@@ -91,7 +164,8 @@ export default function MusicianProfilePage() {
 
     try {
       const { data, error } = await supabase
-        .from('musician_videos')
+        //.from('musician_videos')
+        .from('musician_media')
         .select('*')
         .eq('musician_id', user.id)
         .order('created_at', { ascending: false });
@@ -138,7 +212,8 @@ export default function MusicianProfilePage() {
         .getPublicUrl(fileName);
 
       const { error: dbError } = await supabase
-        .from('musician_videos')
+        //.from('musician_videos')
+        .from('musician_media')
         .insert({
           musician_id: user.id,
           video_url: publicUrl,
@@ -171,7 +246,8 @@ export default function MusicianProfilePage() {
         .remove([filePath]);
 
       const { error } = await supabase
-        .from('musician_videos')
+        //.from('musician_videos')
+        .from('musician_media')
         .delete()
         .eq('id', videoId);
 
@@ -215,6 +291,10 @@ export default function MusicianProfilePage() {
     setError(null);
 
     try {
+      // Extract primary category and subcategories
+      const primaryCat = formData.categories.find(c => c.isPrimary) || formData.categories[0];
+      const allSubcategories = getAllSubcategoriesFlat(formData.categories);
+
       const payload = {
         first_name: formData.first_name,
         last_name: formData.last_name,
@@ -222,8 +302,15 @@ export default function MusicianProfilePage() {
         bio: formData.bio,
         phone: formData.phone,
         location: formData.location,
-        primary_role: formData.primary_role,
+        
+        // NEW: Category fields
+        categories: formData.categories,
+        primary_category: primaryCat?.category || null,
+        subcategories: allSubcategories,
+        
+        // Keep genres for music styles
         genres: formData.genres,
+        
         experience_years: formData.experience_years ? parseInt(formData.experience_years, 10) : null,
         hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
         available: formData.availability === 'available',
@@ -487,54 +574,50 @@ export default function MusicianProfilePage() {
 
           {/* MUSIC DETAILS */}
           {activeTab === 'music' && (
-            <div className="space-y-4 animate-fadeIn">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Musician Details
-              </h3>
+  <div className="space-y-4 animate-fadeIn">
+    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">
+      Musician Details
+    </h3>
 
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                  Primary Role *
-                </label>
-                <select
-                  name="primary_role"
-                  value={formData.primary_role}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                >
-                  <option value="">Select your role</option>
-                  {musicRoles.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-              </div>
+    {/* Categories Section */}
+    <div>
+      <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+        Categories & Skills
+      </label>
+      <CategorySelector
+        value={formData.categories}
+        onChange={(categories) => setFormData(prev => ({ ...prev, categories }))}
+      />
+    </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
-                  Genres (Select all that apply)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {genres.map(genre => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => handleGenreToggle(genre)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
-                        formData.genres.includes(genre)
-                          ? 'bg-purple-600 text-white shadow-md scale-105'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 active:scale-95'
-                      }`}
-                    >
-                      {genre}
-                    </button>
-                  ))}
-                </div>
-                {formData.genres.length > 0 && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    {formData.genres.length} genre{formData.genres.length > 1 ? 's' : ''} selected
-                  </p>
-                )}
-              </div>
+    {/* Genres Section */}
+    <div>
+      <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+        Music Genres/Styles
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {genres.map(genre => (
+          <button
+            key={genre}
+            type="button"
+            onClick={() => handleGenreToggle(genre)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all touch-manipulation ${
+              formData.genres.includes(genre)
+                ? 'bg-purple-600 text-white shadow-md scale-105'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 active:scale-95'
+            }`}
+          >
+            {genre}
+          </button>
+        ))}
+      </div>
+      {formData.genres.length > 0 && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          {formData.genres.length} genre{formData.genres.length > 1 ? 's' : ''} selected
+        </p>
+      )}
+    </div>
+
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

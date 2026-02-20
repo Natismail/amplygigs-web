@@ -1,0 +1,62 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Square with Gradient -->
+  <rect width="512" height="512" rx="128" fill="url(#gradient)"/>
+  
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9333EA"/>  <!-- Purple -->
+      <stop offset="100%" stop-color="#EC4899"/> <!-- Pink -->
+    </linearGradient>
+  </defs>
+  
+  <!-- Guitar Headstock -->
+  <g transform="translate(156, 80)">
+    <!-- Main headstock body -->
+    <path d="M 100 0 L 120 0 C 130 0 140 10 140 20 L 140 330 C 140 340 130 350 120 350 L 80 350 C 70 350 60 340 60 330 L 60 20 C 60 10 70 0 80 0 L 100 0 Z" 
+          fill="white" opacity="0.95"/>
+    
+    <!-- Tuning Pegs (Left Side) -->
+    <!-- Peg 1 -->
+    <circle cx="50" cy="80" r="18" fill="white"/>
+    <circle cx="50" cy="80" r="12" fill="#9333EA"/>
+    <rect x="32" y="76" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Peg 2 -->
+    <circle cx="50" cy="150" r="18" fill="white"/>
+    <circle cx="50" cy="150" r="12" fill="#9333EA"/>
+    <rect x="32" y="146" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Peg 3 -->
+    <circle cx="50" cy="220" r="18" fill="white"/>
+    <circle cx="50" cy="220" r="12" fill="#9333EA"/>
+    <rect x="32" y="216" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Tuning Pegs (Right Side) -->
+    <!-- Peg 4 -->
+    <circle cx="150" cy="80" r="18" fill="white"/>
+    <circle cx="150" cy="80" r="12" fill="#EC4899"/>
+    <rect x="150" y="76" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Peg 5 -->
+    <circle cx="150" cy="150" r="18" fill="white"/>
+    <circle cx="150" cy="150" r="12" fill="#EC4899"/>
+    <rect x="150" y="146" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Peg 6 -->
+    <circle cx="150" cy="220" r="18" fill="white"/>
+    <circle cx="150" cy="220" r="12" fill="#EC4899"/>
+    <rect x="150" y="216" width="18" height="8" rx="4" fill="white"/>
+    
+    <!-- Nut (top of fretboard) -->
+    <rect x="75" y="280" width="50" height="8" rx="2" fill="white"/>
+    
+    <!-- String notches -->
+    <line x1="82" y1="280" x2="82" y2="288" stroke="#9333EA" stroke-width="2"/>
+    <line x1="92" y1="280" x2="92" y2="288" stroke="#9333EA" stroke-width="2"/>
+    <line x1="102" y1="280" x2="102" y2="288" stroke="#9333EA" stroke-width="2"/>
+    <line x1="108" y1="280" x2="108" y2="288" stroke="#EC4899" stroke-width="2"/>
+    <line x1="113" y1="280" x2="113" y2="288" stroke="#EC4899" stroke-width="2"/>
+    <line x1="118" y1="280" x2="118" y2="288" stroke="#EC4899" stroke-width="2"/>
+  </g>
+</svg>

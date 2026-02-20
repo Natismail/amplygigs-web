@@ -10,6 +10,9 @@ import { useSocial } from "@/context/SocialContext";
 import VideoGallery from "@/components/VideoGallery";
 import RatingForm from "@/components/RatingForm";
 import ProposalForm from "@/components/ProposalForm";
+
+import MusicianVideoUpload from '@/components/videos/MusicianVideoUpload';
+import MusicianVideosDisplay from '@/components/videos/MusicianVideosDisplay';
 import {
   FaYoutube,
   FaInstagram,
@@ -30,6 +33,7 @@ import {
   Award,
   Briefcase,
   Send,
+  X,
 } from "lucide-react";
 
 export default function MusicianProfilePage() {
@@ -46,13 +50,16 @@ export default function MusicianProfilePage() {
   const [activeTab, setActiveTab] = useState("about");
   const [showProposalForm, setShowProposalForm] = useState(false);
 
+  const [showImageModal, setShowImageModal] = useState(false);
+
+
   const isOwnProfile = user?.id === id;
 
   useEffect(() => {
     if (!id) return;
     fetchMusicianData();
     fetchStats();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchMusicianData = async () => {
@@ -189,6 +196,33 @@ export default function MusicianProfilePage() {
     fetchMusicianData();
   };
 
+  const ImageZoomModal = ({ imageUrl, onClose }) => {
+    if (!imageUrl) return null;
+
+    return (
+      <div
+        className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-white hover:text-gray-300 transition"
+        >
+          <X className="w-8 h-8" />
+        </button>
+        <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center">
+          <Image
+            src={imageUrl}
+            alt="Profile picture"
+            fill
+            className="object-contain"
+          />
+        </div>
+      </div>
+    );
+  };
+
+
   if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -229,15 +263,25 @@ export default function MusicianProfilePage() {
       <div className="bg-gradient-to-br from-purple-600 to-blue-600 text-white">
         <div className="max-w-5xl mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row items-start gap-8">
-            {/* Profile Picture */}
-            <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl flex-shrink-0">
+            {/* Profile Picture - UPDATED WITH ZOOM */}
+            <div
+              className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl flex-shrink-0 cursor-pointer group"
+              onClick={() => musician.profile_picture_url && setShowImageModal(true)}
+            >
               {musician.profile_picture_url ? (
-                <Image
-                  src={musician.profile_picture_url}
-                  alt={displayName}
-                  fill
-                  className="object-cover"
-                />
+                <>
+                  <Image
+                    src={musician.profile_picture_url}
+                    alt={displayName}
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
+                    <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-sm font-medium">
+                      {/* Click to zoom */}
+                    </span>
+                  </div>
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-purple-800 text-white text-5xl font-bold">
                   {displayName?.[0]?.toUpperCase()}
@@ -248,7 +292,7 @@ export default function MusicianProfilePage() {
             {/* Info */}
             <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-bold mb-2">{displayName}</h1>
-              
+
               <div className="flex flex-wrap items-center gap-4 text-white/90 mb-4">
                 {musician.primary_role && (
                   <span className="flex items-center gap-2">
@@ -313,7 +357,7 @@ export default function MusicianProfilePage() {
                     <MessageCircle className="w-5 h-5" />
                     Message
                   </button>
-                  
+
                   {/* PROPOSAL BUTTON - NEW! */}
                   <button
                     onClick={() => setShowProposalForm(true)}
@@ -325,11 +369,10 @@ export default function MusicianProfilePage() {
 
                   <button
                     onClick={handleFollow}
-                    className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition ${
-                      isFollowing
-                        ? "bg-purple-700 hover:bg-purple-800 text-white"
-                        : "bg-white/20 hover:bg-white/30 text-white backdrop-blur"
-                    }`}
+                    className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition ${isFollowing
+                      ? "bg-purple-700 hover:bg-purple-800 text-white"
+                      : "bg-white/20 hover:bg-white/30 text-white backdrop-blur"
+                      }`}
                   >
                     <Heart className={`w-5 h-5 ${isFollowing ? "fill-current" : ""}`} />
                     {isFollowing ? "Following" : "Follow"}
@@ -343,11 +386,10 @@ export default function MusicianProfilePage() {
               {/* Availability & Rate */}
               <div className="flex flex-wrap gap-4 mt-4">
                 <span
-                  className={`px-4 py-2 rounded-lg font-medium ${
-                    musician.available
-                      ? "bg-green-500/20 text-green-100"
-                      : "bg-red-500/20 text-red-100"
-                  }`}
+                  className={`px-4 py-2 rounded-lg font-medium ${musician.available
+                    ? "bg-green-500/20 text-green-100"
+                    : "bg-red-500/20 text-red-100"
+                    }`}
                 >
                   {musician.available ? "Available for Bookings" : "Currently Unavailable"}
                 </span>
@@ -370,11 +412,10 @@ export default function MusicianProfilePage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`py-4 px-2 font-medium border-b-2 transition whitespace-nowrap ${
-                  activeTab === tab
-                    ? "border-purple-600 text-purple-600"
-                    : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                }`}
+                className={`py-4 px-2 font-medium border-b-2 transition whitespace-nowrap ${activeTab === tab
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -387,6 +428,37 @@ export default function MusicianProfilePage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         {activeTab === "about" && (
           <div className="space-y-6">
+            {/* Categories & Subcategories - NEW! */}
+            {musician.categories && musician.categories.length > 0 && (
+              <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Music className="w-5 h-5" />
+                  Musical Expertise
+                </h2>
+                <div className="space-y-4">
+                  {musician.categories.map((cat, idx) => (
+                    <div key={idx} className="border-l-4 border-purple-500 pl-4">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-2">
+                        {cat.category}
+                      </h3>
+                      {cat.subcategories && cat.subcategories.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {cat.subcategories.map((sub, subIdx) => (
+                            <span
+                              key={subIdx}
+                              className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full text-sm font-medium"
+                            >
+                              {sub}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Bio */}
             {musician.bio && (
               <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
@@ -471,8 +543,30 @@ export default function MusicianProfilePage() {
           </div>
         )}
 
-        {activeTab === "videos" && (
+
+        {/* {activeTab === "videos" && (
           <VideoGallery musicianId={id} isOwnProfile={isOwnProfile} />
+        )} */}
+
+
+        {activeTab === "videos" && (
+          <div className="space-y-6">
+            {/* Upload Section - Only for own profile */}
+            {isOwnProfile && (
+              <MusicianVideoUpload
+                onUploadSuccess={(newVideo) => {
+                  // Optionally refresh the display
+                  console.log('Video uploaded:', newVideo);
+                }}
+              />
+            )}
+
+            {/* Public Display - For everyone */}
+            <MusicianVideosDisplay
+              musicianId={id}
+              isOwnProfile={isOwnProfile}
+            />
+          </div>
         )}
 
         {activeTab === "reviews" && (
@@ -529,9 +623,8 @@ export default function MusicianProfilePage() {
                               {[...Array(5)].map((_, i) => (
                                 <FaStar
                                   key={i}
-                                  className={`w-4 h-4 ${
-                                    i < r.rating ? "text-yellow-400" : "text-gray-300 dark:text-gray-600"
-                                  }`}
+                                  className={`w-4 h-4 ${i < r.rating ? "text-yellow-400" : "text-gray-300 dark:text-gray-600"
+                                    }`}
                                 />
                               ))}
                             </div>
@@ -568,6 +661,14 @@ export default function MusicianProfilePage() {
             onCancel={() => setShowProposalForm(false)}
           />
         </div>
+      )}
+
+      {/* Image Zoom Modal */}
+      {showImageModal && (
+        <ImageZoomModal 
+          imageUrl={musician.profile_picture_url}
+          onClose={() => setShowImageModal(false)}
+        />
       )}
     </div>
   );

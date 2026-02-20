@@ -14,7 +14,6 @@ export default function VideoGallery({ musicianId, isOwnProfile = false }) {
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDescription, setVideoDescription] = useState("");
   const [previewUrl, setPreviewUrl] = useState(null);
-  
   const fileInputRef = useRef(null);
 
   useEffect(() => {

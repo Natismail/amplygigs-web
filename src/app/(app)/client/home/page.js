@@ -8,11 +8,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import MusicianCard from "@/components/MusicianCard";
 import PostEventForm from "@/components/PostEventForm";
+import PostJobForm from "@/components/jobs/PostJobForm"; // NEW IMPORT
 import SearchFilterBar from "@/components/SearchFilterBar";
-import { Plus, Calendar, Users, TrendingUp, Eye, Trash2, RefreshCw, MapPin } from "lucide-react";
+import { Plus, Calendar, Users, TrendingUp, Eye, Trash2, RefreshCw, MapPin, Briefcase } from "lucide-react";
 import LoadingSpinner, { SkeletonCard } from "@/components/LoadingSpinner";
 import EmptyState from "@/components/EmptyState";
 import PullToRefresh from '@/components/PullToRefresh';
+//import StreamingToggle from '@/components/streaming/StreamingToggle';
 
 
 export default function ClientHome() {
@@ -23,6 +25,7 @@ export default function ClientHome() {
   const [musicians, setMusicians] = useState([]);
   const [clientEvents, setClientEvents] = useState([]);
   const [showPostForm, setShowPostForm] = useState(false);
+  const [postingType, setPostingType] = useState(null); // NEW: 'event' or 'job'
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
@@ -125,6 +128,16 @@ export default function ClientHome() {
     }
   };
 
+  // NEW: Handle post button click with type selection
+  const handlePostClick = () => {
+    setShowPostForm(true);
+    setPostingType(null); // Reset to show type selection
+  };
+
+  const handlePostTypeSelect = (type) => {
+    setPostingType(type);
+  };
+
   const handleDeleteEvent = async (eventId) => {
     if (!confirm("Are you sure you want to delete this event?")) return;
 
@@ -221,8 +234,9 @@ export default function ClientHome() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               Welcome Back! 👋
             </h1>
-
-            <button
+<div className="flex items-center gap-3">
+    {/* <StreamingToggle /> */}
+            {/* <button
               onClick={() => setShowPostForm(true)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition shadow-lg hover:shadow-xl"
             >
@@ -230,6 +244,17 @@ export default function ClientHome() {
               <span className="hidden sm:inline">Post Event</span>
             </button>
           </div>
+ </div> */}
+                <button
+                  onClick={handlePostClick}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition shadow-lg hover:shadow-xl"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Post New</span>
+                </button>
+              </div>
+            </div>
+
 
           {/* Tabs */}
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -262,14 +287,14 @@ export default function ClientHome() {
               )}
             </button>
 
-            <button
+              {/* Feed */}
+            {/* <button
               onClick={() => router.push("/feed")}
               className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
             >
               <TrendingUp className="w-4 h-4" />
-              Network
-              {/* Feed */}
-            </button>
+              Social Feed
+            </button> */}
           </div>
         </div>
       </div>
@@ -474,24 +499,160 @@ export default function ClientHome() {
         )}
       </div>
 
-      {/* Post Event Modal */}
-      {showPostForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <PostEventForm
-            onSuccess={(eventData) => {
-              console.log("✅ Event posted:", eventData);
-              setShowPostForm(false);
-              fetchClientEvents();
-              alert("✅ Event posted successfully!");
-              setActiveTab("myEvents");
-            }}
-            onCancel={() => setShowPostForm(false)}
-          />
-        </div>
-      )}
-    </div>
-        </PullToRefresh>
+      {/* Post Modal with Type Selection */}
+        {showPostForm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            {!postingType ? (
+              // Type Selection Screen
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+                    What would you like to post?
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Choose the type of opportunity you're offering
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Quick Gig Card */}
+                  <button
+                    onClick={() => handlePostTypeSelect('event')}
+                    className="group relative p-8 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
+                  >
+                    <div className="absolute top-6 right-6">
+                      <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center group-hover:scale-110 transition">
+                        <Calendar className="w-8 h-8 text-purple-600" />
+                      </div>
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                      Quick Gig / Event
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      One-time performance or event
+                    </p>
+                    
+                    <ul className="space-y-3 text-sm text-gray-700 dark:text-gray-300 mb-6">
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Single event (wedding, party, corporate)</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Musicians send you price proposals</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Pay per event through platform</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Best for: Parties, weddings, one-off shows</span>
+                      </li>
+                    </ul>
+                    
+                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                        FREE TO POST →
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Job/Audition Card */}
+                  <button
+                    onClick={() => handlePostTypeSelect('job')}
+                    className="group relative p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
+                  >
+                    <div className="absolute top-6 right-6">
+                      <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition">
+                        <Briefcase className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Job / Audition
+                      </h3>
+                      <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded-full">
+                        NEW
+                      </span>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      Long-term position or recurring work
+                    </p>
+                    
+                    <ul className="space-y-3 text-sm text-gray-700 dark:text-gray-300 mb-6">
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Monthly/permanent employment</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Musicians apply with portfolio/CV</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Hold auditions, interview candidates</span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                        <span>Best for: Church positions, venue residents</span>
+                      </li>
+                    </ul>
+                    
+                    <div className="pt-4 border-t border-purple-200 dark:border-purple-800">
+                      <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                        ₦10,000 POSTING FEE →
+                      </span>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Cancel Button */}
+                <div className="mt-6 text-center">
+                  <button
+                    onClick={() => setShowPostForm(false)}
+                    className="px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : postingType === 'event' ? (
+              // Show Event Form
+              <PostEventForm
+                onSuccess={(eventData) => {
+                  console.log("✅ Event posted:", eventData);
+                  setShowPostForm(false);
+                  setPostingType(null);
+                  fetchClientEvents();
+                  alert("✅ Event posted successfully!");
+                  setActiveTab("myEvents");
+                }}
+                onCancel={() => {
+                  setShowPostForm(false);
+                  setPostingType(null);
+                }}
+              />
+            ) : (
+              // Show Job Form
+              <PostJobForm
+                onSuccess={() => {
+                  setShowPostForm(false);
+                  setPostingType(null);
+                  // Redirect handled by PostJobForm to payment page
+                }}
+                onCancel={() => {
+                  setShowPostForm(false);
+                  setPostingType(null);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </PullToRefresh>
   );
 }
-
 

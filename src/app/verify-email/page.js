@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Mail, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 
 export default function VerifyEmailPage() {
+  const { signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState('');
@@ -121,7 +122,10 @@ export default function VerifyEmailPage() {
         {/* Sign out */}
         <button
           onClick={async () => {
-            await supabase.auth.signOut();
+            //await supabase.auth.signOut();
+await signOut();
+window.location.href = '/login';
+
             window.location.href = '/login';
           }}
           className="w-full mt-6 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"

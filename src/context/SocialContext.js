@@ -184,50 +184,6 @@ export const SocialProvider = ({ children }) => {
     }
   }, [user]);
 
-  // =====================================================
-  // POST FUNCTIONS
-  // =====================================================
-
-  // const fetchFeed = useCallback(async () => {
-  //   if (!user) return { data: null, error: 'Not authenticated' };
-
-  //   setLoading(prev => ({ ...prev, posts: true }));
-
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from('posts')
-  //       .select(`
-  //         *,
-  //         user:user_id (
-  //           id,
-  //           first_name,
-  //           last_name,
-  //           role,
-  //           profile_picture_url
-  //         ),
-  //         likes:post_likes(count),
-  //         comments:post_comments(count),
-  //         user_liked:post_likes!inner(user_id)
-  //       `)
-  //       .or(`user_id.eq.${user.id},user_id.in.(SELECT following_id FROM user_follows WHERE follower_id = ${user.id})`)
-  //       .eq('is_public', true)
-  //       .order('created_at', { ascending: false })
-  //       .limit(50);
-
-  //     if (error) throw error;
-
-  //     setPosts(data || []);
-  //     return { data, error: null };
-  //   } catch (error) {
-  //     console.error('Error fetching feed:', error);
-  //     return { data: null, error };
-  //   } finally {
-  //     setLoading(prev => ({ ...prev, posts: false }));
-  //   }
-  // }, [user]);
-
-
-// Replace your current fetchFeed with this:
 
 const fetchFeed = useCallback(async () => {
   if (!user) return { data: null, error: 'Not authenticated' };
@@ -720,6 +676,7 @@ const getOrCreateConversation = useCallback(async (otherUserId) => {
 
 
 // In src/context/SocialContext.js - Replace fetchConversations
+// src/context/SocialContext.js - UPDATED fetchConversations
 const fetchConversations = useCallback(async () => {
   if (!user) {
     console.log('⏭️ No user, skipping conversations fetch');
@@ -741,10 +698,12 @@ const fetchConversations = useCallback(async () => {
         conversations!inner (
           id,
           created_at,
-          updated_at
+          updated_at,
+          last_message_at
         )
       `)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .order('conversations(last_message_at)', { ascending: false }); // ✅ Sort by last message
 
     if (error) {
       console.error('❌ Error fetching participations:', {
@@ -762,6 +721,7 @@ const fetchConversations = useCallback(async () => {
       (participations || []).map(async (participation) => {
         const conversationId = participation.conversation_id;
 
+        // Get other participant
         const { data: participants, error: participantsError } = await supabase
           .from('conversation_participants')
           .select(`
@@ -770,6 +730,7 @@ const fetchConversations = useCallback(async () => {
               id,
               first_name,
               last_name,
+              display_name,
               profile_picture_url,
               role
             )
@@ -782,6 +743,7 @@ const fetchConversations = useCallback(async () => {
           console.warn('⚠️ Error fetching participant for conversation:', conversationId);
         }
 
+        // Get last message
         const { data: lastMessage } = await supabase
           .from('messages')
           .select('*')
@@ -790,16 +752,19 @@ const fetchConversations = useCallback(async () => {
           .limit(1)
           .single();
 
-        // ⭐ UPDATED: More explicit unread count
+        // ✅ FIXED: Count unread messages properly
         const { count: unreadCount } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', conversationId)
-          .eq('receiver_id', user.id)    // ⭐ ADDED
-          .eq('read', false);             // ⭐ ADDED
+          .neq('sender_id', user.id)  // ✅ Messages NOT sent by me
+          .is('read_at', null);        // ✅ Not yet read
 
         return {
-          ...participation.conversations,
+          id: participation.conversations.id,
+          created_at: participation.conversations.created_at,
+          updated_at: participation.conversations.updated_at,
+          last_message_at: participation.conversations.last_message_at || lastMessage?.created_at,
           otherUser: participants?.user_profiles,
           lastMessage,
           unreadCount: unreadCount || 0,
@@ -809,19 +774,26 @@ const fetchConversations = useCallback(async () => {
       })
     );
 
-    console.log('✅ Fetched conversations with details:', conversationsWithDetails.length);
+    // ✅ CRITICAL: Sort conversations by last message time (most recent first)
+    const sortedConversations = conversationsWithDetails.sort((a, b) => {
+      const timeA = a.last_message_at || a.created_at || 0;
+      const timeB = b.last_message_at || b.created_at || 0;
+      return new Date(timeB) - new Date(timeA);
+    });
 
-    setConversations(conversationsWithDetails);
+    console.log('✅ Fetched and sorted conversations:', sortedConversations.length);
+
+    setConversations(sortedConversations);
     
-    // ⭐ ADDED: Calculate total unread
-    const totalUnread = conversationsWithDetails.reduce(
+    // Calculate total unread
+    const totalUnread = sortedConversations.reduce(
       (sum, conv) => sum + (conv.unreadCount || 0),
       0
     );
     setUnreadMessagesCount(totalUnread);
     console.log('📬 Total unread messages:', totalUnread);
 
-    return { data: conversationsWithDetails, error: null };
+    return { data: sortedConversations, error: null };
   } catch (error) {
     console.error('❌ Full error details:', {
       message: error.message,
@@ -916,21 +888,39 @@ const sendMessage = useCallback(async (conversationId, content, mediaFile = null
       try {
         const fileExt = mediaFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('messages')
-          .upload(fileName, mediaFile);
+
+        // Determine media type
+      if (mediaFile.type.startsWith('image/')) {
+        mediaType = 'image';
+      } else if (mediaFile.type.startsWith('video/')) {
+        mediaType = 'video';
+      } else if (mediaFile.type.startsWith('audio/')) {
+        mediaType = 'audio'; // ✅ ADD THIS
+      }
+        // const { data: uploadData, error: uploadError } = await supabase.storage
+        //   .from('messages')
+        //   .upload(fileName, mediaFile);
+         const { data, error: uploadError } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, mediaFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
 
         if (uploadError) {
           console.error('❌ Media upload error:', uploadError);
           throw new Error(`Media upload failed: ${uploadError.message}`);
         }
 
-        const { data: urlData } = supabase.storage
-          .from('messages')
-          .getPublicUrl(fileName);
+        // const { data: urlData } = supabase.storage
+        //   .from('messages')
+        //   .getPublicUrl(fileName);
+        const { data: publicUrlData } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(fileName);
 
-        mediaUrl = urlData.publicUrl;
+        //mediaUrl = urlData.publicUrl;
+        mediaUrl = publicUrlData.publicUrl;
         mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'video';
         console.log('✅ Media uploaded:', mediaUrl);
       } catch (uploadErr) {

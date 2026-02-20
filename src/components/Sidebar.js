@@ -9,6 +9,7 @@ import {
   DollarSign, Music, Settings, LogOut, Shield,
   Users, CreditCard, Ticket, Crown, Wrench, 
   MessageCircle, Bell, TrendingUp, Instagram,
+  Users2, PenBox, Guitar, Briefcase, FileText,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -295,22 +296,37 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/admin/network" icon={Users}>
                 Network
               </NavLink>
-
               <NavLink href="/admin/analytics" icon={TrendingUp}>
-      Analytics
-    </NavLink>
-    <NavLink href="/admin/finances" icon={DollarSign}>
-      Finances
-    </NavLink>
-    <NavLink href="/admin/social-media" icon={Instagram}>
-      Social Media
-    </NavLink>
-    <NavLink href="/admin/tickets" icon={Ticket}>
+                Analytics
+              </NavLink>
+              <NavLink href="/admin/finances" icon={DollarSign}>
+                Finances
+              </NavLink>
+              <NavLink href="/admin/social-media" icon={Instagram}>
+                Social Media
+              </NavLink>
+              <NavLink href="/admin/partners" icon={Users2}>
+                Partners
+              </NavLink>
+              <NavLink href="/admin/events" icon={MapPin}>
+                Events
+              </NavLink>
+              <NavLink href="/admin/tickets" icon={Ticket}>
+                Tickets
+              </NavLink>
+              <NavLink href="/admin/reports" icon={Bell}>
+                Reports
+              </NavLink>
+              <NavLink href="/admin/compliance" icon={Shield}>
+                Compliance
+                </NavLink>
+              <NavLink href="/admin/support-tickets" icon={Wrench}>
                 Support
               </NavLink>
-    <NavLink href="/admin/settings" icon={Settings}>
-      Settings
-    </NavLink>
+              <NavLink href="/admin/settings" icon={Settings}>
+                Settings
+              </NavLink>
+
               <div className="my-3 border-t border-gray-800" />
             </>
           )}
@@ -333,12 +349,19 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/gigs" icon={TrendingUp}>
                 Available Gigs
               </NavLink>
-              <NavLink href="/musician/proposals" icon={TrendingUp}>
+              <NavLink href="/musician/proposals" icon={Instagram}>
                 Proposals
               </NavLink>
-              <NavLink href="/kyc/verify" icon={Shield}>
+
+              <NavLink href="/jobs" icon={Briefcase}>
+  Browse Jobs
+</NavLink>
+<NavLink href="/musician/applications" icon={FileText}>
+  My Applications
+</NavLink>
+              {/* <NavLink href="/kyc/verify" icon={Shield}>
                 Verification
-              </NavLink>
+              </NavLink> */}
               <NavLink href="/tracking" icon={MapPin}>
                 Live Tracking
               </NavLink>
@@ -346,7 +369,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Earnings
               </NavLink>
               <NavLink href="/musician/events" icon={Music}>
-                Events
+                All Gigs
               </NavLink>
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
@@ -354,11 +377,17 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/network" icon={Users}>
                 Network
               </NavLink>
-              <NavLink href="/musician/discover" icon={MapPin}>
+              <NavLink href="/feed" icon={Home}>
+                Social Feed
+              </NavLink>
+              <NavLink href="/musician/my-events" icon={Music}>
+                My Events
+              </NavLink>
+              <NavLink href="/live-events" icon={PenBox}>
                 Discover Events
               </NavLink>
-              <NavLink href="/feed" icon={Home}>
-                Feed
+              <NavLink href="/musician/discover" icon={Guitar}>
+                External Gigs
               </NavLink>
               <NavLink href="/notifications" icon={Bell} badge={unreadNotifications}>
                 Notifications
@@ -378,17 +407,35 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/client/home" icon={Home}>
                 Home
               </NavLink>
+              <NavLink href="/client/bookings" icon={Calendar}>
+                My Bookings
+              </NavLink>
               <NavLink href="/client/proposals" icon={TrendingUp}>
                 Proposals
               </NavLink>
-              <NavLink href="/client/bookings" icon={Calendar}>
-                My Bookings
+
+               {/* NEW: Jobs Section */}
+    {/* <NavLink href="/jobs" icon={Briefcase}>
+      Jobs & Auditions
+    </NavLink>
+    <NavLink href="/client/job-postings" icon={Music}>
+      My Job Postings
+    </NavLink> */}
+
+              <NavLink href="/tracking" icon={MapPin}>
+                Live Tracking
               </NavLink>
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
               </NavLink>
-              <NavLink href="/tracking" icon={MapPin}>
-                Live Tracking
+              <NavLink href="/network" icon={Users}>
+                Network
+              </NavLink>
+              <NavLink href="/feed" icon={Home}>
+                Social Feed
+              </NavLink>
+              <NavLink href="/live-events" icon={PenBox}>
+                Discover Events
               </NavLink>
               <NavLink href="/notifications" icon={Bell} badge={unreadNotifications}>
                 Notifications

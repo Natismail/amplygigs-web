@@ -1,15 +1,15 @@
-// src/components/Navbar.js - FIXED WITH EVENT LISTENER
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import Avatar from "./Avatar";
-import { Menu, Sun, Moon, MessageCircle, ArrowLeft } from "lucide-react";
+import { Menu, Sun, Moon, MessageCircle, ArrowLeft, Sparkles } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import NotificationBell from '@/components/social/NotificationBell';
+import AmyAssistant from '@/components/ai/AmyAssistant'; // ⭐ NEW
 
 export default function Navbar({ onMenuClick }) {
   const { user } = useAuth();
@@ -17,15 +17,14 @@ export default function Navbar({ onMenuClick }) {
   const router = useRouter();
   const pathname = usePathname();
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [showAmy, setShowAmy] = useState(false); // ⭐ NEW
 
-  // Determine if we should show back but ton
   const shouldShowBack = pathname !== '/' && 
                          !pathname.startsWith('/login') && 
                          !pathname.startsWith('/signup') &&
                          !pathname.includes('/dashboard') &&
                          !pathname.includes('/home');
 
-  // ⭐ CRITICAL: Memoize fetch function
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.id) return;
 
@@ -45,13 +44,11 @@ export default function Navbar({ onMenuClick }) {
     }
   }, [user?.id]);
 
-  // Fetch unread message count
   useEffect(() => {
     if (!user?.id) return;
 
     fetchUnreadCount();
 
-    // Real-time subscription for new messages
     const channel = supabase
       .channel(`navbar-messages-${user.id}`)
       .on(
@@ -66,7 +63,6 @@ export default function Navbar({ onMenuClick }) {
           console.log("📨 Navbar: New message:", payload.new);
           setUnreadMessages((prev) => prev + 1);
 
-          // Show browser notification
           if (Notification.permission === "granted") {
             new Notification("New Message", {
               body: `${payload.new.sender_name || "Someone"} sent you a message`,
@@ -98,7 +94,6 @@ export default function Navbar({ onMenuClick }) {
     };
   }, [user?.id, fetchUnreadCount]);
 
-  // ⭐ CRITICAL: Listen for messagesRead event
   useEffect(() => {
     const handleMessagesRead = () => {
       console.log('🔄 Navbar: messagesRead event received - refreshing count');
@@ -117,85 +112,100 @@ export default function Navbar({ onMenuClick }) {
   };
 
   return (
-    <nav className="sticky top-0 z-30 flex justify-between items-center px-3 sm:px-6 py-3 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
-      {/* Left Section */}
-      <div className="flex items-center gap-2">
-        {/* Hamburger Menu - ALWAYS VISIBLE */}
-        <button
-          onClick={onMenuClick}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Open menu"
-        >
-          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-        </button>
-
-        {/* Back Button - Shows on detail pages */}
-        {shouldShowBack && (
-          <button
-            onClick={handleBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          </button>
-        )}
-        
-        {/* Logo */}
+    <>
+      <nav className="sticky top-0 z-30 flex justify-between items-center px-3 sm:px-6 py-3 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+        {/* Left Section */}
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🎵</span>
-          <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white hidden sm:block">
-            AmplyGigs
-          </h1>
-        </div>
-      </div>
+          <button
+            onClick={onMenuClick}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+          </button>
 
-      {/* Right Section */}
-      <div className="flex items-center gap-1.5 sm:gap-3">
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Toggle theme"
-        >
-          {theme === "light" ? (
-            <Moon className="w-5 h-5 text-gray-700" />
-          ) : (
-            <Sun className="w-5 h-5 text-yellow-400" />
+          {shouldShowBack && (
+            <button
+              onClick={handleBack}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
           )}
-        </button>
-
-        {/* Messages Icon with Badge */}
-        <Link
-          href="/messages"
-          className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Messages"
-        >
-          <MessageCircle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-          {unreadMessages > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full">
-              {unreadMessages > 99 ? "99+" : unreadMessages}
-            </span>
-          )}
-        </Link>
-
-        {/* Notification Bell */}
-        <NotificationBell />
-
-        {/* User Profile */}
-        {user && (
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
-            <Avatar user={user} size="sm" />
-            <div className="hidden lg:block">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
-                {user.first_name} {user.last_name}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                {user.role?.toLowerCase()}
-              </p>
-            </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🎵</span>
+            <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white hidden sm:block">
+              AmplyGigs
+            </h1>
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+
+        {/* Right Section */}
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* ⭐ AMY BUTTON - NEW */}
+          <button
+            onClick={() => setShowAmy(true)}
+            className="relative p-2 hover:bg-gradient-to-br hover:from-purple-500 hover:to-pink-500 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center group shadow-md hover:shadow-lg"
+            aria-label="Ask Amy"
+            title="Ask Amy (AI Assistant)"
+          >
+            <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+            
+            {/* Pulsing dot indicator */}
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse border-2 border-white dark:border-gray-900" />
+          </button>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Toggle theme"
+          >
+            {theme === "light" ? (
+              <Moon className="w-5 h-5 text-gray-700" />
+            ) : (
+              <Sun className="w-5 h-5 text-yellow-400" />
+            )}
+          </button>
+
+          {/* Messages Icon with Badge */}
+          <Link
+            href="/messages"
+            className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Messages"
+          >
+            <MessageCircle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            {unreadMessages > 0 && (
+              <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                {unreadMessages > 99 ? "99+" : unreadMessages}
+              </span>
+            )}
+          </Link>
+
+          {/* Notification Bell */}
+          <NotificationBell />
+
+          {/* User Profile */}
+          {user && (
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-gray-200 dark:border-gray-700">
+              <Avatar user={user} size="sm" />
+              <div className="hidden lg:block">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
+                  {user.first_name} {user.last_name}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                  {user.role?.toLowerCase()}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* ⭐ AMY MODAL - Shows when button is clicked */}
+      {showAmy && <AmyAssistant onClose={() => setShowAmy(false)} />}
+    </>
   );
 }

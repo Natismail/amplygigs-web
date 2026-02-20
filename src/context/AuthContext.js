@@ -283,44 +283,43 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signOut = async () => {
-    try {
-      setLoading(true);
-      console.log('👋 Signing out...');
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.warn('⚠️ No active session to sign out from');
-        setUser(null);
-        setSession(null);
-        loadedUserId.current = null;
-        setLoading(false);
-        return { error: null };
-      }
-      
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) throw error;
-      
-      console.log('✅ Sign out successful');
-      setUser(null);
-      setSession(null);
-      loadedUserId.current = null;
-      
+  const signOut = async ({ global = false } = {}) => {
+  try {
+    setLoading(true);
+    console.log('👋 Signing out...');
+
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      console.warn('⚠️ No active session');
+      cleanup();
       return { error: null };
-    } catch (error) {
-      console.error('❌ Error signing out:', error);
-      
-      setUser(null);
-      setSession(null);
-      loadedUserId.current = null;
-      
-      return { error };
-    } finally {
-      setLoading(false);
     }
-  };
+
+    const { error } = await supabase.auth.signOut(
+      global ? { scope: 'global' } : undefined
+    );
+
+    if (error) throw error;
+
+    cleanup();
+    console.log('✅ Signed out');
+    return { error: null };
+
+  } catch (error) {
+    console.error('❌ Sign out error:', error);
+    cleanup();
+    return { error };
+  } finally {
+    setLoading(false);
+  }
+};
+
+const cleanup = () => {
+  setUser(null);
+  setSession(null);
+  loadedUserId.current = null;
+};
 
   const value = {
     user,

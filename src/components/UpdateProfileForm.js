@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Metal } from "next/font/google";
+import CategorySelector from '@/components/musician/CategorySelector';
+import { getAllSubcategoriesFlat } from '@/lib/constants/musicianCategories';
+
 
 /* ------------------ Defaults ------------------ */
 
@@ -26,6 +29,8 @@ const EMPTY_FORM = {
   experience_years: "",
   hourly_rate: "",
   genres: [],
+  categories: [],
+  genres: [], 
 };
 
 
@@ -43,7 +48,7 @@ const GENRES = [
   "Afro Soul",
   "Afro Jazz",
   "Amapiano",
-  "Afro House",
+  //"Afro House",
 
   // 🎤 Urban / Contemporary
   "Hip Hop",
@@ -97,9 +102,9 @@ const GENRES = [
 
   // 🎧 Niche / Modern
   "Instrumental",
-  "Lo-fi",
+  //"Lo-fi",
   //"Chillhop",
-  "Soundtrack",
+  //"Soundtrack",
   //"Experimental"
 ];
 
@@ -177,78 +182,97 @@ export default function UpdateProfileForm() {
 
   /* ------------------ Submit ------------------ */
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setSuccess(false);
+// Updating validation with Categories
 
-    if (!user) {
-      setError("You must be logged in.");
-      return;
-    }
+async function handleSubmit(e) {
+  e.preventDefault();
+  setError("");
+  setSuccess(false);
 
-    // ✅ Validate at least one social media
-    const hasSocial = 
-      form.socials.instagram.trim() ||
-      form.socials.twitter.trim() ||
-      form.socials.tiktok.trim() ||
-      form.youtube.trim();
-
-    if (!hasSocial) {
-      setError("Please provide at least ONE social media handle (Instagram, Twitter, TikTok, or YouTube)");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    // ✅ Validate genres
-    if (form.genres.length === 0) {
-      setError("Please select at least ONE music genre");
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setFormLoading(true);
-
-    const payload = {
-      role: "MUSICIAN",
-      name: form.name.trim(),
-      bio: form.bio.trim(),
-      youtube: form.youtube.trim(),
-      socials: form.socials,
-      contact: {
-        ...form.contact,
-        whatsapp: normalizePhone(form.contact.whatsapp),
-      },
-      available: form.available,
-      verification_status: "unverified",
-      experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
-      hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
-      genres: form.genres,
-    };
-
-    console.log('💾 Saving musician profile:', payload);
-
-    const { error } = await supabase
-      .from("user_profiles")
-      .update(payload)
-      .eq("id", user.id);
-
-    setFormLoading(false);
-
-    if (error) {
-      console.error('❌ Error saving profile:', error);
-      setError(error.message || 'Failed to save profile. Please try again.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    console.log('✅ Profile saved successfully');
-    setSuccess(true);
-    
-    setTimeout(() => {
-      router.push("/musician/dashboard");
-    }, 2000);
+  if (!user) {
+    setError("You must be logged in.");
+    return;
   }
+
+  // ✅ Validate categories
+  if (form.categories.length === 0) {
+    setError("Please select at least ONE category with skills");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // ✅ Validate at least one social media
+  const hasSocial = 
+    form.socials.instagram.trim() ||
+    form.socials.twitter.trim() ||
+    form.socials.tiktok.trim() ||
+    form.youtube.trim();
+
+  if (!hasSocial) {
+    setError("Please provide at least ONE social media handle");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  // ✅ Validate genres
+  if (form.genres.length === 0) {
+    setError("Please select at least ONE music genre");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  setFormLoading(true);
+
+  // Extract primary category and all subcategories
+  const primaryCat = form.categories.find(c => c.isPrimary) || form.categories[0];
+  const allSubcategories = getAllSubcategoriesFlat(form.categories);
+
+  const payload = {
+    role: "MUSICIAN",
+    name: form.name.trim(),
+    bio: form.bio.trim(),
+    youtube: form.youtube.trim(),
+    socials: form.socials,
+    contact: {
+      ...form.contact,
+      whatsapp: normalizePhone(form.contact.whatsapp),
+    },
+    available: form.available,
+    verification_status: "unverified",
+    experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
+    hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
+    genres: form.genres,
+    
+    // NEW: Category fields
+    categories: form.categories,
+    primary_category: primaryCat?.category || null,
+    subcategories: allSubcategories,
+  };
+
+  console.log('💾 Saving musician profile:', payload);
+
+  const { error } = await supabase
+    .from("user_profiles")
+    .update(payload)
+    .eq("id", user.id);
+
+  setFormLoading(false);
+
+  if (error) {
+    console.error('❌ Error saving profile:', error);
+    setError(error.message || 'Failed to save profile. Please try again.');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  console.log('✅ Profile saved successfully');
+  setSuccess(true);
+  
+  setTimeout(() => {
+    router.push("/musician/dashboard");
+  }, 2000);
+}
+
 
   /* ------------------ Loading ------------------ */
 
@@ -389,33 +413,44 @@ export default function UpdateProfileForm() {
           </div>
         </div>
 
-        {/* Genres Selection */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
-            Music Genres (Select at least one) *
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {GENRES.map((genre) => (
-              <button
-                key={genre}
-                type="button"
-                onClick={() => toggleGenre(genre)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  form.genres.includes(genre)
-                    ? "bg-purple-600 text-white shadow-md"
-                    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                }`}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-          {form.genres.length > 0 && (
-            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-              ✓ {form.genres.length} genre{form.genres.length > 1 ? 's' : ''} selected
-            </p>
-          )}
+        {/* Categories Section - REPLACE PRIMARY ROLE */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <CategorySelector
+          value={form.categories}
+          onChange={(categories) => setForm(f => ({ ...f, categories }))}
+          error={null}
+        />
+      </div>
+{/* Genres Section - KEEP BUT CLARIFY */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+          Music Genres/Styles (Select at least one) *
+        </label>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          What music styles do you perform? (e.g., Afrobeat, Jazz, Pop)
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {GENRES.map((genre) => (
+            <button
+              key={genre}
+              type="button"
+              onClick={() => toggleGenre(genre)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                form.genres.includes(genre)
+                  ? "bg-purple-600 text-white shadow-md"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              {genre}
+            </button>
+          ))}
         </div>
+        {form.genres.length > 0 && (
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+            ✓ {form.genres.length} genre{form.genres.length > 1 ? 's' : ''} selected
+          </p>
+        )}
+      </div>
 
         {/* Social Media Section */}
         <div className="pt-4 border-t border-gray-200 dark:border-gray-700">

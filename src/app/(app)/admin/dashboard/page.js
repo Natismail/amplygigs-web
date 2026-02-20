@@ -11,6 +11,8 @@ import {
   CheckCircle, Clock, AlertCircle, Wallet,
   Music, UserCheck, Crown
 } from 'lucide-react';
+import StreamingToggle from '@/components/streaming/StreamingToggle';
+
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -159,12 +161,17 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6">
         <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-between mb-2">
+
           <div className="flex items-center gap-3 mb-2">
             {isAdmin ? <Crown className="w-8 h-8" /> : <UserCheck className="w-8 h-8" />}
             <h1 className="text-3xl font-bold">
               {isAdmin ? 'Admin Dashboard' : 'Support Dashboard'}
             </h1>
           </div>
+                {/* <StreamingToggle /> */}
+                </div>
+
           <p className="text-purple-100">
             {isAdmin 
               ? 'Full system management and oversight' 

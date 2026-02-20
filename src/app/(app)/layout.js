@@ -8,6 +8,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";
+//import GlobalMusicPlayer from '@/components/streaming/GlobalMusicPlayer';
+import GlobalAmyAssistant from '@/components/ai/GlobalAmyAssistant';
 
 export default function AppLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -50,6 +52,8 @@ export default function AppLayout({ children }) {
         <main className="flex-1 relative overflow-hidden">
           <GlobalPullToRefresh>
             {children}
+            {/* <GlobalMusicPlayer /> */}
+            {/* <GlobalAmyAssistant /> */}
           </GlobalPullToRefresh>
         </main>
       </div>
@@ -64,6 +68,8 @@ export default function AppLayout({ children }) {
       <main className="transition-all duration-300">
         <GlobalPullToRefresh>
           {children}
+          {/* <GlobalMusicPlayer /> */}
+           {/* <GlobalAmyAssistant /> */}
         </GlobalPullToRefresh>
       </main>
     </div>

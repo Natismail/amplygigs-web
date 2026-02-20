@@ -12,6 +12,8 @@ import AnalyticsCards from "@/components/dashboard/AnalyticsCards";
 import { fetchPublicEvents } from "@/lib/google/fetchPublicEvents";
 import Link from "next/link";
 import PullToRefresh from '@/components/PullToRefresh';
+import StreamingToggle from '@/components/streaming/StreamingToggle';
+
 
 export default function MusicianDashboard() {
   const router = useRouter();
@@ -108,8 +110,6 @@ useEffect(() => {
     };
   }, []); // ✅ Empty dependency array - only run once
 
-  // ❌ REMOVED: The problematic useEffect that was fetching on every mount
-  // The DataContext handles initial fetching automatically
 
   // Show loading only if profile hasn't loaded yet
   if (!profile) {
@@ -143,6 +143,7 @@ useEffect(() => {
               Welcome back, {profile.first_name}!
             </p>
           </div>
+              {/* <StreamingToggle /> */}
         </div>
       </div>
 

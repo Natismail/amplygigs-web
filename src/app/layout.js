@@ -6,30 +6,40 @@ import PWARegister from '@/components/PWARegister';
 import Providers from '@/components/Providers';
 import Script from "next/script";
 
-const geistSans = Geist({ 
-  variable: "--font-geist-sans", 
-  subsets: ["latin"] 
+
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+  preload: false,        // ← skips build-time fetch
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({ 
-  variable: "--font-geist-mono", 
-  subsets: ["latin"] 
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  preload: false,
+  display: "swap",
 });
 
-const roboto = Roboto({ 
-  weight: ["400", "500", "700"], 
-  subsets: ["latin"], 
-  variable: "--font-roboto" 
+const roboto = Roboto({
+  weight: ["400", "500", "700"],
+  subsets: ["latin"],
+  variable: "--font-roboto",
+  preload: false,
+  display: "swap",
 });
 
-const inter = Inter({ 
-  subsets: ["latin"], 
-  variable: "--font-inter" 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  preload: false,
+  display: "swap",
 });
 
 // ✅ Metadata can only be exported from Server Components
 export const metadata = {
-  title: "AmplyGigs - Connect Musicians with Clients",
+  title: "AmplyGigs - Connecting Skills to Platform",
   description: "Real-time location tracking and booking platform for musicians and event organizers",
   manifest: "/manifest.json",
   icons: {
@@ -77,7 +87,7 @@ export default function RootLayout({ children }) {
       >
         <Providers>
           {children}
-          <PWARegister />
+           <PWARegister />
         </Providers>
 
         {/* Service Worker Registration */}

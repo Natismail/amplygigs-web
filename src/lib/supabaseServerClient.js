@@ -1,3 +1,5 @@
+// src/lib/supabaseServerClient.js
+
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from 'next/headers';
 

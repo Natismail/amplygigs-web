@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const PLATFORM_FEE_PERCENTAGE = 5;
+const PLATFORM_FEE_PERCENTAGE = 10;
 const VAT_PERCENTAGE = 7.5;
 
 // Initialize Stripe

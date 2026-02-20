@@ -7,8 +7,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { Shield, Key, Mail, LogOut, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+
 export default function SecuritySettingsPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -58,19 +59,18 @@ export default function SecuritySettingsPage() {
     }
   };
 
-  const handleSignOutAll = async () => {
-    if (!confirm('This will sign you out of all devices. Continue?')) return;
 
-    setLoading(true);
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-      router.push('/login');
-    } catch (err) {
-      setError('Failed to sign out');
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleSignOutAll = async () => {
+  if (!confirm('This will sign you out of all devices. Continue?')) return;
+
+  setLoading(true);
+  const { error } = await signOut({ global: true });
+
+  if (!error) router.push('/login');
+  else setError('Failed to sign out');
+
+  setLoading(false);
+};
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">

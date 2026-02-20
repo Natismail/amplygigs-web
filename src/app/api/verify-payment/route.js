@@ -296,4 +296,5 @@ async function sendPaymentNotifications(transaction, bookingId) {
     console.error('⚠️ Notification error:', error);
     // Don't throw - notifications are not critical
   }
+
 }
