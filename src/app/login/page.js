@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
+import Logo, { LogoIconOnly, LogoWithText, LogoLight } from '@/components/Logo';
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,7 +20,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user, signIn, loading: authLoading } = useAuth();
-const [hasRedirected, setHasRedirected] = useState(false); // Add this state
+  const [hasRedirected, setHasRedirected] = useState(false); // Add this state
 
   // // Redirect if already logged in
   // useEffect(() => {
@@ -172,11 +174,15 @@ const handleSocialLogin = async (provider) => {
       {/* <div className="max-w-md w-full p-6 sm:p-8 bg-white dark:bg-gray-800 bg-opacity-95 dark:bg-opacity-95 rounded-2xl shadow-2xl"> */}
         
         <div className="max-w-sm w-full p-6 sm:p-6 bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-lg shadow-2xl">{/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
+        <div className="text-center justify-item-center mb-6 sm:mb-8">
+          <div className=" flex flex-row">
           {/* <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🎵</div> */}
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-1 sm:mb-2 mt-4">
-             Welcome Back!!!🎵
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-1 sm:mb-2 mt-4 px-2">
+             Welcome Back!!!
+             {/* 🎵 */}
           </h1>
+          <Logo size="lg" showText={false} className="mt-2"/>
+          </div>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Sign in to AmplyGigs
           </p>

@@ -26,8 +26,14 @@ import {
   ZoomIn,
   Image as ImageIcon,
 } from "lucide-react";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import Link from "next/link";
+import LoadingSpinner, { 
+  LogoSpinner, 
+  FullScreenLoading,
+  SkeletonMusicianCard,
+  SkeletonEventCard,
+  ProgressBar,
+  PulseDots
+} from '@/components/LoadingSpinner';import Link from "next/link";
 import { useSocial } from "@/context/SocialContext";
 import PullToRefresh from "@/components/PullToRefresh";
 
@@ -277,7 +283,7 @@ function UserListModal({ title, users, loading, onClose, onNavigate }) {
         <div className="overflow-y-auto flex-1 divide-y divide-gray-100 dark:divide-gray-800">
           {loading ? (
             <div className="flex items-center justify-center py-10">
-              <LoadingSpinner size="sm" />
+              <LoadingSpinner size="lg" />
             </div>
           ) : users.length === 0 ? (
             <p className="text-center text-gray-400 py-10 text-sm">No users found</p>

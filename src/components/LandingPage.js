@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import Logo from './Logo'; // ⭐ NEW
 import { 
   Music, 
   Users, 
@@ -89,11 +90,14 @@ export default function LandingPage({ onNavigate }) {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
+                        <Logo size="lg" showText={true} href="/" />
+
             <div className="flex items-center gap-2">
-              <Music className="w-8 h-8 text-purple-600" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              {/* <Music className="w-8 h-8 text-purple-600" /> */}
+              
+              {/* <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                 AmplyGigs
-              </span>
+              </span> */}
             </div>
             
             <div className="hidden md:flex items-center gap-8">
@@ -457,7 +461,7 @@ export default function LandingPage({ onNavigate }) {
               onClick={() => onNavigate('/explore')}
               className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-xl font-semibold hover:bg-white/10 transition"
             >
-              Explore Musicians
+              Explore AmplyGigs
             </button>
           </div>
         </div>
@@ -467,8 +471,10 @@ export default function LandingPage({ onNavigate }) {
       <footer className="bg-gray-900 text-gray-300 py-12 px-4 sm:px-6 lg:px-8">
   <div className="max-w-7xl mx-auto text-center">
     <div className="flex items-center justify-center gap-2 mb-4">
-      <Music className="w-6 h-6 text-purple-400" />
-      <span className="text-xl font-bold text-white">AmplyGigs</span>
+      {/* <Music className="w-6 h-6 text-purple-400" />
+      <span className="text-xl font-bold text-white">AmplyGigs</span> */}
+         <Logo size="lg" showText={true}/>
+
     </div>
     <p className="text-sm mb-4">
       © 2026 AmplyGigs. All rights reserved.

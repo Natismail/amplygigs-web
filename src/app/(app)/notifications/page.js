@@ -1,4 +1,4 @@
-// app/notifications/page.js
+// app/notifications/page.js - FIXED: Correct table name
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -8,10 +8,10 @@ import {
   Check, 
   CheckCheck, 
   Trash2, 
-  Filter,
   Search,
   X,
-  Settings
+  Settings,
+  ArrowLeft
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
@@ -23,19 +23,20 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read', 'archived'
+  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
 
   const notificationTypes = [
     { value: 'all', label: 'All Types' },
-    { value: 'booking_confirmed', label: 'Bookings' },
-    { value: 'message_received', label: 'Messages' },
-    { value: 'payment_released', label: 'Payments' },
-    { value: 'job_application_received', label: 'Job Applications' },
-    { value: 'rating_received', label: 'Ratings' },
-    { value: 'proposal_received', label: 'Proposals' },
+    { value: 'booking', label: 'Bookings' },
+    { value: 'message', label: 'Messages' },
+    { value: 'payment', label: 'Payments' },
+    { value: 'job', label: 'Job Applications' },
+    { value: 'rating', label: 'Ratings' },
+    { value: 'proposal', label: 'Proposals' },
+    { value: 'event', label: 'Events' },
   ];
 
   useEffect(() => {
@@ -50,66 +51,110 @@ export default function NotificationsPage() {
   }, [notifications, filter, typeFilter, searchQuery]);
 
   const fetchNotifications = async () => {
+    if (!user?.id) return;
+
     setLoading(true);
+    try {
+      console.log('📧 Fetching notifications for user:', user.id);
 
-    const { data, error } = await supabase
-      .from('in_app_notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      // ⭐ FIXED: Query correct table name
+      const { data, error } = await supabase
+        .from('notifications')  // ⭐ Changed from 'in_app_notifications'
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setNotifications(data);
+      if (error) {
+        console.error('❌ Error fetching notifications:', error);
+        throw error;
+      }
+
+      console.log('✅ Fetched notifications:', data?.length || 0);
+      setNotifications(data || []);
+    } catch (error) {
+      console.error('❌ Error in fetchNotifications:', error);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const subscribeToNotifications = () => {
+    if (!user?.id) return;
+
+    console.log('🔔 Subscribing to notifications');
+
+    // ⭐ FIXED: Subscribe to correct table
     const subscription = supabase
-      .channel('notifications_page')
+      .channel(`notifications-page-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'in_app_notifications',
+          table: 'notifications',  // ⭐ Changed from 'in_app_notifications'
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
+          console.log('🔔 New notification:', payload.new);
           setNotifications(prev => [payload.new, ...prev]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification updated:', payload.new);
+          setNotifications(prev =>
+            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification deleted:', payload.old);
+          setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
         }
       )
       .subscribe();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   };
 
   const applyFilters = () => {
     let filtered = [...notifications];
 
-    // Status filter
+    // ⭐ FIXED: Check BOTH read fields
     if (filter === 'unread') {
-      filtered = filtered.filter(n => !n.is_read);
+      filtered = filtered.filter(n => !n.is_read && !n.read);
     } else if (filter === 'read') {
-      filtered = filtered.filter(n => n.is_read);
-    } else if (filter === 'archived') {
-      filtered = filtered.filter(n => n.is_archived);
-    } else {
-      filtered = filtered.filter(n => !n.is_archived);
+      filtered = filtered.filter(n => n.is_read || n.read);
     }
 
     // Type filter
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(n => n.notification_type.includes(typeFilter));
+      filtered = filtered.filter(n => n.type?.includes(typeFilter));
     }
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(n => 
-        n.title.toLowerCase().includes(query) ||
-        n.message.toLowerCase().includes(query)
+        n.title?.toLowerCase().includes(query) ||
+        n.message?.toLowerCase().includes(query)
       );
     }
 
@@ -117,22 +162,40 @@ export default function NotificationsPage() {
   };
 
   const markAsRead = async (notificationIds) => {
-    const { error } = await supabase
-      .from('in_app_notifications')
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .in('id', notificationIds);
+    try {
+      console.log('📧 Marking notifications as read:', notificationIds);
 
-    if (!error) {
+      // ⭐ FIXED: Update BOTH read fields
+      const { error } = await supabase
+        .from('notifications')
+        .update({ 
+          is_read: true, 
+          read: true,
+          read_at: new Date().toISOString() 
+        })
+        .in('id', notificationIds);
+
+      if (error) throw error;
+
+      console.log('✅ Marked as read');
+
       setNotifications(prev =>
-        prev.map(n => notificationIds.includes(n.id) ? { ...n, is_read: true } : n)
+        prev.map(n => notificationIds.includes(n.id) 
+          ? { ...n, is_read: true, read: true, read_at: new Date().toISOString() } 
+          : n
+        )
       );
       setSelectedIds([]);
+    } catch (error) {
+      console.error('❌ Error marking as read:', error);
+      alert('Failed to mark notifications as read');
     }
   };
 
   const markAllAsRead = async () => {
+    // ⭐ FIXED: Check BOTH read fields
     const unreadIds = notifications
-      .filter(n => !n.is_read && !n.is_archived)
+      .filter(n => !n.is_read && !n.read)
       .map(n => n.id);
 
     if (unreadIds.length > 0) {
@@ -141,14 +204,23 @@ export default function NotificationsPage() {
   };
 
   const deleteNotifications = async (notificationIds) => {
-    const { error } = await supabase
-      .from('in_app_notifications')
-      .update({ is_archived: true, archived_at: new Date().toISOString() })
-      .in('id', notificationIds);
+    try {
+      console.log('🗑️ Deleting notifications:', notificationIds);
 
-    if (!error) {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (error) throw error;
+
+      console.log('✅ Deleted');
+
       setNotifications(prev => prev.filter(n => !notificationIds.includes(n.id)));
       setSelectedIds([]);
+    } catch (error) {
+      console.error('❌ Error deleting:', error);
+      alert('Failed to delete notifications');
     }
   };
 
@@ -169,7 +241,8 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = async (notification) => {
-    if (!notification.is_read) {
+    // ⭐ FIXED: Check BOTH read fields
+    if (!notification.is_read && !notification.read) {
       await markAsRead([notification.id]);
     }
 
@@ -182,22 +255,45 @@ export default function NotificationsPage() {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
     
     if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
-    return new Date(date).toLocaleDateString('en-NG', { 
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    return new Date(date).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
       year: 'numeric'
     });
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read && !n.is_archived).length;
+  const getIcon = (type) => {
+    const icons = {
+      'booking_confirmed': '✅',
+      'booking_created': '📅',
+      'booking_cancelled': '❌',
+      'payment_received': '💰',
+      'payment_released': '💸',
+      'message_received': '💬',
+      'job_application': '📋',
+      'proposal_received': '📨',
+      'event_interest': '👋',
+      'follow': '👥',
+      'like': '❤️',
+      'comment': '💬',
+      'share': '🔄',
+    };
+    return icons[type] || '🔔';
+  };
+
+  // ⭐ FIXED: Check BOTH read fields
+  const unreadCount = notifications.filter(n => !n.is_read && !n.read).length;
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Please log in to view notifications</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center">
+          <Bell className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Please log in to view notifications</p>
+        </div>
       </div>
     );
   }
@@ -208,6 +304,14 @@ export default function NotificationsPage() {
         
         {/* Header */}
         <div className="mb-6">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 transition"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
@@ -323,12 +427,14 @@ export default function NotificationsPage() {
 
         {/* Quick Actions */}
         <div className="flex gap-2 mb-6">
-          <button
-            onClick={toggleSelectAll}
-            className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
-          >
-            {selectedIds.length === filteredNotifications.length ? 'Deselect all' : 'Select all'}
-          </button>
+          {filteredNotifications.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+            >
+              {selectedIds.length === filteredNotifications.length ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
           {unreadCount > 0 && (
             <>
               <span className="text-gray-400">•</span>
@@ -369,93 +475,89 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredNotifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`relative bg-white dark:bg-gray-800 rounded-xl border ${
-                  !notification.is_read
-                    ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10'
-                    : 'border-gray-200 dark:border-gray-700'
-                } hover:shadow-md transition group overflow-hidden`}
-              >
-                {/* Priority Indicator */}
-                {notification.priority !== 'normal' && (
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                    notification.priority === 'urgent' ? 'bg-red-500' :
-                    notification.priority === 'high' ? 'bg-orange-500' :
-                    'bg-blue-500'
-                  }`} />
-                )}
+            {filteredNotifications.map((notification) => {
+              // ⭐ FIXED: Check BOTH read fields
+              const isUnread = !notification.is_read && !notification.read;
 
-                <div className="p-4 pl-5">
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(notification.id)}
-                      onChange={() => toggleSelect(notification.id)}
-                      className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-600"
-                      onClick={(e) => e.stopPropagation()}
-                    />
+              return (
+                <div
+                  key={notification.id}
+                  className={`relative bg-white dark:bg-gray-800 rounded-xl border ${
+                    isUnread
+                      ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10'
+                      : 'border-gray-200 dark:border-gray-700'
+                  } hover:shadow-md transition group overflow-hidden`}
+                >
+                  <div className="p-4">
+                    <div className="flex items-start gap-4">
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(notification.id)}
+                        onChange={() => toggleSelect(notification.id)}
+                        className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-600"
+                        onClick={(e) => e.stopPropagation()}
+                      />
 
-                    {/* Icon */}
-                    <div className="flex-shrink-0 text-3xl mt-0.5">
-                      {notification.icon}
-                    </div>
-
-                    {/* Content */}
-                    <div 
-                      className="flex-1 min-w-0 cursor-pointer"
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-white">
-                          {notification.title}
-                        </h4>
-                        <span className="text-xs text-gray-500 dark:text-gray-500 whitespace-nowrap">
-                          {getTimeAgo(notification.created_at)}
-                        </span>
+                      {/* Icon */}
+                      <div className="flex-shrink-0 text-3xl mt-0.5">
+                        {getIcon(notification.type)}
                       </div>
 
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        {notification.message}
-                      </p>
+                      {/* Content */}
+                      <div 
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">
+                            {notification.title}
+                          </h4>
+                          <span className="text-xs text-gray-500 dark:text-gray-500 whitespace-nowrap">
+                            {getTimeAgo(notification.created_at)}
+                          </span>
+                        </div>
 
-                      <div className="flex items-center gap-3">
-                        {!notification.is_read && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          {notification.message}
+                        </p>
+
+                        <div className="flex items-center gap-3">
+                          {isUnread && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead([notification.id]);
+                              }}
+                              className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                            >
+                              <Check className="w-3 h-3" />
+                              Mark as read
+                            </button>
+                          )}
+                          
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              markAsRead([notification.id]);
+                              deleteNotifications([notification.id]);
                             }}
-                            className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                            className="text-xs text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
                           >
-                            <Check className="w-3 h-3" />
-                            Mark as read
+                            <Trash2 className="w-3 h-3" />
+                            Delete
                           </button>
-                        )}
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotifications([notification.id]);
-                          }}
-                          className="text-xs text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Unread Indicator */}
-                    {!notification.is_read && (
-                      <div className="w-2 h-2 bg-purple-600 rounded-full flex-shrink-0 mt-2" />
-                    )}
+                      {/* Unread Indicator */}
+                      {isUnread && (
+                        <div className="w-2 h-2 bg-purple-600 rounded-full flex-shrink-0 mt-2" />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

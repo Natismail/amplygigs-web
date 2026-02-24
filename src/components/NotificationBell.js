@@ -1,11 +1,11 @@
-// src/components/NotificationBell.jsx
+// src/components/social/NotificationBell.js - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, CheckCheck, Trash2, Settings } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function NotificationBell() {
   const { user } = useAuth();
@@ -15,13 +15,18 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'unread'
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchNotifications();
       subscribeToNotifications();
+      
+      // Request browser notification permission
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
     }
   }, [user]);
 
@@ -38,107 +43,248 @@ export default function NotificationBell() {
   }, []);
 
   const fetchNotifications = async () => {
-    setLoading(true);
-    
-    const { data, error } = await supabase
-      .from('in_app_notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    if (!user?.id) return;
 
-    if (!error && data) {
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.is_read).length);
+    setLoading(true);
+    try {
+      console.log('📧 Fetching notifications for user:', user.id);
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      console.log('✅ Fetched notifications:', data?.length || 0);
+      setNotifications(data || []);
+      
+      // ⭐ Count unread using BOTH fields for compatibility
+      const unread = (data || []).filter(n => !n.is_read && !n.read).length;
+      console.log('📊 Unread count:', unread);
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('❌ Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const subscribeToNotifications = () => {
-    // Real-time subscription for new notifications
-    const subscription = supabase
-      .channel('notifications')
+    if (!user?.id) return null;
+
+    console.log('🔔 Subscribing to notifications for user:', user.id);
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'in_app_notifications',
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
+          console.log('🔔 New notification:', payload.new);
+          
           setNotifications(prev => [payload.new, ...prev]);
           setUnreadCount(prev => prev + 1);
-          
-          // Show browser notification if supported
-          if ('Notification' in window && Notification.permission === 'granted') {
+
+          // Browser notification
+          if (Notification.permission === 'granted') {
             new Notification(payload.new.title, {
               body: payload.new.message,
-              icon: '/icon-192x192.png',
-              badge: '/badge-72x72.png',
+              icon: '/icons/icon-192.png',
+              tag: `notification-${payload.new.id}`,
             });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification updated:', payload.new);
+          
+          setNotifications(prev =>
+            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          );
+          
+          // Recalculate unread count
+          const wasUnread = !payload.old.is_read && !payload.old.read;
+          const isNowRead = payload.new.is_read || payload.new.read;
+          
+          if (wasUnread && isNowRead) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification deleted:', payload.old);
+          
+          setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          
+          // Decrease unread count if deleted notification was unread
+          if (!payload.old.is_read && !payload.old.read) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
           }
         }
       )
       .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return channel;
   };
 
   const markAsRead = async (notificationId) => {
-    const { error } = await supabase
-      .from('in_app_notifications')
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq('id', notificationId);
+    try {
+      console.log('📧 Marking notification as read:', notificationId);
 
-    if (!error) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
+
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ notificationId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to mark as read');
+      }
+
+      const result = await response.json();
+      console.log('✅ Notification marked as read:', result);
+
+      // Update local state
       setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+        prev.map(n => 
+          n.id === notificationId 
+            ? { ...n, is_read: true, read: true, read_at: new Date().toISOString() }
+            : n
+        )
       );
+      
       setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('❌ Error marking notification as read:', error);
+      alert('Failed to mark notification as read');
     }
   };
 
   const markAllAsRead = async () => {
-    const unreadIds = notifications
-      .filter(n => !n.is_read)
-      .map(n => n.id);
+    try {
+      console.log('📧 Marking all notifications as read');
 
-    if (unreadIds.length === 0) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
 
-    const { error } = await supabase
-      .from('in_app_notifications')
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .in('id', unreadIds);
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
 
-    if (!error) {
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to mark all as read');
+      }
+
+      const result = await response.json();
+      console.log('✅ All notifications marked as read:', result);
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, is_read: true, read: true, read_at: new Date().toISOString() }))
+      );
+      
       setUnreadCount(0);
+    } catch (error) {
+      console.error('❌ Error marking all as read:', error);
+      alert('Failed to mark all notifications as read');
     }
   };
 
   const deleteNotification = async (notificationId) => {
-    const { error } = await supabase
-      .from('in_app_notifications')
-      .update({ is_archived: true, archived_at: new Date().toISOString() })
-      .eq('id', notificationId);
+    try {
+      console.log('🗑️ Deleting notification:', notificationId);
 
-    if (!error) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
+
+      const response = await fetch(`/api/notifications/mark-read?id=${notificationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete notification');
+      }
+
+      console.log('✅ Notification deleted');
+
+      // Update local state
+      const wasUnread = notifications.find(n => n.id === notificationId && !n.is_read && !n.read);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      alert('Failed to delete notification');
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    markAsRead(notification.id);
+  const handleNotificationClick = async (notification) => {
+    // Mark as read
+    if (!notification.is_read && !notification.read) {
+      await markAsRead(notification.id);
+    }
     
+    // Navigate if has action URL
     if (notification.action_url) {
       router.push(notification.action_url);
       setIsOpen(false);
     }
+  };
+
+  const handleDelete = async (e, notificationId) => {
+    e.stopPropagation();
+    await deleteNotification(notificationId);
   };
 
   const getTimeAgo = (date) => {
@@ -151,18 +297,27 @@ export default function NotificationBell() {
     return new Date(date).toLocaleDateString();
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'urgent': return 'border-red-500 bg-red-50 dark:bg-red-900/10';
-      case 'high': return 'border-orange-500 bg-orange-50 dark:bg-orange-900/10';
-      case 'normal': return 'border-blue-500 bg-blue-50 dark:bg-blue-900/10';
-      case 'low': return 'border-gray-300 bg-gray-50 dark:bg-gray-900/10';
-      default: return 'border-gray-300 bg-white dark:bg-gray-800';
-    }
+  const getIcon = (type) => {
+    const icons = {
+      'follow': '👥',
+      'like': '❤️',
+      'comment': '💬',
+      'share': '🔄',
+      'booking_confirmed': '✅',
+      'booking_created': '📅',
+      'booking_cancelled': '❌',
+      'payment_received': '💰',
+      'payment_released': '💸',
+      'message_received': '💬',
+      'job_application': '📋',
+      'proposal_received': '📨',
+      'event_interest': '👋',
+    };
+    return icons[type] || '🔔';
   };
 
   const filteredNotifications = activeTab === 'unread' 
-    ? notifications.filter(n => !n.is_read)
+    ? notifications.filter(n => !n.is_read && !n.read)
     : notifications;
 
   if (!user) return null;
@@ -172,10 +327,11 @@ export default function NotificationBell() {
       {/* Bell Icon Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label="Notifications"
+        title={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
-        <Bell className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300" />
         
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
@@ -195,11 +351,11 @@ export default function NotificationBell() {
                 Notifications
               </h3>
               <button
-                onClick={() => router.push('/settings/notifications')}
+                onClick={() => setIsOpen(false)}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
-                title="Notification settings"
+                title="Close"
               >
-                <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
 
@@ -243,8 +399,8 @@ export default function NotificationBell() {
           <div className="max-h-[32rem] overflow-y-auto">
             {loading ? (
               <div className="p-8 text-center">
-                <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto" />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">Loading...</p>
+                <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : filteredNotifications.length === 0 ? (
               <div className="p-8 text-center">
@@ -255,86 +411,78 @@ export default function NotificationBell() {
               </div>
             ) : (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredNotifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`relative group ${
-                      !notification.is_read 
-                        ? 'bg-purple-50 dark:bg-purple-900/10' 
-                        : 'bg-white dark:bg-gray-800'
-                    } hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer`}
-                  >
-                    {/* Priority Indicator */}
-                    {notification.priority !== 'normal' && (
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                        notification.priority === 'urgent' ? 'bg-red-500' :
-                        notification.priority === 'high' ? 'bg-orange-500' :
-                        'bg-blue-500'
-                      }`} />
-                    )}
-
+                {filteredNotifications.map((notification) => {
+                  const isUnread = !notification.is_read && !notification.read;
+                  
+                  return (
                     <div
-                      onClick={() => handleNotificationClick(notification)}
-                      className="p-4 pl-5"
+                      key={notification.id}
+                      className={`relative group ${
+                        isUnread
+                          ? 'bg-purple-50 dark:bg-purple-900/10' 
+                          : 'bg-white dark:bg-gray-800'
+                      } hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer`}
                     >
-                      <div className="flex items-start gap-3">
-                        {/* Icon */}
-                        <div className="flex-shrink-0 text-2xl mt-1">
-                          {notification.icon}
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
-                              {notification.title}
-                            </h4>
-                            
-                            {/* Delete Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNotification(notification.id);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                            </button>
+                      <div
+                        onClick={() => handleNotificationClick(notification)}
+                        className="p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Icon */}
+                          <div className="flex-shrink-0 text-2xl mt-1">
+                            {getIcon(notification.type)}
                           </div>
 
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                            {notification.message}
-                          </p>
-
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-500">
-                              {getTimeAgo(notification.created_at)}
-                            </span>
-
-                            {!notification.is_read && (
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
+                                {notification.title}
+                              </h4>
+                              
+                              {/* Delete Button */}
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  markAsRead(notification.id);
-                                }}
-                                className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                                onClick={(e) => handleDelete(e, notification.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition"
+                                title="Delete"
                               >
-                                <Check className="w-3 h-3" />
-                                Mark as read
+                                <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                               </button>
-                            )}
-                          </div>
-                        </div>
+                            </div>
 
-                        {/* Unread Indicator */}
-                        {!notification.is_read && (
-                          <div className="w-2 h-2 bg-purple-600 rounded-full flex-shrink-0 mt-2" />
-                        )}
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                              {notification.message}
+                            </p>
+
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-500">
+                                {getTimeAgo(notification.created_at)}
+                              </span>
+
+                              {isUnread && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notification.id);
+                                  }}
+                                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Mark as read
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Unread Indicator */}
+                          {isUnread && (
+                            <div className="w-2 h-2 bg-purple-600 rounded-full flex-shrink-0 mt-2" />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -358,5 +506,3 @@ export default function NotificationBell() {
     </div>
   );
 }
-
-

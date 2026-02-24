@@ -3,12 +3,14 @@
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import Avatar from "./Avatar";
+import Logo, { LogoIconOnly, LogoWithText, LogoLight } from '@/components/Logo';
 import { Menu, Sun, Moon, MessageCircle, ArrowLeft, Sparkles } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import NotificationBell from '@/components/social/NotificationBell';
+//import NotificationBell from '@/components/social/NotificationBell';
+import NotificationBell from '@/components/NotificationBell';
 import AmyAssistant from '@/components/ai/AmyAssistant'; // ⭐ NEW
 
 export default function Navbar({ onMenuClick }) {
@@ -113,7 +115,7 @@ export default function Navbar({ onMenuClick }) {
 
   return (
     <>
-      <nav className="sticky top-0 z-30 flex justify-between items-center px-3 sm:px-6 py-3 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+      <nav className="sticky top-0 z-30 flex justify-between items-center px-3 sm:px-6 py-2 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
         {/* Left Section */}
         <div className="flex items-center gap-2">
           <button
@@ -127,19 +129,40 @@ export default function Navbar({ onMenuClick }) {
           {shouldShowBack && (
             <button
               onClick={handleBack}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[30px] min-w-[30px] flex items-center justify-center"
               aria-label="Go back"
+              title="Go back"
             >
               <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </button>
           )}
-          
-          <div className="flex items-center gap-2">
+
+          {/* <div className="flex items-center gap-2">
             <span className="text-2xl">🎵</span>
             <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white hidden sm:block">
               AmplyGigs
             </h1>
-          </div>
+          </div> */}
+
+              {/* <Logo size="lg" showText={true} href="/" /> */}
+
+            {/* Desktop: Icon + Text */}
+            <Logo 
+              size="lg" 
+              showText={true} 
+              href="/" 
+              variant="default"
+              className="hidden sm:flex"
+            />
+
+            {/* Mobile: Icon Only */}
+            <Logo 
+              size="lg" 
+              showText={false} 
+              href="/" 
+              variant="default"
+              className="flex sm:hidden"
+            />
         </div>
 
         {/* Right Section */}
@@ -171,7 +194,7 @@ export default function Navbar({ onMenuClick }) {
           </button>
 
           {/* Messages Icon with Badge */}
-          <Link
+          {/* <Link
             href="/messages"
             className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Messages"
@@ -182,7 +205,7 @@ export default function Navbar({ onMenuClick }) {
                 {unreadMessages > 99 ? "99+" : unreadMessages}
               </span>
             )}
-          </Link>
+          </Link> */}
 
           {/* Notification Bell */}
           <NotificationBell />

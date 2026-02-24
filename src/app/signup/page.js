@@ -45,6 +45,8 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, User, Mail, Lock, Users, Phone } from "lucide-react";
+import Logo, { LogoIconOnly, LogoWithText, LogoLight } from '@/components/Logo';
+
 
 export default function SignUpPage() {
   const [form, setForm] = useState({
@@ -198,8 +200,10 @@ export default function SignUpPage() {
       <div className="max-w-sm w-full p-6 sm:p-6 bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-85 rounded-lg shadow-2xl">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
+           {/* <Logo size="lg" showText={false} className=" "/> */}
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-1 sm:mb-2">
-            🎵 Join AmplyGigs
+            🎵
+           Join AmplyGigs
           </h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Create your account to get started

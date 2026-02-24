@@ -10,6 +10,7 @@ import {
   Users, CreditCard, Ticket, Crown, Wrench, 
   MessageCircle, Bell, TrendingUp, Instagram,
   Users2, PenBox, Guitar, Briefcase, FileText,
+  Music2,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -359,18 +360,14 @@ export default function Sidebar({ isOpen, onClose }) {
 <NavLink href="/musician/applications" icon={FileText}>
   My Applications
 </NavLink>
-              {/* <NavLink href="/kyc/verify" icon={Shield}>
-                Verification
-              </NavLink> */}
+              
               <NavLink href="/tracking" icon={MapPin}>
                 Live Tracking
               </NavLink>
               <NavLink href="/musician/earnings" icon={DollarSign}>
                 Earnings
               </NavLink>
-              <NavLink href="/musician/events" icon={Music}>
-                All Gigs
-              </NavLink>
+              
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
               </NavLink>
@@ -380,15 +377,21 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/feed" icon={Home}>
                 Social Feed
               </NavLink>
-              <NavLink href="/musician/my-events" icon={Music}>
+              <NavLink href="/musician/my-events" icon={Guitar}>
                 My Events
               </NavLink>
               <NavLink href="/live-events" icon={PenBox}>
                 Discover Events
               </NavLink>
-              <NavLink href="/musician/discover" icon={Guitar}>
+              <NavLink href="/musician/discover" icon={Music2}>
                 External Gigs
               </NavLink>
+              <NavLink href="/musician/events" icon={Music}>
+                All Gigs
+              </NavLink>
+              {/* <NavLink href="/kyc/verify" icon={Shield}>
+                Verification
+              </NavLink> */}
               <NavLink href="/notifications" icon={Bell} badge={unreadNotifications}>
                 Notifications
               </NavLink>
@@ -414,7 +417,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 Proposals
               </NavLink>
 
-               {/* NEW: Jobs Section */}
     {/* <NavLink href="/jobs" icon={Briefcase}>
       Jobs & Auditions
     </NavLink>

@@ -6,7 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from '@/lib/supabaseClient';
 import ProfilePictureUpload from "@/components/ProfilePictureUpload";
 import ProfileSyncButton from "@/components/ProfileSyncButton";
-import { User, Mail, Phone, MapPin, RefreshCw, Wallet, Plus, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import NotificationPreferences from "@/components/settings/NotificationPreferences";
+import { User, Mail, Phone, MapPin, RefreshCw, Wallet, Plus, ArrowUpRight, ArrowDownLeft, Bell } from "lucide-react";
 
 export default function ClientSettingsPage() {
   const { user } = useAuth();
@@ -176,6 +177,17 @@ export default function ClientSettingsPage() {
               >
                 <Wallet className="w-4 h-4" />
                 Wallet
+              </button>
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`pb-4 pt-6 px-2 font-medium text-sm border-b-2 transition flex items-center gap-2 ${
+                  activeTab === 'notifications'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Bell className="w-4 h-4" />
+                Notifications
               </button>
             </nav>
           </div>
@@ -418,6 +430,12 @@ export default function ClientSettingsPage() {
               </div>
             )}
           </div>
+
+          {/* NOTIFICATIONS TAB - NEW! */}
+            {activeTab === 'notifications' && (
+              <NotificationPreferences />
+            )}
+          
         </div>
 
         {/* Deposit Modal */}

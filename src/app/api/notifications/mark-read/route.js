@@ -1,4 +1,4 @@
-// src/app/api/notifications/mark-read/route.js
+// src/app/api/notifications/mark-read/route.js - FIXED VERSION
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
@@ -8,6 +8,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// ⭐ Mark single notification as read
 export async function POST(request) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -19,7 +20,6 @@ export async function POST(request) {
     }
 
     // Create client with user's token for auth
-    const token = authHeader.replace('Bearer ', '');
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -50,11 +50,14 @@ export async function POST(request) {
       );
     }
 
-    // Use admin client to update
+    console.log('📧 Marking notification as read:', { notificationId, userId: user.id });
+
+    // ⭐ CRITICAL: Update BOTH read fields for compatibility
     const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ 
-        is_read: true,
+        is_read: true,     // ⭐ Primary field
+        read: true,        // ⭐ Compatibility field
         read_at: new Date().toISOString()
       })
       .eq('id', notificationId)
@@ -63,17 +66,18 @@ export async function POST(request) {
       .single();
 
     if (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('❌ Error marking notification as read:', error);
       return NextResponse.json(
         { error: 'Failed to mark notification as read', details: error.message },
         { status: 500 }
       );
     }
 
+    console.log('✅ Notification marked as read:', data);
     return NextResponse.json({ success: true, notification: data });
 
   } catch (error) {
-    console.error('Mark notification as read error:', error);
+    console.error('❌ Mark notification as read error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -81,7 +85,7 @@ export async function POST(request) {
   }
 }
 
-// Mark all notifications as read
+// ⭐ Mark all notifications as read
 export async function PUT(request) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -113,24 +117,29 @@ export async function PUT(request) {
       );
     }
 
-    // Use admin client to update all
+    console.log('📧 Marking all notifications as read for user:', user.id);
+
+    // ⭐ CRITICAL: Update BOTH read fields for compatibility
     const { data, error } = await supabaseAdmin
       .from('notifications')
       .update({ 
-        is_read: true,
+        is_read: true,     // ⭐ Primary field
+        read: true,        // ⭐ Compatibility field
         read_at: new Date().toISOString()
       })
       .eq('user_id', user.id)
-      .eq('is_read', false)
+      .or('is_read.eq.false,read.eq.false')  // ⭐ Check BOTH fields
       .select();
 
     if (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error('❌ Error marking all notifications as read:', error);
       return NextResponse.json(
         { error: 'Failed to mark notifications as read', details: error.message },
         { status: 500 }
       );
     }
+
+    console.log('✅ Marked all notifications as read:', data?.length || 0);
 
     return NextResponse.json({ 
       success: true, 
@@ -139,7 +148,7 @@ export async function PUT(request) {
     });
 
   } catch (error) {
-    console.error('Mark all notifications as read error:', error);
+    console.error('❌ Mark all notifications as read error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
@@ -147,7 +156,7 @@ export async function PUT(request) {
   }
 }
 
-// Delete a notification
+// ⭐ Delete a notification
 export async function DELETE(request) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -189,6 +198,8 @@ export async function DELETE(request) {
       );
     }
 
+    console.log('🗑️ Deleting notification:', { notificationId, userId: user.id });
+
     const { error } = await supabaseAdmin
       .from('notifications')
       .delete()
@@ -196,17 +207,18 @@ export async function DELETE(request) {
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Error deleting notification:', error);
+      console.error('❌ Error deleting notification:', error);
       return NextResponse.json(
         { error: 'Failed to delete notification', details: error.message },
         { status: 500 }
       );
     }
 
+    console.log('✅ Notification deleted');
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('Delete notification error:', error);
+    console.error('❌ Delete notification error:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }
