@@ -342,31 +342,29 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/profile" icon={User}>
                 Profile
               </NavLink>
+              <NavLink href="/musician/earnings" icon={DollarSign}>
+                Earnings
+              </NavLink>
               <NavLink href="/musician/bookings" icon={Calendar}>
                 Bookings
-              </NavLink>
-              <NavLink href="/musician/gigs" icon={TrendingUp}>
-                Available Gigs
               </NavLink>
               <NavLink href="/musician/proposals" icon={Instagram}>
                 Proposals
               </NavLink>
-
+              <NavLink href="/musician/gigs" icon={TrendingUp}>
+                Available Gigs
+              </NavLink>          
               <NavLink href="/tracking" icon={MapPin}>
                 Live Tracking
               </NavLink>
-              <NavLink href="/musician/earnings" icon={DollarSign}>
-                Earnings
-              </NavLink>
-
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
               </NavLink>
-              <NavLink href="/network" icon={Users}>
-                Network
-              </NavLink>
               <NavLink href="/feed" icon={Home}>
                 Social Feed
+              </NavLink>
+              <NavLink href="/network" icon={Users}>
+                Network
               </NavLink>
               <NavLink href="/jobs" icon={Briefcase}>
                 Browse Jobs

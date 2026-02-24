@@ -14,7 +14,7 @@ const AMY_USER_ID = '00000000-0000-0000-0000-000000000001';
 export default function ChatWindow({ conversation, onBack }) {
   const { user } = useAuth();
   const { messages, fetchMessages, sendMessage, subscribeToMessages } = useSocial();
-  
+
   const [messageText, setMessageText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
@@ -22,7 +22,7 @@ export default function ChatWindow({ conversation, onBack }) {
   const [error, setError] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [amyIsThinking, setAmyIsThinking] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -40,7 +40,7 @@ export default function ChatWindow({ conversation, onBack }) {
       const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       setIsMobile(mobile);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -53,7 +53,7 @@ export default function ChatWindow({ conversation, onBack }) {
 
     fetchMessages(conversation.id);
     const channel = subscribeToMessages(conversation.id);
-    
+
     return () => {
       channel?.unsubscribe();
     };
@@ -92,7 +92,7 @@ export default function ChatWindow({ conversation, onBack }) {
 
     setMediaFile(file);
     setError(null);
-    
+
     const reader = new FileReader();
     reader.onloadend = () => setMediaPreview(reader.result);
     reader.readAsDataURL(file);
@@ -105,6 +105,12 @@ export default function ChatWindow({ conversation, onBack }) {
       fileInputRef.current.value = '';
     }
   }, []);
+  // ⭐ ADD THIS HELPER FUNCTION AT THE TOP OF YOUR COMPONENT (JAVASCRIPT)
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // ============================================
   // AMY AI RESPONSE GENERATION
@@ -114,25 +120,25 @@ export default function ChatWindow({ conversation, onBack }) {
     try {
       // Parse intent
       const intentResult = await aiClient.parseIntent(userMessage, 'chat');
-      
+
       let amyResponseText = '';
       const filters = intentResult.filters;
-      
+
       // Generate contextual response based on intent
       if (intentResult.intent === 'search_gigs') {
         const genre = filters.genre || 'musicians';
         const location = filters.location || 'your area';
         const budget = filters.budget_max ? `under ₦${filters.budget_max.toLocaleString()}` : '';
-        
+
         amyResponseText = `I found ${genre} in ${location} ${budget}! Here are the top matches:\n\n`;
-        
+
         // TODO: Actually fetch musicians from database
         // For now, placeholder:
         amyResponseText += `🎵 3 verified ${genre} available\n`;
         amyResponseText += `💰 Rates starting from ₦50,000\n`;
         amyResponseText += `⭐ Average rating: 4.8/5\n\n`;
         amyResponseText += `Would you like me to show you their profiles?`;
-        
+
       } else if (intentResult.intent === 'book_musician') {
         amyResponseText = `I can help you book a ${filters.genre || 'musician'} for your ${filters.event_type || 'event'}!\n\n`;
         amyResponseText += `Here's what I need:\n`;
@@ -141,7 +147,7 @@ export default function ChatWindow({ conversation, onBack }) {
         amyResponseText += `💰 Your budget\n`;
         amyResponseText += `🎵 Music genre preference\n\n`;
         amyResponseText += `Can you provide these details?`;
-        
+
       } else if (intentResult.intent === 'create_event') {
         amyResponseText = `Exciting! Let's create your event. 🎉\n\n`;
         amyResponseText += `I'll guide you through:\n`;
@@ -149,7 +155,7 @@ export default function ChatWindow({ conversation, onBack }) {
         amyResponseText += `2️⃣ Ticket tiers and pricing\n`;
         amyResponseText += `3️⃣ Artist lineup\n\n`;
         amyResponseText += `Ready to start? Tell me about your event!`;
-        
+
       } else {
         // General assistance
         amyResponseText = `I'm here to help! I can assist with:\n\n`;
@@ -159,9 +165,9 @@ export default function ChatWindow({ conversation, onBack }) {
         amyResponseText += `💬 Answering questions about AmplyGigs\n\n`;
         amyResponseText += `What would you like to do?`;
       }
-      
+
       return amyResponseText;
-      
+
     } catch (error) {
       console.error('Amy response generation error:', error);
       return "I'm having a bit of trouble right now, but I'm here to help! Could you try asking again? 😊";
@@ -212,38 +218,38 @@ export default function ChatWindow({ conversation, onBack }) {
       if (isAmyChat) {
         // ✅ AMY MODE: Transcribe and respond with AI
         setAmyIsThinking(true);
-        
+
         // Transcribe
         const transcription = await aiClient.transcribe(audioBlob);
-        
+
         // Send user's transcribed message
         await sendMessage(conversation.id, `🎤 ${transcription.text}`, null);
-        
+
         // Get Amy's response
         const amyResponseText = await getAmyResponse(transcription.text);
-        
+
         // Send Amy's text response
         await sendMessage(conversation.id, amyResponseText, null);
-        
+
         // Convert to speech and play
         const audioResponse = await aiClient.textToSpeech(amyResponseText, 'nova', 1.0);
         const audioURL = URL.createObjectURL(audioResponse);
-        
+
         if (amyAudioRef.current) {
           amyAudioRef.current.src = audioURL;
           amyAudioRef.current.play();
         }
-        
+
         setAmyIsThinking(false);
-        
+
       } else {
         // ✅ REGULAR MODE: Just send voice message
         const audioFile = new File([audioBlob], 'voice.wav', { type: 'audio/wav' });
         await sendMessage(conversation.id, '🎤 Voice message', audioFile);
       }
-      
+
       scrollToBottom();
-      
+
     } catch (err) {
       setError(err.message || 'Failed to send voice message');
       setTimeout(() => setError(null), 3000);
@@ -259,56 +265,56 @@ export default function ChatWindow({ conversation, onBack }) {
 
   const handleSend = useCallback(async (e) => {
     e?.preventDefault();
-    
+
     const trimmedText = messageText.trim();
     if (!trimmedText && !mediaFile) return;
     if (sending) return;
 
     setSending(true);
     setError(null);
-    
+
     try {
       // Send user's message
       const result = await sendMessage(conversation.id, trimmedText, mediaFile);
-      
+
       if (result.error) {
         throw new Error(result.error.message || 'Failed to send');
       }
-      
+
       setMessageText('');
       removeMedia();
 
       // ✅ If chatting with Amy, get AI response
       if (isAmyChat && trimmedText) {
         setAmyIsThinking(true);
-        
+
         try {
           const amyResponseText = await getAmyResponse(trimmedText);
-          
+
           // Send Amy's response
           await sendMessage(conversation.id, amyResponseText, null);
-          
+
           // Convert to speech and play
           const audioBlob = await aiClient.textToSpeech(amyResponseText, 'nova', 1.0);
           const audioURL = URL.createObjectURL(audioBlob);
-          
+
           if (amyAudioRef.current) {
             amyAudioRef.current.src = audioURL;
             amyAudioRef.current.play();
           }
-          
+
         } catch (amyError) {
           console.error('Amy response error:', amyError);
         } finally {
           setAmyIsThinking(false);
         }
       }
-      
+
       setTimeout(() => {
         textareaRef.current?.focus();
         scrollToBottom();
       }, 100);
-      
+
     } catch (err) {
       setError(err.message || 'Failed to send');
       setTimeout(() => setError(null), 3000);
@@ -321,7 +327,7 @@ export default function ChatWindow({ conversation, onBack }) {
     if (isMobile) {
       return;
     }
-    
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
@@ -350,7 +356,7 @@ export default function ChatWindow({ conversation, onBack }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-white dark:bg-gray-900">
-      
+
       {/* HEADER */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
         <button
@@ -367,9 +373,9 @@ export default function ChatWindow({ conversation, onBack }) {
             <Sparkles className="w-5 h-5 text-white" />
           </div>
         ) : (
-          <Avatar 
-            user={conversation.otherUser} 
-            size="sm" 
+          <Avatar
+            user={conversation.otherUser}
+            size="sm"
             className="flex-shrink-0"
           />
         )}
@@ -388,8 +394,8 @@ export default function ChatWindow({ conversation, onBack }) {
             )}
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {isAmyChat 
-              ? 'Your AI assistant • Powered by OpenAI' 
+            {isAmyChat
+              ? 'Your AI assistant • Powered by OpenAI'
               : conversation.otherUser?.role?.toLowerCase() || 'User'}
           </p>
         </div>
@@ -404,9 +410,9 @@ export default function ChatWindow({ conversation, onBack }) {
       </div>
 
       {/* MESSAGES */}
-      <div 
+      <div
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-50 dark:bg-gray-950"
-        style={{ 
+        style={{
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain'
         }}
@@ -423,8 +429,8 @@ export default function ChatWindow({ conversation, onBack }) {
                   )}
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {isAmyChat 
-                    ? "👋 Hi! I'm Amy, your AI assistant" 
+                  {isAmyChat
+                    ? "👋 Hi! I'm Amy, your AI assistant"
                     : 'No messages yet. Say hi! 👋'}
                 </p>
                 {isAmyChat && (
@@ -436,30 +442,35 @@ export default function ChatWindow({ conversation, onBack }) {
             </div>
           ) : (
             <>
+
+              {/* MESSAGES SECTION - UPDATE THIS PART */}
               {messages.map((message) => {
                 const isOwn = message.sender_id === user?.id;
                 const isFromAmy = message.sender_id === AMY_USER_ID;
-                
+
                 return (
                   <div
                     key={message.id}
                     className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
                   >
+                    {/* Avatar */}
                     {!isOwn && (
                       isFromAmy ? (
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0 mt-auto">
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                       ) : (
-                        <Avatar 
-                          user={message.sender || conversation.otherUser} 
-                          size="xs" 
+                        <Avatar
+                          user={message.sender || conversation.otherUser}
+                          size="xs"
                           className="flex-shrink-0 mt-auto"
                         />
                       )
                     )}
 
                     <div className={`flex flex-col max-w-[75%] sm:max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
+
+                      {/* ⭐ MEDIA HANDLING - FIXED FOR MOBILE */}
                       {message.media_url && (
                         <div className="mb-1 rounded-2xl overflow-hidden shadow-md">
                           {message.media_type === 'image' ? (
@@ -477,24 +488,73 @@ export default function ChatWindow({ conversation, onBack }) {
                               className="max-w-full max-h-60 rounded-2xl"
                             />
                           ) : message.media_type === 'audio' ? (
-                            <audio
-                              src={message.media_url}
-                              controls
-                              className="w-full max-w-xs"
-                            />
+                            // ⭐ VOICE MESSAGE BUBBLE - MOBILE OPTIMIZED
+                            <div className={`
+                px-3 py-3 rounded-2xl shadow-sm min-w-[200px] max-w-[280px]
+                ${isFromAmy
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500'
+                                : isOwn
+                                  ? 'bg-purple-600'
+                                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+                              }
+              `}>
+                              {/* Voice Message Label */}
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isOwn || isFromAmy
+                                    ? 'bg-white/20'
+                                    : 'bg-purple-100 dark:bg-purple-900/30'
+                                  }`}>
+                                  <Mic className={`w-4 h-4 ${isOwn || isFromAmy
+                                      ? 'text-white'
+                                      : 'text-purple-600 dark:text-purple-400'
+                                    }`} />
+                                </div>
+                                <span className={`text-xs font-medium ${isOwn || isFromAmy
+                                    ? 'text-white'
+                                    : 'text-gray-700 dark:text-gray-300'
+                                  }`}>
+                                  Voice Message
+                                </span>
+                              </div>
+
+                              {/* ⭐ MOBILE-OPTIMIZED AUDIO PLAYER */}
+                              <audio
+                                src={message.media_url}
+                                controls
+                                controlsList="nodownload noplaybackrate"
+                                preload="metadata"
+                                className="w-full h-10"
+                                style={{
+                                  // Force native controls to show properly on mobile
+                                  width: '100%',
+                                  height: '40px',
+                                  borderRadius: '8px',
+                                }}
+                              />
+
+                              {/* Duration Indicator (if available) */}
+                              {message.media_duration && (
+                                <div className={`text-xs mt-1 ${isOwn || isFromAmy
+                                    ? 'text-white/80'
+                                    : 'text-gray-500 dark:text-gray-400'
+                                  }`}>
+                                  {formatDuration(message.media_duration)}
+                                </div>
+                              )}
+                            </div>
                           ) : null}
                         </div>
                       )}
 
+                      {/* Text Content */}
                       {message.content && (
                         <div
-                          className={`px-4 py-2 rounded-2xl shadow-sm ${
-                            isFromAmy
+                          className={`px-4 py-2 rounded-2xl shadow-sm ${isFromAmy
                               ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-bl-md border-2 border-purple-300'
                               : isOwn
-                              ? 'bg-purple-600 text-white rounded-br-md'
-                              : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-gray-700'
-                          }`}
+                                ? 'bg-purple-600 text-white rounded-br-md'
+                                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-gray-700'
+                            }`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words">
                             {message.content}
@@ -502,6 +562,7 @@ export default function ChatWindow({ conversation, onBack }) {
                         </div>
                       )}
 
+                      {/* Timestamp & Read Status */}
                       <div className="flex items-center gap-1 mt-1 px-2">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
@@ -518,6 +579,7 @@ export default function ChatWindow({ conversation, onBack }) {
                   </div>
                 );
               })}
+
               <div ref={messagesEndRef} />
             </>
           )}
@@ -590,7 +652,7 @@ export default function ChatWindow({ conversation, onBack }) {
             onChange={handleFileSelect}
             className="hidden"
           />
-          
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -604,11 +666,10 @@ export default function ChatWindow({ conversation, onBack }) {
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             disabled={sending || amyIsThinking}
-            className={`flex-shrink-0 p-2.5 rounded-full transition-colors active:scale-95 disabled:opacity-50 ${
-              isRecording 
-                ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 animate-pulse' 
+            className={`flex-shrink-0 p-2.5 rounded-full transition-colors active:scale-95 disabled:opacity-50 ${isRecording
+                ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 animate-pulse'
                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
-            }`}
+              }`}
           >
             {isRecording ? (
               <MicOff className="w-5 h-5" />
@@ -623,13 +684,13 @@ export default function ChatWindow({ conversation, onBack }) {
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              amyIsThinking 
-                ? "Amy is thinking..." 
-                : isAmyChat 
-                ? "Ask Amy anything..." 
-                : isMobile 
-                ? "Type a message..." 
-                : "Type a message... (Enter to send)"
+              amyIsThinking
+                ? "Amy is thinking..."
+                : isAmyChat
+                  ? "Ask Amy anything..."
+                  : isMobile
+                    ? "Type a message..."
+                    : "Type a message... (Enter to send)"
             }
             disabled={sending || isRecording || amyIsThinking}
             maxLength={1000}
