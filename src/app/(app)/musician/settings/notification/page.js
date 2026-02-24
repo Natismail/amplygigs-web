@@ -394,12 +394,23 @@ export default function NotificationSettingsPage() {
 
       {/* Communication Channels */}
       <div>
+      <div className="flex">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
           Communication Channels
         </h2>
+        {/* ⭐ FIXED: Opens modal instead of navigating */}
+                    {/* <button
+                      onClick={() => setShowSettings(true)}
+                      className="flex  justify-end gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition"
+                    >
+                      <Settings className="w-5 h-5" />
+                      <span className="hidden sm:inline">Preference</span>
+                    </button> */}
+                    </div>
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
           {notificationChannels.map(renderNotificationToggle)}
         </div>
+        
       </div>
 
       {/* Activity Notifications */}

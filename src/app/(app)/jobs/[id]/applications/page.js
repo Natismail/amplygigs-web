@@ -1,3 +1,5 @@
+//src/app/(app)/jobs/[id]/applications/page.js
+
 "use client";
 
 import { useState, useEffect } from 'react';

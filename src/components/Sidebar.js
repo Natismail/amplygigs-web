@@ -4,10 +4,10 @@
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
-import { 
-  X, Home, User, Calendar, CheckCircle, MapPin, 
+import {
+  X, Home, User, Calendar, CheckCircle, MapPin,
   DollarSign, Music, Settings, LogOut, Shield,
-  Users, CreditCard, Ticket, Crown, Wrench, 
+  Users, CreditCard, Ticket, Crown, Wrench,
   MessageCircle, Bell, TrendingUp, Instagram,
   Users2, PenBox, Guitar, Briefcase, FileText,
   Music2,
@@ -41,7 +41,7 @@ export default function Sidebar({ isOpen, onClose }) {
         .eq("read", false);
 
       if (error) throw error;
-      
+
       console.log('📊 Sidebar unread count:', count);
       setUnreadCount(count || 0);
     } catch (error) {
@@ -69,7 +69,7 @@ export default function Sidebar({ isOpen, onClose }) {
         (payload) => {
           console.log("📨 Sidebar: New message received:", payload.new);
           setUnreadCount((prev) => prev + 1);
-          
+
           // Show browser notification
           if (Notification.permission === "granted") {
             new Notification("New Message", {
@@ -151,7 +151,7 @@ export default function Sidebar({ isOpen, onClose }) {
         },
         (payload) => {
           setUnreadNotifications((prev) => prev + 1);
-          
+
           // Show browser notification
           if (Notification.permission === "granted") {
             new Notification(payload.new.title || "New Notification", {
@@ -192,7 +192,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const handleSignOut = async () => {
     setIsLoggingOut(true);
     onClose();
-    
+
     try {
       await signOut();
       router.replace("/login");
@@ -206,16 +206,15 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const NavLink = ({ href, icon: Icon, children, badge }) => {
     const isActive = pathname === href;
-    
+
     return (
       <Link
         href={href}
         onClick={onClose}
-        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px] group ${
-          isActive
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px] group ${isActive
             ? "bg-purple-600 text-white shadow-lg"
             : "text-gray-300 hover:bg-gray-800 hover:text-white"
-        }`}
+          }`}
       >
         <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`} />
         <span className="flex-1 font-medium">{children}</span>
@@ -242,9 +241,8 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-72 bg-gray-900 text-white transform transition-transform duration-300 z-50 flex flex-col ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed top-0 left-0 h-full w-72 bg-gray-900 text-white transform transition-transform duration-300 z-50 flex flex-col ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
@@ -320,7 +318,7 @@ export default function Sidebar({ isOpen, onClose }) {
               </NavLink>
               <NavLink href="/admin/compliance" icon={Shield}>
                 Compliance
-                </NavLink>
+              </NavLink>
               <NavLink href="/admin/support-tickets" icon={Wrench}>
                 Support
               </NavLink>
@@ -354,20 +352,13 @@ export default function Sidebar({ isOpen, onClose }) {
                 Proposals
               </NavLink>
 
-              <NavLink href="/jobs" icon={Briefcase}>
-  Browse Jobs
-</NavLink>
-<NavLink href="/musician/applications" icon={FileText}>
-  My Applications
-</NavLink>
-              
               <NavLink href="/tracking" icon={MapPin}>
                 Live Tracking
               </NavLink>
               <NavLink href="/musician/earnings" icon={DollarSign}>
                 Earnings
               </NavLink>
-              
+
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
               </NavLink>
@@ -376,6 +367,12 @@ export default function Sidebar({ isOpen, onClose }) {
               </NavLink>
               <NavLink href="/feed" icon={Home}>
                 Social Feed
+              </NavLink>
+              <NavLink href="/jobs" icon={Briefcase}>
+                Browse Jobs
+              </NavLink>
+              <NavLink href="/musician/applications" icon={FileText}>
+                My Applications
               </NavLink>
               <NavLink href="/musician/my-events" icon={Guitar}>
                 My Events
@@ -417,7 +414,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Proposals
               </NavLink>
 
-    {/* <NavLink href="/jobs" icon={Briefcase}>
+              {/* <NavLink href="/jobs" icon={Briefcase}>
       Jobs & Auditions
     </NavLink>
     <NavLink href="/client/job-postings" icon={Music}>

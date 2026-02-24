@@ -1,4 +1,4 @@
-// app/notifications/page.js - FIXED: Correct table name
+// app/notifications/page.js - FIXED: Opens settings modal
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
+import NotificationPreferences from '@/components/settings/NotificationPreferences'; // ⭐ Import component
 
 export default function NotificationsPage() {
   const { user } = useAuth();
@@ -23,10 +24,11 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [filteredNotifications, setFilteredNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
+  const [filter, setFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [showSettings, setShowSettings] = useState(false); // ⭐ NEW: Modal state
 
   const notificationTypes = [
     { value: 'all', label: 'All Types' },
@@ -57,9 +59,8 @@ export default function NotificationsPage() {
     try {
       console.log('📧 Fetching notifications for user:', user.id);
 
-      // ⭐ FIXED: Query correct table name
       const { data, error } = await supabase
-        .from('notifications')  // ⭐ Changed from 'in_app_notifications'
+        .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -83,7 +84,6 @@ export default function NotificationsPage() {
 
     console.log('🔔 Subscribing to notifications');
 
-    // ⭐ FIXED: Subscribe to correct table
     const subscription = supabase
       .channel(`notifications-page-${user.id}`)
       .on(
@@ -91,7 +91,7 @@ export default function NotificationsPage() {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'notifications',  // ⭐ Changed from 'in_app_notifications'
+          table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
@@ -137,19 +137,16 @@ export default function NotificationsPage() {
   const applyFilters = () => {
     let filtered = [...notifications];
 
-    // ⭐ FIXED: Check BOTH read fields
     if (filter === 'unread') {
       filtered = filtered.filter(n => !n.is_read && !n.read);
     } else if (filter === 'read') {
       filtered = filtered.filter(n => n.is_read || n.read);
     }
 
-    // Type filter
     if (typeFilter !== 'all') {
       filtered = filtered.filter(n => n.type?.includes(typeFilter));
     }
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(n => 
@@ -165,7 +162,6 @@ export default function NotificationsPage() {
     try {
       console.log('📧 Marking notifications as read:', notificationIds);
 
-      // ⭐ FIXED: Update BOTH read fields
       const { error } = await supabase
         .from('notifications')
         .update({ 
@@ -193,7 +189,6 @@ export default function NotificationsPage() {
   };
 
   const markAllAsRead = async () => {
-    // ⭐ FIXED: Check BOTH read fields
     const unreadIds = notifications
       .filter(n => !n.is_read && !n.read)
       .map(n => n.id);
@@ -241,7 +236,6 @@ export default function NotificationsPage() {
   };
 
   const handleNotificationClick = async (notification) => {
-    // ⭐ FIXED: Check BOTH read fields
     if (!notification.is_read && !notification.read) {
       await markAsRead([notification.id]);
     }
@@ -284,7 +278,6 @@ export default function NotificationsPage() {
     return icons[type] || '🔔';
   };
 
-  // ⭐ FIXED: Check BOTH read fields
   const unreadCount = notifications.filter(n => !n.is_read && !n.read).length;
 
   if (!user) {
@@ -323,12 +316,13 @@ export default function NotificationsPage() {
               </p>
             </div>
 
+            {/* ⭐ FIXED: Opens modal instead of navigating */}
             <button
-              onClick={() => router.push('/settings/notifications')}
+              onClick={() => setShowSettings(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition"
             >
               <Settings className="w-5 h-5" />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="hidden sm:inline">Preference</span>
             </button>
           </div>
 
@@ -476,7 +470,6 @@ export default function NotificationsPage() {
         ) : (
           <div className="space-y-2">
             {filteredNotifications.map((notification) => {
-              // ⭐ FIXED: Check BOTH read fields
               const isUnread = !notification.is_read && !notification.read;
 
               return (
@@ -561,6 +554,33 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* ⭐ SETTINGS MODAL */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between z-10">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <Settings className="w-7 h-7" />
+                Notification Preference
+              </h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+              >
+                <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <NotificationPreferences />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

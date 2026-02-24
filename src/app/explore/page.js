@@ -3,14 +3,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Music, MapPin, Star, Search, Calendar, Users, Globe, Filter, X, TrendingUp, Clock } from 'lucide-react';
+import { Music, MapPin, Star, Search, Calendar, Users, Globe, Filter, X, TrendingUp, Clock, Briefcase } from 'lucide-react';
 import { supabase } from "@/lib/supabaseClient";
+import JobsContent from '@/components/jobs/JobsContent';
 
 export default function ExplorePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('musicians'); // 'musicians' | 'events'
   const [musicians, setMusicians] = useState([]);
   const [events, setEvents] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
   
@@ -220,6 +222,10 @@ export default function ExplorePage() {
     router.push(`/login?returnTo=/event/${eventId}`);
   };
 
+  const handleJobClick = (eventId) => {
+    router.push(`/login?returnTo=/job/${jobId}`);
+  };
+
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedGenre('all');
@@ -273,6 +279,24 @@ export default function ExplorePage() {
                   {events.length > 0 && (
                     <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
                       {events.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('jobs')}
+                className={`px-6 py-3 rounded-lg font-semibold transition ${
+                  activeTab === 'jobs'
+                    ? 'bg-white text-purple-600 shadow-lg'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-5 h-5" />
+                  Find Job Openings
+                  {jobs.length > 0 && (
+                    <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                      {jobs.length}
                     </span>
                   )}
                 </div>
@@ -726,27 +750,35 @@ export default function ExplorePage() {
           </>
         )}
 
+        {activeTab === 'jobs' && (
+  <JobsContent />
+)}
+
         {/* Call to Action */}
-        <div className="mt-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            {activeTab === 'musicians' 
-              ? 'Ready to Book Your Perfect Musician?'
-              : 'Want to List Your Event?'
-            }
-          </h2>
-          <p className="text-xl text-purple-100 mb-8">
-            {activeTab === 'musicians'
-              ? 'Sign up now to unlock full profiles, instant booking, and secure payments'
-              : 'Join now to post events and connect with talented musicians'
-            }
-          </p>
-          <button
-            onClick={() => router.push('/signup')}
-            className="px-8 py-4 bg-white text-purple-600 rounded-xl font-semibold hover:shadow-2xl transition transform hover:scale-105"
-          >
-            Get Started Free
-          </button>
-        </div>
+{activeTab !== 'jobs' && (
+  <div className="mt-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-12 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      {activeTab === 'musicians' 
+        ? 'Ready to Book Your Perfect Musician/Entertainer?'
+        : 'Want to List Your Event?'
+      }
+    </h2>
+
+    <p className="text-xl text-purple-100 mb-8">
+      {activeTab === 'musicians'
+        ? 'Sign up now to unlock full profiles, instant booking, and secure payments'
+        : 'Join now to post events and connect with talented musicians'
+      }
+    </p>
+
+    <button
+      onClick={() => router.push('/signup')}
+      className="px-8 py-4 bg-white text-purple-600 rounded-xl font-semibold hover:shadow-2xl transition transform hover:scale-105"
+    >
+      Get Started Free
+    </button>
+  </div>
+)}
       </div>
     </div>
   );

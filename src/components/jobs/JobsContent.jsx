@@ -19,7 +19,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
-export default function JobsPage() {
+export default function JobsContent() {
   const [user, setUser] = useState(null);
   const router = useRouter();
   const [jobs, setJobs] = useState([]);

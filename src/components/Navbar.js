@@ -194,7 +194,7 @@ export default function Navbar({ onMenuClick }) {
           </button>
 
           {/* Messages Icon with Badge */}
-          {/* <Link
+          <Link
             href="/messages"
             className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Messages"
@@ -205,7 +205,7 @@ export default function Navbar({ onMenuClick }) {
                 {unreadMessages > 99 ? "99+" : unreadMessages}
               </span>
             )}
-          </Link> */}
+          </Link>
 
           {/* Notification Bell */}
           <NotificationBell />
