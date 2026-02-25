@@ -1,4 +1,4 @@
-// src/app/(app)/musician/settings/bank-accounts/page.js - IMPROVED UI
+// src/app/(app)/musician/settings/bank-accounts/page.js - COMPLETE FIX
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,65 +26,88 @@ export default function BankAccountsPage() {
     fetchAccounts();
   }, [user]);
 
+  // ⭐ FIXED: Use correct table name and column
   const fetchAccounts = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("bank_accounts")
+      .from("musician_bank_accounts")  // ✅ Changed from bank_accounts
       .select("*")
-      .eq("user_id", user.id)
+      .eq("musician_id", user.id)  // ✅ Changed from user_id
       .order("created_at", { ascending: false });
     
     if (!error) {
       setAccounts(data || []);
+    } else {
+      console.error('Fetch accounts error:', error);
     }
     setLoading(false);
   };
 
+  // ⭐ FIXED: Complete rewrite with proper error handling
   const addAccount = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setSaving(true);
 
-    // Validation
-    if (!form.bank_name || !form.account_number || !form.account_name) {
-      setError('All fields are required');
-      setSaving(false);
-      return;
-    }
+    try {
+      // Validation
+      if (!form.bank_name?.trim() || !form.account_number?.trim() || !form.account_name?.trim()) {
+        throw new Error('All fields are required');
+      }
 
-    if (form.account_number.length < 10) {
-      setError('Account number must be at least 10 digits');
-      setSaving(false);
-      return;
-    }
+      if (form.account_number.length < 10) {
+        throw new Error('Account number must be at least 10 digits');
+      }
 
-    const { error: insertError } = await supabase
-      .from("bank_accounts")
-      .insert({
-        user_id: user.id,
-        ...form,
-      });
+      console.log('💾 Adding bank account for user:', user.id);
 
-    setSaving(false);
+      // ⭐ FIXED: Use correct table name and include all required fields
+      const { data, error: insertError } = await supabase
+        .from("musician_bank_accounts")  // ✅ Changed from bank_accounts
+        .insert({
+          musician_id: user.id,  // ✅ Changed from user_id
+          bank_name: form.bank_name.trim(),
+          account_number: form.account_number.trim(),
+          account_name: form.account_name.trim(),
+          country_code: 'NG',  // ✅ Required field
+          currency: 'NGN',  // ✅ Required field
+          payment_provider: 'manual',  // ✅ Required field
+          is_default: accounts.length === 0,  // ✅ First account is default
+          is_verified: false,
+          status: 'active',
+        })
+        .select()
+        .single();
 
-    if (insertError) {
-      setError('Failed to add bank account. Please try again.');
-    } else {
+      if (insertError) {
+        console.error('❌ Insert error:', insertError);
+        throw new Error(insertError.message || 'Failed to add account');
+      }
+
+      console.log('✅ Bank account added:', data);
+
       setSuccess('Bank account added successfully!');
       setForm({ bank_name: "", account_number: "", account_name: "" });
       setShowForm(false);
       fetchAccounts();
       setTimeout(() => setSuccess(''), 3000);
+
+    } catch (err) {
+      console.error('❌ Add account error:', err);
+      setError(err.message || 'Failed to add bank account. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
+  // ⭐ FIXED: Use correct table name
   const deleteAccount = async (id) => {
     if (!confirm('Are you sure you want to delete this bank account?')) return;
     
     setDeleting(id);
     const { error } = await supabase
-      .from("bank_accounts")
+      .from("musician_bank_accounts")  // ✅ Changed from bank_accounts
       .delete()
       .eq("id", id);
     
@@ -93,6 +116,7 @@ export default function BankAccountsPage() {
       setSuccess('Bank account deleted successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } else {
+      console.error('Delete error:', error);
       setError('Failed to delete account');
     }
     setDeleting(null);
@@ -164,6 +188,11 @@ export default function BankAccountsPage() {
                     <h3 className="font-semibold text-lg text-gray-900 dark:text-white truncate">
                       {acc.bank_name}
                     </h3>
+                    {acc.is_default && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded">
+                        Default
+                      </span>
+                    )}
                   </div>
 
                   {/* Account Details */}
@@ -254,7 +283,7 @@ export default function BankAccountsPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Chase Bank, Wells Fargo"
+                  placeholder="e.g., Opay, Kuda, GTBank"
                   value={form.bank_name}
                   onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"

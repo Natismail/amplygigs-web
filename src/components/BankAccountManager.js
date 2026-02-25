@@ -94,6 +94,8 @@ export default function BankAccountManager({ onAccountAdded }) {
     setError(null);
     setResolvedName('');
 
+
+    
     try {
       const response = await fetch('/api/banks/verify-account', {
         method: 'POST',
