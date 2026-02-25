@@ -128,7 +128,7 @@ export default function Navbar({ onMenuClick }) {
           {shouldShowBack && (
             <button
               onClick={handleBack}
-              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[25px] flex items-center justify-center flex-shrink-0"
+              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[30px] flex items-center justify-center flex-shrink-0"
               aria-label="Go back"
               title="Go back"
             >

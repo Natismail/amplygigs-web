@@ -1,10 +1,9 @@
-// src/components/social/NotificationBell.js - UNIFIED VERSION
+// src/components/social/NotificationBell.js - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, X, Check, CheckCheck, Trash2, Settings } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useSocial } from '@/context/SocialContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -13,35 +12,21 @@ export default function NotificationBell() {
   const router = useRouter();
   const dropdownRef = useRef(null);
   
-  // Use existing social context
-  const { 
-    notifications, 
-    unreadNotificationsCount,
-    fetchNotifications,
-    markNotificationAsRead,
-    markAllNotificationsAsRead,
-    deleteNotification,
-    subscribeToNotifications
-  } = useSocial();
-  
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'unread'
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      
-      // Subscribe to real-time notifications
-      const channel = subscribeToNotifications();
+      subscribeToNotifications();
       
       // Request browser notification permission
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
       }
-      
-      return () => {
-        channel?.unsubscribe();
-      };
     }
   }, [user]);
 
@@ -57,17 +42,244 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const fetchNotifications = async () => {
+    if (!user?.id) return;
+
+    setLoading(true);
+    try {
+      console.log('📧 Fetching notifications for user:', user.id);
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      console.log('✅ Fetched notifications:', data?.length || 0);
+      setNotifications(data || []);
+      
+      // ⭐ Count unread using BOTH fields for compatibility
+      const unread = (data || []).filter(n => !n.is_read && !n.read).length;
+      console.log('📊 Unread count:', unread);
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('❌ Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const subscribeToNotifications = () => {
+    if (!user?.id) return null;
+
+    console.log('🔔 Subscribing to notifications for user:', user.id);
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 New notification:', payload.new);
+          
+          setNotifications(prev => [payload.new, ...prev]);
+          setUnreadCount(prev => prev + 1);
+
+          // Browser notification
+          if (Notification.permission === 'granted') {
+            new Notification(payload.new.title, {
+              body: payload.new.message,
+              icon: '/icons/icon-192.png',
+              tag: `notification-${payload.new.id}`,
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification updated:', payload.new);
+          
+          setNotifications(prev =>
+            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          );
+          
+          // Recalculate unread count
+          const wasUnread = !payload.old.is_read && !payload.old.read;
+          const isNowRead = payload.new.is_read || payload.new.read;
+          
+          if (wasUnread && isNowRead) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification deleted:', payload.old);
+          
+          setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          
+          // Decrease unread count if deleted notification was unread
+          if (!payload.old.is_read && !payload.old.read) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return channel;
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      console.log('📧 Marking notification as read:', notificationId);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
+
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ notificationId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to mark as read');
+      }
+
+      const result = await response.json();
+      console.log('✅ Notification marked as read:', result);
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => 
+          n.id === notificationId 
+            ? { ...n, is_read: true, read: true, read_at: new Date().toISOString() }
+            : n
+        )
+      );
+      
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('❌ Error marking notification as read:', error);
+      alert('Failed to mark notification as read');
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      console.log('📧 Marking all notifications as read');
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
+
+      const response = await fetch('/api/notifications/mark-read', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to mark all as read');
+      }
+
+      const result = await response.json();
+      console.log('✅ All notifications marked as read:', result);
+
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, is_read: true, read: true, read_at: new Date().toISOString() }))
+      );
+      
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('❌ Error marking all as read:', error);
+      alert('Failed to mark all notifications as read');
+    }
+  };
+
+  const deleteNotification = async (notificationId) => {
+    try {
+      console.log('🗑️ Deleting notification:', notificationId);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ No session');
+        return;
+      }
+
+      const response = await fetch(`/api/notifications/mark-read?id=${notificationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete notification');
+      }
+
+      console.log('✅ Notification deleted');
+
+      // Update local state
+      const wasUnread = notifications.find(n => n.id === notificationId && !n.is_read && !n.read);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      if (wasUnread) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      alert('Failed to delete notification');
+    }
+  };
+
   const handleNotificationClick = async (notification) => {
-    await markNotificationAsRead(notification.id);
+    // Mark as read
+    if (!notification.is_read && !notification.read) {
+      await markAsRead(notification.id);
+    }
     
+    // Navigate if has action URL
     if (notification.action_url) {
       router.push(notification.action_url);
       setIsOpen(false);
     }
-  };
-
-  const handleMarkAllRead = async () => {
-    await markAllNotificationsAsRead();
   };
 
   const handleDelete = async (e, notificationId) => {
@@ -93,11 +305,13 @@ export default function NotificationBell() {
       'share': '🔄',
       'booking_confirmed': '✅',
       'booking_created': '📅',
+      'booking_cancelled': '❌',
       'payment_received': '💰',
       'payment_released': '💸',
       'message_received': '💬',
       'job_application': '📋',
       'proposal_received': '📨',
+      'event_interest': '👋',
     };
     return icons[type] || '🔔';
   };
@@ -113,14 +327,15 @@ export default function NotificationBell() {
       {/* Bell Icon Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="relative p-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[40px] min-w-[40px] flex items-center justify-center"
         aria-label="Notifications"
+        title={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300" />
         
-        {unreadNotificationsCount > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-            {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
@@ -135,16 +350,13 @@ export default function NotificationBell() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 Notifications
               </h3>
-              {/* <button
-                onClick={() => {
-                  router.push('/settings/notifications');
-                  setIsOpen(false);
-                }}
+              <button
+                onClick={() => setIsOpen(false)}
                 className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
-                title="Notification settings"
+                title="Close"
               >
-                <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button> */}
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
             </div>
 
             {/* Tabs */}
@@ -167,14 +379,14 @@ export default function NotificationBell() {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                Unread ({unreadNotificationsCount})
+                Unread ({unreadCount})
               </button>
             </div>
 
             {/* Mark All Read Button */}
-            {unreadNotificationsCount > 0 && (
+            {unreadCount > 0 && (
               <button
-                onClick={handleMarkAllRead}
+                onClick={markAllAsRead}
                 className="w-full mt-3 px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition flex items-center justify-center gap-2"
               >
                 <CheckCheck className="w-4 h-4" />
@@ -185,7 +397,12 @@ export default function NotificationBell() {
 
           {/* Notifications List */}
           <div className="max-h-[32rem] overflow-y-auto">
-            {filteredNotifications.length === 0 ? (
+            {loading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="p-8 text-center">
                 <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-500 dark:text-gray-400">
@@ -246,7 +463,7 @@ export default function NotificationBell() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    markNotificationAsRead(notification.id);
+                                    markAsRead(notification.id);
                                   }}
                                   className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
                                 >
