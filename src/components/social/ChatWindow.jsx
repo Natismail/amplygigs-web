@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Avatar from '@/components/Avatar';
 import { useMarkMessagesRead } from '@/hooks/useMarkMessagesRead';
 import { aiClient } from '@/lib/ai/client';
+import VoiceMessagePlayer from './VoiceMessagePlayer';
 
 const AMY_USER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -443,7 +444,6 @@ export default function ChatWindow({ conversation, onBack }) {
           ) : (
             <>
 
-              {/* MESSAGES SECTION - UPDATE THIS PART */}
               {messages.map((message) => {
                 const isOwn = message.sender_id === user?.id;
                 const isFromAmy = message.sender_id === AMY_USER_ID;
@@ -451,28 +451,28 @@ export default function ChatWindow({ conversation, onBack }) {
                 return (
                   <div
                     key={message.id}
-                    className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                    className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}  // ✅ This is good
                   >
                     {/* Avatar */}
                     {!isOwn && (
                       isFromAmy ? (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0 mt-auto">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                       ) : (
                         <Avatar
                           user={message.sender || conversation.otherUser}
                           size="xs"
-                          className="flex-shrink-0 mt-auto"
+                          className="flex-shrink-0"
                         />
                       )
                     )}
-
                     <div className={`flex flex-col max-w-[75%] sm:max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
 
                       {/* ⭐ MEDIA HANDLING - FIXED FOR MOBILE */}
+
                       {message.media_url && (
-                        <div className="mb-1 rounded-2xl overflow-hidden shadow-md">
+                        <div className="mb-1">
                           {message.media_type === 'image' ? (
                             <img
                               src={message.media_url}
@@ -488,72 +488,23 @@ export default function ChatWindow({ conversation, onBack }) {
                               className="max-w-full max-h-60 rounded-2xl"
                             />
                           ) : message.media_type === 'audio' ? (
-                            // ⭐ VOICE MESSAGE BUBBLE - MOBILE OPTIMIZED
-                            <div className={`
-                px-3 py-3 rounded-2xl shadow-sm min-w-[200px] max-w-[280px]
-                ${isFromAmy
-                                ? 'bg-gradient-to-r from-purple-500 to-pink-500'
-                                : isOwn
-                                  ? 'bg-purple-600'
-                                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-                              }
-              `}>
-                              {/* Voice Message Label */}
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isOwn || isFromAmy
-                                    ? 'bg-white/20'
-                                    : 'bg-purple-100 dark:bg-purple-900/30'
-                                  }`}>
-                                  <Mic className={`w-4 h-4 ${isOwn || isFromAmy
-                                      ? 'text-white'
-                                      : 'text-purple-600 dark:text-purple-400'
-                                    }`} />
-                                </div>
-                                <span className={`text-xs font-medium ${isOwn || isFromAmy
-                                    ? 'text-white'
-                                    : 'text-gray-700 dark:text-gray-300'
-                                  }`}>
-                                  Voice Message
-                                </span>
-                              </div>
-
-                              {/* ⭐ MOBILE-OPTIMIZED AUDIO PLAYER */}
-                              <audio
-                                src={message.media_url}
-                                controls
-                                controlsList="nodownload noplaybackrate"
-                                preload="metadata"
-                                className="w-full h-10"
-                                style={{
-                                  // Force native controls to show properly on mobile
-                                  width: '100%',
-                                  height: '40px',
-                                  borderRadius: '8px',
-                                }}
-                              />
-
-                              {/* Duration Indicator (if available) */}
-                              {message.media_duration && (
-                                <div className={`text-xs mt-1 ${isOwn || isFromAmy
-                                    ? 'text-white/80'
-                                    : 'text-gray-500 dark:text-gray-400'
-                                  }`}>
-                                  {formatDuration(message.media_duration)}
-                                </div>
-                              )}
-                            </div>
+                            // ⭐ USE CUSTOM PLAYER INSTEAD OF NATIVE <audio>
+                            <VoiceMessagePlayer
+                              audioUrl={message.media_url}
+                              isOwn={isOwn}
+                              isFromAmy={isFromAmy}
+                            />
                           ) : null}
                         </div>
                       )}
-
                       {/* Text Content */}
                       {message.content && (
                         <div
                           className={`px-4 py-2 rounded-2xl shadow-sm ${isFromAmy
-                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-bl-md border-2 border-purple-300'
-                              : isOwn
-                                ? 'bg-purple-600 text-white rounded-br-md'
-                                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-gray-700'
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-bl-md border-2 border-purple-300'
+                            : isOwn
+                              ? 'bg-purple-600 text-white rounded-br-md'
+                              : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-gray-700'
                             }`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words">
@@ -667,8 +618,8 @@ export default function ChatWindow({ conversation, onBack }) {
             onClick={isRecording ? stopRecording : startRecording}
             disabled={sending || amyIsThinking}
             className={`flex-shrink-0 p-2.5 rounded-full transition-colors active:scale-95 disabled:opacity-50 ${isRecording
-                ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 animate-pulse'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
+              ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 animate-pulse'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
               }`}
           >
             {isRecording ? (

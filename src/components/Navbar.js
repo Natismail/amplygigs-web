@@ -116,10 +116,10 @@ export default function Navbar({ onMenuClick }) {
     <>
       <nav className="sticky top-0 z-30 flex justify-between items-center px-2 h-[80px] sm:px-6 py-2 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
         {/* Left Section */}
-        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+        <div className="flex items-center gap-0 sm:gap-1 min-w-0">
           <button
             onClick={onMenuClick}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+            className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
             aria-label="Open menu"
           >
             <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
@@ -128,7 +128,7 @@ export default function Navbar({ onMenuClick }) {
           {shouldShowBack && (
             <button
               onClick={handleBack}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[25px] flex items-center justify-center flex-shrink-0"
               aria-label="Go back"
               title="Go back"
             >
@@ -150,7 +150,7 @@ export default function Navbar({ onMenuClick }) {
           {/* Mobile: Icon Only - SMALLER SIZE */}
           <div className="block sm:hidden">
             <Logo 
-              size="lg" 
+              size="sm" 
               showText={false} 
               href="/" 
               variant="default"
@@ -159,11 +159,11 @@ export default function Navbar({ onMenuClick }) {
         </div>
 
         {/* Right Section */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1 flex-shrink-0">
           {/* ⭐ AMY BUTTON - Responsive sizing */}
           <button
             onClick={() => setShowAmy(true)}
-            className="relative p-1 hover:bg-gradient-to-br hover:from-purple-500 hover:to-pink-500 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-lg transition min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center group shadow-md hover:shadow-lg flex-shrink-0"
+            className="relative p-0 hover:bg-gradient-to-br hover:from-purple-500 hover:to-pink-500 bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-lg transition min-h-[30px] min-w-[30px] sm:min-h-[38px] sm:min-w-[38px] flex items-center justify-center group shadow-md hover:shadow-lg flex-shrink-0"
             aria-label="Ask Amy"
             title="Ask Amy (AI Assistant)"
           >
@@ -176,7 +176,7 @@ export default function Navbar({ onMenuClick }) {
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center flex-shrink-0"
+            className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center flex-shrink-0"
             aria-label="Toggle theme"
           >
             {theme === "light" ? (
@@ -189,7 +189,7 @@ export default function Navbar({ onMenuClick }) {
           {/* Messages Icon with Badge */}
           <Link
             href="/messages"
-            className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center flex-shrink-0"
+            className="relative p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[40px] min-w-[40px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center flex-shrink-0"
             aria-label="Messages"
           >
             <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" />

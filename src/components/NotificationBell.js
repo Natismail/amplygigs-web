@@ -327,7 +327,7 @@ export default function NotificationBell() {
       {/* Bell Icon Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="relative p-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition min-h-[40px] min-w-[40px] flex items-center justify-center"
         aria-label="Notifications"
         title={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
