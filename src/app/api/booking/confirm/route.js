@@ -68,7 +68,7 @@ export async function POST(request) {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })} has been confirmed. Payment of ₦${booking.amount.toLocaleString()} is secured in escrow.`,
+      })} has been confirmed. Payment of ₦${(booking?.amount || 0).toLocaleString()} is secured in escrow.`,
       priority: 'high',
       relatedEntityType: 'booking',
       relatedEntityId: booking.id,

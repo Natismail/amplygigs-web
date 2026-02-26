@@ -38,6 +38,7 @@ export async function middleware(req) {
     "wss://*.supabase.co",
     "https://api.paystack.co",
     "https://api.stripe.com",
+    "https://nominatim.openstreetmap.org",
   ];
 
   // ✅ ADD: Allow localhost in development

@@ -368,7 +368,7 @@ export default function BookingDetailsPage() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Offered Amount</span>
               <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                {currencySymbol}{booking.amount?.toLocaleString() || 0}
+                {currencySymbol}{(booking?.amount || 0).toLocaleString()}
               </span>
             </div>
             

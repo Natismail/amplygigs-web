@@ -345,22 +345,23 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/earnings" icon={DollarSign}>
                 Earnings
               </NavLink>
-              <NavLink href="/musician/bookings" icon={Calendar}>
-                Bookings
-              </NavLink>
-              <NavLink href="/musician/proposals" icon={Instagram}>
-                Proposals
-              </NavLink>
-              <NavLink href="/musician/gigs" icon={TrendingUp}>
+              <NavLink href="/musician/gigs" icon={Guitar}>
                 Available Gigs
               </NavLink>          
+              <NavLink href="/musician/bookings" icon={Calendar}>
+                My Bookings
+              </NavLink>
+              <NavLink href="/musician/proposals" icon={TrendingUp}>
+                Proposals
+              </NavLink>
+              
               <NavLink href="/tracking" icon={MapPin}>
                 Live Tracking
               </NavLink>
               <NavLink href="/messages" icon={MessageCircle} badge={unreadCount}>
                 Messages
               </NavLink>
-              <NavLink href="/feed" icon={Home}>
+              <NavLink href="/feed" icon={Instagram}>
                 Social Feed
               </NavLink>
               <NavLink href="/network" icon={Users}>
@@ -372,7 +373,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/applications" icon={FileText}>
                 My Applications
               </NavLink>
-              <NavLink href="/musician/my-events" icon={Guitar}>
+              <NavLink href="/musician/my-events" icon={Music}>
                 My Events
               </NavLink>
               <NavLink href="/live-events" icon={PenBox}>
@@ -381,9 +382,9 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/musician/discover" icon={Music2}>
                 External Gigs
               </NavLink>
-              <NavLink href="/musician/events" icon={Music}>
+              {/* <NavLink href="/musician/events" icon={Music}>
                 All Gigs
-              </NavLink>
+              </NavLink> */}
               {/* <NavLink href="/kyc/verify" icon={Shield}>
                 Verification
               </NavLink> */}
@@ -428,7 +429,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink href="/network" icon={Users}>
                 Network
               </NavLink>
-              <NavLink href="/feed" icon={Home}>
+              <NavLink href="/feed" icon={Instagram}>
                 Social Feed
               </NavLink>
               <NavLink href="/live-events" icon={PenBox}>

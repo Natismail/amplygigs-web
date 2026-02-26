@@ -68,7 +68,7 @@ export default function PaymentPage() {
     if (!booking || !user) return;
 
     // Check sufficient balance
-    if (wallet.balance < booking.amount) {
+    if (wallet.balance < (booking?.amount || 0)) {
       setError('Insufficient wallet balance. Please add funds or pay directly.');
       return;
     }
@@ -174,14 +174,47 @@ export default function PaymentPage() {
     );
   }
 
-  const platformFee = booking.amount * 0.10; // 10%
-  const vat = booking.amount * 0.075; // 7.5%
+
+  // ⭐ NEW: Check for valid booking amount
+  if (!booking.amount || booking.amount === null || booking.amount === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h2 className="text-2xl font-bold mb-2 text-red-600">Invalid Booking Amount</h2>
+        <p className="text-gray-600 mb-4">This booking has no amount set.</p>
+        <button
+          onClick={() => router.back()}
+          className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          ← Go Back
+        </button>
+      </div>
+    );
+  }
+
+  // const platformFee = booking.amount * 0.10; // 10%
+  // const vat = booking.amount * 0.075; // 7.5%
+  // const totalFees = platformFee + vat;
+  // const totalAmount = booking.amount;
+  // const musicianReceives = booking.amount - totalFees;
+  // const hasWallet = wallet && wallet.balance > 0;
+  // const hasSufficientBalance = wallet && wallet.balance >= booking.amount;
+  // const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
+
+
+
+// ⭐ SAFE CALCULATIONS:
+  const bookingAmount = booking.amount || 0; // ⭐ Safe fallback
+  const platformFee = bookingAmount * 0.10; // 10%
+  const vat = bookingAmount * 0.075; // 7.5%
   const totalFees = platformFee + vat;
-  const totalAmount = booking.amount;
-  const musicianReceives = booking.amount - totalFees;
+  const totalAmount = bookingAmount;
+  const musicianReceives = bookingAmount - totalFees;
   const hasWallet = wallet && wallet.balance > 0;
-  const hasSufficientBalance = wallet && wallet.balance >= booking.amount;
+  //const hasSufficientBalance = wallet && wallet.balance >= bookingAmount; // 
+  const hasSufficientBalance = wallet && wallet.balance >= (booking?.amount || 0); // ⭐ Use safe amount
   const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
@@ -234,31 +267,36 @@ export default function PaymentPage() {
               </div>
             </div>
 
-            {/* Payment Amount */}
+           {/* Payment Amount */}
             <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
               <div className="flex justify-between items-center mb-4">
                 <span className="font-semibold text-lg text-gray-900 dark:text-white">
                   Total Amount
                 </span>
                 <span className="font-bold text-3xl text-blue-600 dark:text-blue-400">
-                  {currencySymbol}{totalAmount.toLocaleString()}
+                  {/* ⭐ SAFE: Uses fallback */}
+                  {currencySymbol}{(booking?.amount || 0).toLocaleString()}
                 </span>
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                 <div className="flex justify-between">
                   <span>Booking Amount:</span>
-                  <span>{currencySymbol}{booking.amount.toLocaleString()}</span>
+                  {/* ⭐ SAFE: Uses fallback */}
+                  <span>{currencySymbol}{(booking?.amount || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Platform Fee (10%):</span>
+                  {/* ⭐ SAFE: platformFee already calculated safely */}
                   <span>-{currencySymbol}{platformFee.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>VAT (7.5%):</span>
+                  {/* ⭐ SAFE: vat already calculated safely */}
                   <span>-{currencySymbol}{vat.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between pt-1 border-t border-blue-200 dark:border-blue-700 font-medium">
                   <span>Musician Receives:</span>
+                  {/* ⭐ SAFE: musicianReceives already calculated safely */}
                   <span className="text-green-600">{currencySymbol}{musicianReceives.toFixed(2)}</span>
                 </div>
               </div>
@@ -319,7 +357,8 @@ export default function PaymentPage() {
                             {!hasSufficientBalance && (
                               <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
                                 <span>⚠️</span>
-                                Insufficient balance • Need {currencySymbol}{(booking.amount - wallet.balance).toLocaleString()} more
+                                Insufficient balance •Need {currencySymbol}{((booking?.amount || 0) - wallet.balance).toLocaleString()} more
+
                               </p>
                             )}
                           </>

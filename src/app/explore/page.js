@@ -100,7 +100,7 @@ export default function ExplorePage() {
         `)
         .eq('status', 'open') // Only show open events
         // Keep commented for testing - you can uncomment later
-        // .gte('event_date', new Date().toISOString()) // Future events only
+         .gte('event_date', new Date().toISOString()) // Future events only
         .order('created_at', { ascending: false }) // Most recent first
         .limit(10);
 

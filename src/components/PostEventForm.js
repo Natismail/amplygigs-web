@@ -1,11 +1,11 @@
-// src/components/PostEventForm.js - FIXED VERSION
+// src/components/PostEventForm.js - ENHANCED WITH GPS COORDINATES
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
-import { X, ChevronLeft, ChevronRight, Upload, Check } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Upload, Check, MapPin, Locate } from "lucide-react";
 
 export default function PostEventForm({ onSuccess, onCancel }) {
   const { user } = useAuth();
@@ -14,12 +14,17 @@ export default function PostEventForm({ onSuccess, onCancel }) {
   const [success, setSuccess] = useState(false);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     event_type: "",
     venue: "",
+    city: "",
+    country: "Nigeria",
+    latitude: null,
+    longitude: null,
     event_date: "",
     event_time: "",
     duration: "",
@@ -38,7 +43,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("File size must be less than 5MB");
       return;
@@ -52,7 +56,98 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     reader.readAsDataURL(file);
   };
 
-  // Validation for each step
+  // ⭐ NEW: Get current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setGettingLocation(true);
+    setError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setForm(prev => ({
+          ...prev,
+          latitude,
+          longitude
+        }));
+        setGettingLocation(false);
+        
+        // Optionally reverse geocode to get city name
+        reverseGeocode(latitude, longitude);
+      },
+      (error) => {
+        console.error("Location error:", error);
+        setError("Failed to get location. Please enter manually.");
+        setGettingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  // ⭐ NEW: Reverse geocode coordinates to city name
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      const data = await response.json();
+      
+      if (data.address) {
+        setForm(prev => ({
+          ...prev,
+          city: data.address.city || data.address.town || data.address.state || '',
+          country: data.address.country || 'Nigeria'
+        }));
+      }
+    } catch (err) {
+      console.error("Reverse geocode error:", err);
+    }
+  };
+
+  // ⭐ NEW: Geocode venue address to coordinates
+  const geocodeVenue = async (venue) => {
+    if (!venue || venue.length < 3) return;
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(venue)}&limit=1`
+      );
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        setForm(prev => ({
+          ...prev,
+          latitude: parseFloat(lat),
+          longitude: parseFloat(lon)
+        }));
+      }
+    } catch (err) {
+      console.error("Geocode error:", err);
+    }
+  };
+
+  // ⭐ NEW: Debounced venue geocoding
+  useEffect(() => {
+    if (!form.venue) return;
+    
+    const timer = setTimeout(() => {
+      if (form.venue && !form.latitude) {
+        geocodeVenue(form.venue);
+      }
+    }, 1500); // Geocode after 1.5s of no typing
+
+    return () => clearTimeout(timer);
+  }, [form.venue]);
+
   const validateStep = (step) => {
     setError(null);
     
@@ -77,7 +172,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         setError("Event date is required");
         return false;
       }
-      // Validate date is not in the past
+      
       const selectedDate = new Date(form.event_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -86,6 +181,12 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         setError("Event date cannot be in the past");
         return false;
       }
+
+      // ⭐ WARN if no GPS coordinates (but don't block)
+      if (!form.latitude || !form.longitude) {
+        console.warn("⚠️ No GPS coordinates provided for event");
+      }
+      
       return true;
     }
 
@@ -109,7 +210,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Final validation
     if (!validateStep(1) || !validateStep(2)) {
       setCurrentStep(1);
       return;
@@ -126,7 +226,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     }
 
     try {
-      // Combine date and time
       let eventDateTime = form.event_date;
       if (form.event_time) {
         eventDateTime = `${form.event_date}T${form.event_time}:00`;
@@ -138,15 +237,13 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
       let mediaUrl = null;
       
-      // Upload media file if exists
       if (form.media_file) {
         const file = form.media_file;
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         
-        // Check if bucket exists, if not, inform user
         const { error: uploadError } = await supabase.storage
-          .from("posts") // or "event-media" if you have that bucket
+          .from("posts")
           .upload(fileName, file, { 
             cacheControl: "3600", 
             upsert: false 
@@ -164,7 +261,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         mediaUrl = data.publicUrl;
       }
 
-      // Insert event
+      // ⭐ ENHANCED: Include GPS coordinates
       const { data: eventData, error: dbError } = await supabase
         .from("events")
         .insert([{
@@ -173,6 +270,10 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           description: form.description,
           event_type: form.event_type,
           venue: form.venue,
+          city: form.city,
+          country: form.country,
+          latitude: form.latitude,
+          longitude: form.longitude,
           event_date: eventDateTime,
           duration: form.duration ? parseInt(form.duration) : null,
           expected_attendees: form.expected_attendees ? parseInt(form.expected_attendees) : null,
@@ -186,9 +287,14 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
       if (dbError) throw new Error(dbError.message);
 
+      console.log('✅ Event created with GPS:', {
+        id: eventData.id,
+        latitude: eventData.latitude,
+        longitude: eventData.longitude
+      });
+
       setSuccess(true);
       
-      // Wait a bit to show success message, then callback
       setTimeout(() => {
         setSuccess(false);
         if (onSuccess) {
@@ -196,12 +302,15 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         }
       }, 2000);
 
-      // Reset form
       setForm({
         title: "",
         description: "",
         event_type: "",
         venue: "",
+        city: "",
+        country: "Nigeria",
+        latitude: null,
+        longitude: null,
         event_date: "",
         event_time: "",
         duration: "",
@@ -240,7 +349,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           </button>
         </div>
         
-        {/* Progress Bar */}
         <div className="h-2 bg-purple-800 rounded-full overflow-hidden">
           <div 
             className="h-full bg-white transition-all duration-300"
@@ -251,7 +359,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
       {/* Scrollable Content */}
       <div className="p-6 overflow-y-auto flex-1">
-        {/* Success Message */}
         {success && (
           <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-xl p-4 mb-4 flex items-center gap-3 animate-fadeIn">
             <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -261,7 +368,6 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           </div>
         )}
         
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 rounded-xl p-4 mb-4">
             <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
@@ -314,6 +420,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
                   className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white resize-none text-base"
                   rows="4"
                   required
+                  maxLength={500}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {form.description.length}/500 characters
@@ -322,21 +429,68 @@ export default function PostEventForm({ onSuccess, onCancel }) {
             </div>
           )}
 
-          {/* Step 2: Event Details */}
+          {/* Step 2: Event Details + Location */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
+              {/* ⭐ NEW: Venue with GPS */}
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                   Venue / Location
                 </label>
-                <input
-                  type="text"
-                  value={form.venue}
-                  onChange={(e) => setForm({ ...form, venue: e.target.value })}
-                  placeholder="e.g., Oriental Hotel, Lagos"
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={form.venue}
+                    onChange={(e) => setForm({ ...form, venue: e.target.value })}
+                    placeholder="e.g., Oriental Hotel, Victoria Island, Lagos"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                  />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Type venue address - GPS coordinates will be detected automatically
+                </p>
               </div>
+
+              {/* ⭐ NEW: Current Location Button */}
+              <button
+                type="button"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition text-blue-700 dark:text-blue-300 font-medium"
+              >
+                {gettingLocation ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    Getting location...
+                  </>
+                ) : (
+                  <>
+                    <Locate className="w-5 h-5" />
+                    Use My Current Location
+                  </>
+                )}
+              </button>
+
+              {/* ⭐ NEW: GPS Coordinates Display */}
+              {(form.latitude && form.longitude) && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Check className="w-4 h-4 text-green-600" />
+                    <span className="text-green-800 dark:text-green-200 font-medium">
+                      Location detected
+                    </span>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-1 font-mono">
+                    {form.latitude.toFixed(6)}, {form.longitude.toFixed(6)}
+                  </p>
+                  {form.city && (
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      📍 {form.city}, {form.country}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -430,7 +584,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
               </div>
 
               <div>
-                <label className="block-1 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">
                   <Upload className="w-4 h-4" />
                   Upload Media (Optional)
                 </label>
@@ -480,7 +634,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         </form>
       </div>
 
-      {/* Footer Navigation - Fixed at bottom */}
+      {/* Footer Navigation */}
       <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
         {currentStep > 1 && (
           <button

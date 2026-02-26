@@ -293,9 +293,9 @@ export default function MusicianGigsPage() {
           </div>
 
           {/* Filters & View Toggle */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
             {/* Filter Tabs */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide">
               {[
                 { id: "all", label: "All Events", icon: TrendingUp },
                 { id: "interested", label: "My Interests", icon: CheckCircle },
@@ -306,13 +306,13 @@ export default function MusicianGigsPage() {
                   <button
                     key={tab.id}
                     onClick={() => setFilter(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                    className={`flex items-center gap-2 px-2 py-2 rounded-lg font-medium whitespace-nowrap transition ${
                       filter === tab.id
                         ? "bg-purple-600 text-white"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-3 h-4" />
                     {tab.label}
                   </button>
                 );
@@ -400,6 +400,7 @@ export default function MusicianGigsPage() {
                 ))}
               </div>
             )}
+
 
             {/* ⭐ NEW: List View (Desktop only) */}
             {view === 'list' && !isMobile && (

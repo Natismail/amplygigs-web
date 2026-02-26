@@ -73,17 +73,6 @@ const nextConfig = {
         headers: [
           {
   key: 'Content-Security-Policy',
-  // value: [
-  //   "default-src 'self'",
-  //   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  //   "style-src 'self' 'unsafe-inline'",
-  //   "img-src 'self' data: blob: https:",
-  //   //"media-src 'self' blob: data: https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com",
-  //   "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com",
-  //   "connect-src 'self' https://api.jamendo.com https://*.supabase.co wss://*.supabase.co",
-  //   "font-src 'self' data:",
-  //   "frame-src 'self'",
-  // ].join('; ')
   value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://js.paystack.co https://js.stripe.com",
@@ -92,9 +81,16 @@ const nextConfig = {
               "font-src 'self' data:",
               `connect-src 'self' ${
                 isDevelopment ? 'http://localhost:8000 http://127.0.0.1:8000' : ''
-              } https://api.jamendo.com https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://api.stripe.com`,
+              } https://api.jamendo.com 
+              https://*.supabase.co 
+              wss://*.supabase.co 
+              https://api.paystack.co 
+              https://api.stripe.com 
+              https://nominatim.openstreetmap.org
+              https://tile.openstreetmap.org
+              https://api.openstreetmap.org`,
               "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com",
-              "frame-src https://js.paystack.co https://js.stripe.com https://checkout.stripe.com",
+              "frame-src https://js.paystack.co https://js.stripe.com https://checkout.stripe.com https://checkout.paystack.com",
               "font-src 'self' data:",
             ].join('; ').replace(/\s+/g, ' '),
 }

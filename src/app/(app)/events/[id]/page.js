@@ -1,4 +1,4 @@
-// src/app/(app)/events/[id]/page.js - IMPROVED
+// src/app/(app)/events/[id]/page.js - FIXED WITH BOOKING PREVENTION
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,7 +15,8 @@ import {
   Clock,
   Edit,
   Trash2,
-  Share2,
+  CheckCircle,
+  XCircle,
   TrendingUp,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ export default function EventDetailsPage() {
   
   const [event, setEvent] = useState(null);
   const [interestedMusicians, setInterestedMusicians] = useState([]);
+  const [existingBookings, setExistingBookings] = useState([]); // ⭐ NEW
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -34,9 +36,12 @@ export default function EventDetailsPage() {
   useEffect(() => {
     if (id) {
       fetchEventDetails();
+      if (isOwner) {
+        fetchExistingBookings(); // ⭐ NEW
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, isOwner]);
 
   const fetchEventDetails = async () => {
     setLoading(true);
@@ -86,6 +91,45 @@ export default function EventDetailsPage() {
     }
   };
 
+  // ⭐ NEW: Fetch existing bookings for this event
+  const fetchExistingBookings = async () => {
+    if (!user?.id || !id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("musician_id, status")
+        .eq("event_id", id)
+        .eq("client_id", user.id)
+        .in("status", ["pending", "confirmed", "completed"]); // Not cancelled
+
+      if (error) throw error;
+
+      setExistingBookings(data || []);
+      console.log('📋 Existing bookings for this event:', data);
+    } catch (error) {
+      console.error("Error fetching existing bookings:", error);
+    }
+  };
+
+  // ⭐ NEW: Check if musician already has a booking
+  const hasExistingBooking = (musicianId) => {
+    return existingBookings.some(b => b.musician_id === musicianId);
+  };
+
+  // ⭐ NEW: Get musician availability status
+  const getMusicianStatus = (musician) => {
+    if (!musician.available) {
+      return { canBook: false, reason: 'Unavailable', color: 'red' };
+    }
+    
+    if (hasExistingBooking(musician.id)) {
+      return { canBook: false, reason: 'Already Booked', color: 'blue' };
+    }
+    
+    return { canBook: true, reason: 'Available', color: 'green' };
+  };
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this event?")) return;
 
@@ -106,34 +150,41 @@ export default function EventDetailsPage() {
   };
 
   const handleCreateBooking = async (musicianId) => {
+    // ⭐ ENHANCED: Check before creating
+    const musician = interestedMusicians.find(m => m.id === musicianId);
+    const status = getMusicianStatus(musician);
+    
+    if (!status.canBook) {
+      alert(`❌ Cannot create booking: ${status.reason}`);
+      return;
+    }
+
     if (!confirm("Create a booking with this musician?")) return;
 
     try {
+      // ⭐ FIXED: Add null check for proposed_amount
       const { data, error } = await supabase.from("bookings").insert({
         client_id: user.id,
         musician_id: musicianId,
         event_id: id,
         event_date: event.event_date,
-        event_location: event.venue,
-        amount: event.proposed_amount,
+        event_location: event.venue || 'Location TBD',
+        amount: event.proposed_amount || null, // ⭐ FIXED: Handle null
         status: "pending",
       }).select().single();
 
       if (error) throw error;
 
-      alert("Booking created! The musician will be notified.");
+      alert("✅ Booking created! The musician will be notified.");
+      
+      // Refresh bookings list
+      await fetchExistingBookings();
+      
       router.push(`/client/bookings/${data.id}`);
     } catch (error) {
-  console.error('❌ Error creating booking:', error);
-  console.error('Error details:', {
-    message: error.message,
-    details: error.details,
-    hint: error.hint,
-    code: error.code,
-  });
-  console.error('Error type:', typeof error);
-  console.error('Error message:', error?.message);
-}
+      console.error('❌ Error creating booking:', error);
+      alert('Failed to create booking: ' + error.message);
+    }
   };
 
   if (loading) {
@@ -248,7 +299,8 @@ export default function EventDetailsPage() {
               {event.proposed_amount && (
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-5 h-5" />
-                  ₦{event.proposed_amount.toLocaleString()} budget
+                  {/* ⭐ FIXED: Null check */}
+                  ₦{event.proposed_amount ? event.proposed_amount.toLocaleString() : 'TBD'} budget
                 </div>
               )}
             </div>
@@ -279,7 +331,7 @@ export default function EventDetailsPage() {
             </h2>
             {isOwner && interestedMusicians.length > 0 && (
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Click a musician to create a booking
+                Only available musicians can be booked
               </span>
             )}
           </div>
@@ -296,27 +348,54 @@ export default function EventDetailsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {interestedMusicians.map((musician) => (
-                <div key={musician.id} className="relative">
-                  <MusicianCard musician={musician} />
-                  
-                  {/* Book Button (for event owners) */}
-                  {isOwner && (
-                    <button
-                      onClick={() => handleCreateBooking(musician.id)}
-                      className="absolute top-4 right-4 z-10 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm shadow-lg transition"
-                    >
-                      Create Booking
-                    </button>
-                  )}
+              {interestedMusicians.map((musician) => {
+                const status = getMusicianStatus(musician);
+                
+                return (
+                  <div key={musician.id} className="relative">
+                    <MusicianCard musician={musician} />
+                    
+                    {/* ⭐ IMPROVED: Status-based button */}
+                    {isOwner && (
+                      <div className="mt-3">
+                        {status.canBook ? (
+                          <button
+                            onClick={() => handleCreateBooking(musician.id)}
+                            className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm shadow-lg transition flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Create Booking
+                          </button>
+                        ) : (
+                          <div className={`w-full px-4 py-2.5 rounded-lg text-sm font-semibold text-center ${
+                            status.color === 'blue' 
+                              ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                          }`}>
+                            {status.color === 'blue' ? (
+                              <div className="flex items-center justify-center gap-2">
+                                <CheckCircle className="w-4 h-4" />
+                                {status.reason}
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-2">
+                                <XCircle className="w-4 h-4" />
+                                {status.reason}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Interested timestamp */}
-                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    Interested{" "}
-                    {new Date(musician.interested_at).toLocaleDateString()}
+                    {/* Interested timestamp */}
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                      Interested{" "}
+                      {new Date(musician.interested_at).toLocaleDateString()}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
