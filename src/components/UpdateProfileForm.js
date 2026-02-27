@@ -7,6 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Metal } from "next/font/google";
 import CategorySelector from '@/components/musician/CategorySelector';
+import CountrySelector, { COUNTRIES } from "@/components/CountrySelector";
+import CurrencySelector, { getCurrencyByCode } from "@/components/CurrencySelector";
 import { getAllSubcategoriesFlat } from '@/lib/constants/musicianCategories';
 
 
@@ -26,11 +28,16 @@ const EMPTY_FORM = {
     availableLine: "",
   },
   available: true,
+  
+  // ⭐ NEW: Location & Currency
+  country: "Nigeria",
+  country_code: "NG",
+  rate_currency: "NGN",
+  
   experience_years: "",
   hourly_rate: "",
   genres: [],
   categories: [],
-  genres: [], 
 };
 
 
@@ -132,32 +139,38 @@ export default function UpdateProfileForm() {
     setFormLoading(true);
 
     const { data, error } = await supabase
-      .from("user_profiles")
-      .select("name, bio, youtube, socials, contact, available, experience_years, hourly_rate, genres")
-      .eq("id", user.id)
-      .single();
+  .from("user_profiles")
+  .select("name, bio, youtube, socials, contact, available, country, country_code, rate_currency, experience_years, hourly_rate, genres")
+  .eq("id", user.id)
+  .single();
 
     if (error) {
       console.error("Profile fetch error:", error);
     } else if (data) {
       setForm({
-        name: data.name ?? "",
-        bio: data.bio ?? "",
-        youtube: data.youtube ?? "",
-        socials: {
-          instagram: data.socials?.instagram ?? "",
-          twitter: data.socials?.twitter ?? "",
-          tiktok: data.socials?.tiktok ?? "",
-        },
-        contact: {
-          whatsapp: data.contact?.whatsapp ?? "",
-          availableLine: data.contact?.availableLine ?? "",
-        },
-        available: data.available ?? true,
-        experience_years: data.experience_years ?? "",
-        hourly_rate: data.hourly_rate ?? "",
-        genres: data.genres ?? [],
-      });
+  name: data.name ?? "",
+  bio: data.bio ?? "",
+  youtube: data.youtube ?? "",
+  socials: {
+    instagram: data.socials?.instagram ?? "",
+    twitter: data.socials?.twitter ?? "",
+    tiktok: data.socials?.tiktok ?? "",
+  },
+  contact: {
+    whatsapp: data.contact?.whatsapp ?? "",
+    availableLine: data.contact?.availableLine ?? "",
+  },
+  available: data.available ?? true,
+  
+  // ⭐ NEW: Load location & currency
+  country: data.country ?? "Nigeria",
+  country_code: data.country_code ?? "NG",
+  rate_currency: data.rate_currency ?? "NGN",
+  
+  experience_years: data.experience_years ?? "",
+  hourly_rate: data.hourly_rate ?? "",
+  genres: data.genres ?? [],
+});
     }
 
     setFormLoading(false);
@@ -228,26 +241,32 @@ async function handleSubmit(e) {
   const allSubcategories = getAllSubcategoriesFlat(form.categories);
 
   const payload = {
-    role: "MUSICIAN",
-    name: form.name.trim(),
-    bio: form.bio.trim(),
-    youtube: form.youtube.trim(),
-    socials: form.socials,
-    contact: {
-      ...form.contact,
-      whatsapp: normalizePhone(form.contact.whatsapp),
-    },
-    available: form.available,
-    verification_status: "unverified",
-    experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
-    hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
-    genres: form.genres,
-    
-    // NEW: Category fields
-    categories: form.categories,
-    primary_category: primaryCat?.category || null,
-    subcategories: allSubcategories,
-  };
+  role: "MUSICIAN",
+  name: form.name.trim(),
+  bio: form.bio.trim(),
+  youtube: form.youtube.trim(),
+  socials: form.socials,
+  contact: {
+    ...form.contact,
+    whatsapp: normalizePhone(form.contact.whatsapp),
+  },
+  available: form.available,
+  verification_status: "unverified",
+  
+  // ⭐ NEW: Location & Currency
+  country: form.country,
+  country_code: form.country_code,
+  rate_currency: form.rate_currency,
+  
+  experience_years: form.experience_years ? parseInt(form.experience_years, 10) : 0,
+  hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : 0,
+  genres: form.genres,
+  
+  // Category fields
+  categories: form.categories,
+  primary_category: primaryCat?.category || null,
+  subcategories: allSubcategories,
+};
 
   console.log('💾 Saving musician profile:', payload);
 
@@ -375,43 +394,79 @@ async function handleSubmit(e) {
         </div>
 
         {/* Experience & Rate Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Years of Experience *
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              max="50"
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="5"
-              value={form.experience_years}
-              onChange={(e) => setForm((f) => ({ ...f, experience_years: e.target.value }))}
-              required
-            />
-          </div>
+{/* ⭐ NEW: Location & Currency Section */}
+<div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+    Location & Pricing
+  </h3>
+  
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    {/* Country Selector */}
+    <CountrySelector
+      value={form.country_code}
+      onChange={(country) => setForm(f => ({
+        ...f,
+        country: country.name,
+        country_code: country.code,
+        rate_currency: country.currency
+      }))}
+      label="Where are you based?"
+      showCurrency={true}
+    />
+    
+    {/* Experience */}
+    <div>
+      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+        Years of Experience *
+      </label>
+      <input
+        type="number"
+        inputMode="numeric"
+        min="0"
+        max="50"
+        className="w-full p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white"
+        placeholder="5"
+        value={form.experience_years}
+        onChange={(e) => setForm(f => ({ ...f, experience_years: e.target.value }))}
+        required
+      />
+    </div>
+  </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Hourly Rate (₦) *
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="15000"
-              value={form.hourly_rate}
-              onChange={(e) => setForm((f) => ({ ...f, hourly_rate: e.target.value }))}
-              required
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Minimum rate per hour
-            </p>
-          </div>
-        </div>
+  {/* Hourly Rate with Currency */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <CurrencySelector
+      value={form.rate_currency}
+      onChange={(currency) => setForm(f => ({ ...f, rate_currency: currency.code }))}
+      label="Rate Currency"
+      showPaymentProvider={false}
+    />
+    
+    <div>
+      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+        Hourly Rate *
+      </label>
+      <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+          {getCurrencyByCode(form.rate_currency).symbol}
+        </span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min="0"
+          className="w-full pl-12 pr-4 p-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white"
+          placeholder={form.rate_currency === 'NGN' ? '15000' : form.rate_currency === 'USD' ? '50' : '40'}
+          value={form.hourly_rate}
+          onChange={(e) => setForm(f => ({ ...f, hourly_rate: e.target.value }))}
+          required
+        />
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Your minimum rate per hour
+      </p>
+    </div>
+  </div>
+</div>
 
         {/* Categories Section - REPLACE PRIMARY ROLE */}
       <div className="pt-4 border-t border-gray-200 dark:border-gray-700">

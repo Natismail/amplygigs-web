@@ -1,9 +1,11 @@
-// src/components/MusicianCard.js - FULLY OPTIMIZED
+// src/components/MusicianCard.js - WITH COUNTRY, CURRENCY & CATEGORIES
 "use client";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSocial } from "@/context/SocialContext";
+import { formatCurrency } from "@/components/CurrencySelector"; // ⭐ NEW
+import { getCountryByCode } from "@/components/CountrySelector"; // ⭐ NEW
 import { 
   MessageCircle, 
   MapPin, 
@@ -11,7 +13,8 @@ import {
   Award, 
   Music, 
   CheckCircle,
-  Clock
+  Clock,
+  Globe // ⭐ NEW
 } from "lucide-react";
 import { FaYoutube, FaInstagram, FaTwitter, FaTiktok } from "react-icons/fa";
 
@@ -33,6 +36,11 @@ export default function MusicianCard({ musician }) {
     gadget_specs,
     average_rating,
     hourly_rate,
+    rate_currency, // ⭐ NEW
+    country, // ⭐ NEW
+    country_code, // ⭐ NEW
+    categories, // ⭐ NEW
+    subcategories, // ⭐ NEW
     genres,
     experience_years,
     followers_count,
@@ -42,6 +50,9 @@ export default function MusicianCard({ musician }) {
   const { getOrCreateConversation } = useSocial();
 
   const displayName = display_name || `${first_name} ${last_name}`;
+  
+  // ⭐ NEW: Get country info
+  const countryInfo = country_code ? getCountryByCode(country_code) : null;
 
   const handleChat = async (e) => {
     e.stopPropagation();
@@ -112,6 +123,15 @@ export default function MusicianCard({ musician }) {
           </div>
         )}
 
+        {/* ⭐ NEW: Country Flag Badge */}
+        {countryInfo && (
+          <div className="absolute bottom-3 right-3">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm text-gray-900 dark:text-white rounded-full text-xs font-semibold">
+              {countryInfo.flag}
+            </span>
+          </div>
+        )}
+
         {/* Overlay Gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </div>
@@ -158,7 +178,7 @@ export default function MusicianCard({ musician }) {
           )}
         </div>
 
-        {/* Location & Rate */}
+        {/* ⭐ ENHANCED: Location & Rate with Currency */}
         <div className="flex items-center justify-between text-sm">
           {location && (
             <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
@@ -169,29 +189,62 @@ export default function MusicianCard({ musician }) {
           
           {hourly_rate && (
             <div className="font-semibold text-purple-600 dark:text-purple-400">
-              ₦{hourly_rate.toLocaleString()}/hr
+              {formatCurrency(hourly_rate, rate_currency || 'NGN')}/hr
             </div>
           )}
         </div>
 
-        {/* Genres */}
-        {genres && genres.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {genres.slice(0, 3).map((genre, index) => (
-              <span 
-                key={index}
-                className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium"
-              >
-                {genre}
-              </span>
-            ))}
-            {genres.length > 3 && (
-              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full text-xs font-medium">
-                +{genres.length - 3}
-              </span>
-            )}
-          </div>
-        )}
+        {/* ⭐ NEW: Categories & Skills (if available) */}
+{/* Categories & Skills */}
+{Array.isArray(categories) && categories.length > 0 ? (
+  <div className="flex flex-wrap gap-1.5">
+    {categories.slice(0, 1).map((cat, index) => {
+      const categoryName =
+        typeof cat === "string"
+          ? cat
+          : cat?.category || "Category";
+
+      return (
+        <span
+          key={index}
+          className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium"
+        >
+          {categoryName}
+        </span>
+      );
+    })}
+
+    {/* Handle nested subcategories safely */}
+    {categories[0]?.subcategories &&
+      Array.isArray(categories[0].subcategories) &&
+      categories[0].subcategories.slice(0, 2).map((sub, index) => (
+        <span
+          key={`sub-${index}`}
+          className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium"
+        >
+          {typeof sub === "string" ? sub : sub?.name || "Skill"}
+        </span>
+      ))}
+
+    {categories[0]?.subcategories &&
+      categories[0].subcategories.length > 2 && (
+        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full text-xs font-medium">
+          +{categories[0].subcategories.length - 2}
+        </span>
+      )}
+  </div>
+) : Array.isArray(genres) && genres.length > 0 ? (
+  <div className="flex flex-wrap gap-1.5">
+    {genres.slice(0, 3).map((genre, index) => (
+      <span
+        key={index}
+        className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium"
+      >
+        {genre}
+      </span>
+    ))}
+  </div>
+) : null}
 
         {/* Bio */}
         {bio && (
@@ -273,4 +326,3 @@ export default function MusicianCard({ musician }) {
     </div>
   );
 }
-

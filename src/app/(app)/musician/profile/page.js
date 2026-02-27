@@ -9,8 +9,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import ProfileSyncButton from '@/components/ProfileSyncButton';
 import { getCategoryIcon, getAllSubcategoriesFlat } from '@/lib/constants/musicianCategories';
 import CategorySelector from '@/components/musician/CategorySelector';
-
-
+import CountrySelector, { COUNTRIES } from "@/components/CountrySelector";
+import CurrencySelector, { getCurrencyByCode } from "@/components/CurrencySelector";
 
 import { 
   ArrowLeft, 
@@ -141,6 +141,11 @@ export default function MusicianProfilePage() {
         bio: user.bio || '',
         phone: user.phone || '',
         location: user.location || '',
+        // ⭐ NEW
+        country: user.country || 'Nigeria',
+        country_code: user.country_code || 'NG',
+        rate_currency: user.rate_currency || 'NGN',
+
         primary_role: user.primary_role || '',
         categories: user.categories || [],
         genres: user.genres || [],
@@ -302,6 +307,12 @@ export default function MusicianProfilePage() {
         bio: formData.bio,
         phone: formData.phone,
         location: formData.location,
+
+         
+  // ⭐ NEW: Location & Currency
+  country: formData.country,
+  country_code: formData.country_code,
+  rate_currency: formData.rate_currency,
         
         // NEW: Category fields
         categories: formData.categories,
@@ -636,21 +647,50 @@ export default function MusicianProfilePage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                    Hourly Rate (₦)
-                  </label>
-                  <input
-                    name="hourly_rate"
-                    type="number"
-                    inputMode="numeric"
-                    value={formData.hourly_rate}
-                    onChange={handleChange}
-                    placeholder="15000"
-                    min="0"
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                  />
-                </div>
+                {/* ⭐ NEW: Country & Currency */}
+<div className="mb-4">
+  <CountrySelector
+    value={formData.country_code}
+    onChange={(country) => setFormData(prev => ({
+      ...prev,
+      country: country.name,
+      country_code: country.code,
+      rate_currency: country.currency
+    }))}
+    label="Based in"
+    showCurrency={true}
+  />
+</div>
+
+{/* Hourly Rate with Currency */}
+<div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
+  <CurrencySelector
+    value={formData.rate_currency}
+    onChange={(currency) => setFormData(prev => ({ ...prev, rate_currency: currency.code }))}
+    label="Rate Currency"
+    showPaymentProvider={false}
+  />
+  
+  <div>
+    <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+      Hourly Rate
+    </label>
+    <div className="relative">
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+        {getCurrencyByCode(formData.rate_currency).symbol}
+      </span>
+      <input
+        type="number"
+        inputMode="numeric"
+        value={formData.hourly_rate}
+        onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
+        placeholder={formData.rate_currency === 'NGN' ? '15000' : '50'}
+        min="0"
+        className="w-full pl-12 pr-4 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+      />
+    </div>
+  </div>
+</div>
               </div>
 
               <div>

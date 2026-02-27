@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 import { 
   MapPin, 
   DollarSign, 
@@ -216,7 +218,8 @@ export default function JobDetailPage() {
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Salary</p>
                     <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                      ₦{job.salary_min?.toLocaleString()}+
+                        {formatCurrency(job.salary_min || 0, job.currency || 'NGN')}
++
                     </p>
                   </div>
                 </div>

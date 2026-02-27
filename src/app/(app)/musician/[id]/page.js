@@ -13,6 +13,9 @@ import ProposalForm from "@/components/ProposalForm";
 
 import MusicianVideoUpload from '@/components/videos/MusicianVideoUpload';
 import MusicianVideosDisplay from '@/components/videos/MusicianVideosDisplay';
+import { formatCurrency } from "@/components/CurrencySelector";
+import { getCountryByCode } from "@/components/CountrySelector";
+
 import {
   FaYoutube,
   FaInstagram,
@@ -34,6 +37,7 @@ import {
   Briefcase,
   Send,
   X,
+  Globe,
 } from "lucide-react";
 
 export default function MusicianProfilePage() {
@@ -66,35 +70,40 @@ export default function MusicianProfilePage() {
     setLoading(true);
 
     const { data, error } = await supabase
-      .from("user_profiles")
-      .select(`
-        id,
-        first_name,
-        last_name,
-        display_name,
-        bio,
-        role,
-        available,
-        profile_picture_url,
-        gadget_specs,
-        average_rating,
-        hourly_rate,
-        primary_role,
-        genres,
-        experience_years,
-        location,
-        youtube,
-        tiktok,
-        whatsapp,
-        instagram,
-        twitter,
-        socials,
-        followers_count,
-        following_count
-      `)
-      .eq("id", id)
-      .eq("role", "MUSICIAN")
-      .single();
+  .from("user_profiles")
+  .select(`
+    id,
+    first_name,
+    last_name,
+    display_name,
+    bio,
+    role,
+    available,
+    profile_picture_url,
+    gadget_specs,
+    average_rating,
+    hourly_rate,
+    rate_currency,
+    country,
+    country_code,
+    primary_role,
+    categories,
+    subcategories,
+    genres,
+    experience_years,
+    location,
+    youtube,
+    tiktok,
+    whatsapp,
+    instagram,
+    twitter,
+    socials,
+    followers_count,
+    following_count
+  `)
+  .eq("id", id)
+  .eq("role", "MUSICIAN")
+  .single();
 
     if (error) {
       console.error("Profile error:", error);
@@ -300,12 +309,12 @@ export default function MusicianProfilePage() {
                     {musician.primary_role}
                   </span>
                 )}
-                {musician.location && (
-                  <span className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {musician.location}
-                  </span>
-                )}
+                {musician.country && (
+  <span className="flex items-center gap-2">
+    <Globe className="w-4 h-4" />
+    {getCountryByCode(musician.country_code || 'NG').flag} {musician.country}
+  </span>
+)}
                 {musician.experience_years && (
                   <span className="flex items-center gap-2">
                     <Briefcase className="w-4 h-4" />
@@ -394,10 +403,10 @@ export default function MusicianProfilePage() {
                   {musician.available ? "Available for Bookings" : "Currently Unavailable"}
                 </span>
                 {musician.hourly_rate && (
-                  <span className="px-4 py-2 bg-white/20 backdrop-blur rounded-lg font-medium">
-                    ₦{musician.hourly_rate.toLocaleString()}/hr
-                  </span>
-                )}
+  <span className="px-4 py-2 bg-white/20 backdrop-blur rounded-lg font-medium">
+    {formatCurrency(musician.hourly_rate, musician.rate_currency || 'NGN')}/hr
+  </span>
+)}
               </div>
             </div>
           </div>
@@ -428,36 +437,61 @@ export default function MusicianProfilePage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         {activeTab === "about" && (
           <div className="space-y-6">
-            {/* Categories & Subcategories - NEW! */}
-            {musician.categories && musician.categories.length > 0 && (
-              <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Music className="w-5 h-5" />
-                  Musical Expertise
-                </h2>
-                <div className="space-y-4">
-                  {musician.categories.map((cat, idx) => (
-                    <div key={idx} className="border-l-4 border-purple-500 pl-4">
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-2">
-                        {cat.category}
-                      </h3>
-                      {cat.subcategories && cat.subcategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {cat.subcategories.map((sub, subIdx) => (
-                            <span
-                              key={subIdx}
-                              className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full text-sm font-medium"
-                            >
-                              {sub}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+{/* Categories & Subcategories - ENHANCED */}
+{musician.categories && musician.categories.length > 0 && (
+  <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <Music className="w-5 h-5 text-purple-600" />
+      Musical Expertise
+    </h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {musician.categories.map((cat, idx) => (
+        <div 
+          key={idx} 
+          className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/10 rounded-r-lg"
+        >
+          <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <Music className="w-4 h-4" />
+            {cat.category}
+          </h3>
+          {cat.subcategories && cat.subcategories.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {cat.subcategories.map((sub, subIdx) => (
+                <span
+                  key={subIdx}
+                  className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full text-sm font-medium"
+                >
+                  {sub}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+
+{/* Show subcategories even if no categories array */}
+{(!musician.categories || musician.categories.length === 0) && 
+ musician.subcategories && musician.subcategories.length > 0 && (
+  <section className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <Music className="w-5 h-5 text-purple-600" />
+      Skills
+    </h2>
+    <div className="flex flex-wrap gap-2">
+      {musician.subcategories.map((skill, idx) => (
+        <span
+          key={idx}
+          className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium"
+        >
+          {skill}
+        </span>
+      ))}
+    </div>
+  </section>
+)}
 
             {/* Bio */}
             {musician.bio && (

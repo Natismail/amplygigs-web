@@ -1,4 +1,4 @@
-// src/app/api/verify-payment/route.js - COMPLETE FIX
+// src/app/api/verify-payment/route.js - SUPPORTS BOTH PAYSTACK & STRIPE
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -45,12 +45,13 @@ export async function POST(req) {
         message: 'Payment already confirmed',
         details: {
           amount: booking.amount,
-          reference: txRef || reference
+          reference: txRef || reference,
+          provider: provider || 'paystack'
         }
       });
     }
 
-    // Verify payment
+    // Verify payment based on provider
     const paymentRef = reference || txRef;
     if (!paymentRef) {
       console.error('❌ Missing payment reference');
@@ -60,31 +61,22 @@ export async function POST(req) {
       );
     }
 
-    console.log('🟢 Verifying with Paystack:', paymentRef);
-
-    const verifyResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${paymentRef}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        },
-      }
-    );
-
-    if (!verifyResponse.ok) {
-      console.error('❌ Paystack API error:', verifyResponse.status);
-      return Response.json(
-        { success: false, error: 'Payment verification failed' },
-        { status: 500 }
-      );
+    let verificationResult;
+    
+    // ⭐ ENHANCED: Support both Paystack and Stripe
+    if (provider === 'stripe') {
+      console.log('🔵 Verifying with Stripe:', paymentRef);
+      verificationResult = await verifyStripe(paymentRef);
+    } else {
+      // Default to Paystack
+      console.log('🟢 Verifying with Paystack:', paymentRef);
+      verificationResult = await verifyPaystack(paymentRef);
     }
 
-    const verifyResult = await verifyResponse.json();
-
-    if (!verifyResult.status || verifyResult.data.status !== 'success') {
-      console.error('❌ Payment not successful:', verifyResult);
+    if (!verificationResult.success) {
+      console.error('❌ Payment verification failed');
       return Response.json(
-        { success: false, error: 'Payment not successful' },
+        { success: false, error: 'Payment verification failed' },
         { status: 400 }
       );
     }
@@ -118,7 +110,7 @@ export async function POST(req) {
         amount: booking.amount,
         status: 'held',
         payment_reference: paymentRef,
-        payment_provider: 'paystack',
+        payment_provider: provider || 'paystack',
       });
 
     if (escrowError) {
@@ -140,7 +132,7 @@ export async function POST(req) {
         net_amount: netAmount,
         platform_fee: platformFee,
         payment_status: 'successful',
-        payment_method: 'paystack',
+        payment_method: provider || 'paystack',
         description: `Payment for booking ${bookingId}`,
         transaction_ref: paymentRef,
       });
@@ -156,7 +148,7 @@ export async function POST(req) {
       details: {
         amount: booking.amount,
         reference: paymentRef,
-        provider: 'paystack'
+        provider: provider || 'paystack'
       }
     });
 
@@ -169,6 +161,49 @@ export async function POST(req) {
   }
 }
 
+// ⭐ Verify Paystack payment
+async function verifyPaystack(reference) {
+  try {
+    const response = await fetch(
+      `https://api.paystack.co/transaction/verify/${reference}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        },
+      }
+    );
 
+    if (!response.ok) {
+      return { success: false, data: null };
+    }
 
+    const result = await response.json();
 
+    if (result.status && result.data.status === 'success') {
+      return { success: true, data: result.data };
+    }
+
+    return { success: false, data: result };
+  } catch (error) {
+    console.error('Paystack verification error:', error);
+    return { success: false, data: null };
+  }
+}
+
+// ⭐ Verify Stripe payment
+async function verifyStripe(sessionId) {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status === 'paid') {
+      return { success: true, data: session };
+    }
+
+    return { success: false, data: session };
+  } catch (error) {
+    console.error('Stripe verification error:', error);
+    return { success: false, data: null };
+  }
+}

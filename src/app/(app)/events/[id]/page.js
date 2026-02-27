@@ -1,10 +1,11 @@
-// src/app/(app)/events/[id]/page.js - FIXED WITH BOOKING PREVENTION
+// src/app/(app)/events/[id]/page.js - WITH CURRENCY & CATEGORIES
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import { formatCurrency } from "@/components/CurrencySelector"; // ⭐ NEW
 import MusicianCard from "@/components/MusicianCard";
 import Image from "next/image";
 import {
@@ -18,6 +19,8 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
+  Music, // ⭐ NEW
+  Star, // ⭐ NEW
 } from "lucide-react";
 
 export default function EventDetailsPage() {
@@ -27,7 +30,7 @@ export default function EventDetailsPage() {
   
   const [event, setEvent] = useState(null);
   const [interestedMusicians, setInterestedMusicians] = useState([]);
-  const [existingBookings, setExistingBookings] = useState([]); // ⭐ NEW
+  const [existingBookings, setExistingBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -37,7 +40,7 @@ export default function EventDetailsPage() {
     if (id) {
       fetchEventDetails();
       if (isOwner) {
-        fetchExistingBookings(); // ⭐ NEW
+        fetchExistingBookings();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +94,6 @@ export default function EventDetailsPage() {
     }
   };
 
-  // ⭐ NEW: Fetch existing bookings for this event
   const fetchExistingBookings = async () => {
     if (!user?.id || !id) return;
     
@@ -101,7 +103,7 @@ export default function EventDetailsPage() {
         .select("musician_id, status")
         .eq("event_id", id)
         .eq("client_id", user.id)
-        .in("status", ["pending", "confirmed", "completed"]); // Not cancelled
+        .in("status", ["pending", "confirmed", "completed"]);
 
       if (error) throw error;
 
@@ -112,12 +114,10 @@ export default function EventDetailsPage() {
     }
   };
 
-  // ⭐ NEW: Check if musician already has a booking
   const hasExistingBooking = (musicianId) => {
     return existingBookings.some(b => b.musician_id === musicianId);
   };
 
-  // ⭐ NEW: Get musician availability status
   const getMusicianStatus = (musician) => {
     if (!musician.available) {
       return { canBook: false, reason: 'Unavailable', color: 'red' };
@@ -150,7 +150,6 @@ export default function EventDetailsPage() {
   };
 
   const handleCreateBooking = async (musicianId) => {
-    // ⭐ ENHANCED: Check before creating
     const musician = interestedMusicians.find(m => m.id === musicianId);
     const status = getMusicianStatus(musician);
     
@@ -162,14 +161,14 @@ export default function EventDetailsPage() {
     if (!confirm("Create a booking with this musician?")) return;
 
     try {
-      // ⭐ FIXED: Add null check for proposed_amount
       const { data, error } = await supabase.from("bookings").insert({
         client_id: user.id,
         musician_id: musicianId,
         event_id: id,
         event_date: event.event_date,
         event_location: event.venue || 'Location TBD',
-        amount: event.proposed_amount || null, // ⭐ FIXED: Handle null
+        amount: event.proposed_amount || null,
+        currency: event.currency || 'NGN', // ⭐ NEW
         status: "pending",
       }).select().single();
 
@@ -177,7 +176,6 @@ export default function EventDetailsPage() {
 
       alert("✅ Booking created! The musician will be notified.");
       
-      // Refresh bookings list
       await fetchExistingBookings();
       
       router.push(`/client/bookings/${data.id}`);
@@ -237,11 +235,30 @@ export default function EventDetailsPage() {
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h1 className="text-3xl sm:text-4xl font-bold mb-2">{event.title}</h1>
-                {event.event_type && (
-                  <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur rounded-full text-sm font-medium">
-                    {event.event_type}
-                  </span>
-                )}
+                
+                {/* ⭐ NEW: Category & Event Type Badges */}
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {event.event_type && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur rounded-full text-sm font-medium">
+                      <Star className="w-3.5 h-3.5" />
+                      {event.event_type}
+                    </span>
+                  )}
+                  
+                  {event.category && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/30 backdrop-blur rounded-full text-sm font-medium">
+                      <Music className="w-3.5 h-3.5" />
+                      {event.category}
+                    </span>
+                  )}
+                  
+                  {event.subcategories && event.subcategories.length > 0 && (
+                    <span className="inline-block px-3 py-1 bg-green-500/30 backdrop-blur rounded-full text-sm font-medium">
+                      {event.subcategories.slice(0, 3).join(', ')}
+                      {event.subcategories.length > 3 && ` +${event.subcategories.length - 3}`}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {isOwner && (
@@ -296,11 +313,11 @@ export default function EventDetailsPage() {
                   ~{event.expected_attendees} attendees
                 </div>
               )}
+              {/* ⭐ ENHANCED: Currency Display */}
               {event.proposed_amount && (
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-5 h-5" />
-                  {/* ⭐ FIXED: Null check */}
-                  ₦{event.proposed_amount ? event.proposed_amount.toLocaleString() : 'TBD'} budget
+                  {formatCurrency(event.proposed_amount, event.currency || 'NGN')} budget
                 </div>
               )}
             </div>
@@ -355,7 +372,6 @@ export default function EventDetailsPage() {
                   <div key={musician.id} className="relative">
                     <MusicianCard musician={musician} />
                     
-                    {/* ⭐ IMPROVED: Status-based button */}
                     {isOwner && (
                       <div className="mt-3">
                         {status.canBook ? (
@@ -388,7 +404,6 @@ export default function EventDetailsPage() {
                       </div>
                     )}
 
-                    {/* Interested timestamp */}
                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
                       Interested{" "}
                       {new Date(musician.interested_at).toLocaleDateString()}

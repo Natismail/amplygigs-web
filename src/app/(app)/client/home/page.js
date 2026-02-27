@@ -12,7 +12,7 @@ import PostJobForm from "@/components/jobs/PostJobForm";
 import SearchFilterBar from "@/components/SearchFilterBar";
 import ViewToggle from "@/components/ViewToggle"; // ⭐ NEW
 import CarouselView from "@/components/CarouselView"; // ⭐ NEW
-import { Plus, Calendar, Users, TrendingUp, Eye, Trash2, RefreshCw, MapPin, Briefcase } from "lucide-react";
+import { Plus, Calendar, Users, TrendingUp, MapPin, Eye, Trash2, RefreshCw, Briefcase, Music, Star } from "lucide-react";
 import LoadingSpinner, { 
   LogoSpinner, 
   FullScreenLoading,
@@ -24,6 +24,8 @@ import LoadingSpinner, {
 } from '@/components/LoadingSpinner';
 import EmptyState from "@/components/EmptyState";
 import PullToRefresh from '@/components/PullToRefresh';
+import { formatCurrency } from "@/components/CurrencySelector";
+
 //import StreamingToggle from '@/components/streaming/StreamingToggle';
 
 export default function ClientHome() {
@@ -761,6 +763,7 @@ export default function ClientHome() {
 }
 
 // ⭐ NEW: Event Card Component (Extracted for reuse in carousel and grid)
+
 function EventCard({ event, onDelete, onView }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition h-full flex flex-col">
@@ -772,6 +775,14 @@ function EventCard({ event, onDelete, onView }) {
             fill
             className="object-cover"
           />
+          
+          {/* ⭐ NEW: Interested Badge on Image */}
+          {event.interested_count > 0 && (
+            <div className="absolute top-3 right-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-gray-900 dark:text-white flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              {event.interested_count}
+            </div>
+          )}
         </div>
       )}
 
@@ -781,11 +792,30 @@ function EventCard({ event, onDelete, onView }) {
             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 line-clamp-1">
               {event.title}
             </h3>
-            {event.event_type && (
-              <span className="inline-block px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium">
-                {event.event_type}
-              </span>
-            )}
+            
+            {/* ⭐ ENHANCED: Category Badges */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {event.event_type && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                  <Star className="w-3 h-3" />
+                  {event.event_type}
+                </span>
+              )}
+              
+              {event.category && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+                  <Music className="w-3 h-3" />
+                  {event.category}
+                </span>
+              )}
+              
+              {event.subcategories && event.subcategories.length > 0 && (
+                <span className="inline-block px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium">
+                  {event.subcategories[0]}
+                  {event.subcategories.length > 1 && ` +${event.subcategories.length - 1}`}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -812,23 +842,19 @@ function EventCard({ event, onDelete, onView }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-              <Eye className="w-4 h-4" />
-              <span className="font-medium text-sm">
-                {event.interested_count} interested
+          {/* ⭐ ENHANCED: Budget with Currency */}
+          {event.proposed_amount && (
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Budget</span>
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {formatCurrency(event.proposed_amount, event.currency || 'NGN')}
               </span>
             </div>
-
-            {event.proposed_amount && (
-              <span className="font-semibold text-gray-900 dark:text-white">
-                ₦{event.proposed_amount.toLocaleString()}
-              </span>
-            )}
-          </div>
+          )}
         </div>
 
-        <div className="flex gap-2 pt-2 mt-auto">
+        {/* ⭐ IMPROVED: Action Buttons */}
+        <div className="flex gap-2 pt-2 mt-auto border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onView}
             className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
@@ -844,7 +870,31 @@ function EventCard({ event, onDelete, onView }) {
             <Trash2 className="w-5 h-5" />
           </button>
         </div>
+
+        {/* ⭐ NEW: Status Indicator */}
+        <div className="flex items-center justify-between text-xs">
+          <span className={`px-2 py-1 rounded-full font-medium ${
+            event.status === 'open' 
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' 
+              : event.status === 'closed'
+              ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+          }`}>
+            {event.status === 'open' ? '🟢 Open' : event.status === 'closed' ? '⚫ Closed' : '🔴 Cancelled'}
+          </span>
+          
+          {event.interested_count > 0 && (
+            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              {event.interested_count} interested
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+//       </div>
+//     </div>
+//   );
+// }

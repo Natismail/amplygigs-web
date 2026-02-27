@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import ViewToggle from "@/components/ViewToggle"; 
 import CarouselView from "@/components/CarouselView"; 
+import { formatCurrency } from "@/components/CurrencySelector";
 import {
   Calendar,
   MapPin,
@@ -450,14 +451,23 @@ export default function MusicianGigsPage() {
 
                     {/* Budget & Actions */}
                     <div className="flex flex-col items-end gap-3 flex-shrink-0">
-                      {event.proposed_amount && (
+                      {/* {event.proposed_amount && (
                         <div className="text-right">
                           <p className="font-bold text-lg text-purple-600 dark:text-purple-400">
                             ₦{event.proposed_amount.toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Budget</p>
                         </div>
-                      )}
+                      )} */}
+
+                      {event.proposed_amount && (
+  <div className="text-right">
+    <p className="font-bold text-lg text-purple-600 dark:text-purple-400">
+      {formatCurrency(event.proposed_amount, event.currency || 'NGN')}
+    </p>
+    <p className="text-xs text-gray-500 dark:text-gray-400">Budget</p>
+  </div>
+)}
                       
                       <div className="flex gap-2">
                         <button
@@ -529,7 +539,7 @@ function EventCard({ event, onShowInterest, onViewDetails, processingInterest })
       {/* Content */}
       <div className="p-5 space-y-3 flex-1 flex flex-col">
         {/* Title & Type */}
-        <div>
+        {/* <div>
           <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
             {event.title}
           </h3>
@@ -538,7 +548,35 @@ function EventCard({ event, onShowInterest, onViewDetails, processingInterest })
               {event.event_type}
             </p>
           )}
-        </div>
+        </div> */}
+
+        <div>
+  <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+    {event.title}
+  </h3>
+  
+  {/* ⭐ NEW: Category Badges */}
+  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+    {event.event_type && (
+      <span className="inline-block px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-medium rounded-full">
+        {event.event_type}
+      </span>
+    )}
+    
+    {event.category && (
+      <span className="inline-block px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
+        {event.category}
+      </span>
+    )}
+    
+    {event.subcategories && event.subcategories.length > 0 && (
+      <span className="inline-block px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">
+        {event.subcategories[0]}
+        {event.subcategories.length > 1 && ` +${event.subcategories.length - 1}`}
+      </span>
+    )}
+  </div>
+</div>
 
         {/* Description */}
         <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
@@ -583,7 +621,7 @@ function EventCard({ event, onShowInterest, onViewDetails, processingInterest })
         </div>
 
         {/* Budget */}
-        {event.proposed_amount && (
+        {/* {event.proposed_amount && (
           <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
             <span className="text-sm text-gray-600 dark:text-gray-400">
               Budget
@@ -592,7 +630,20 @@ function EventCard({ event, onShowInterest, onViewDetails, processingInterest })
               ₦{event.proposed_amount.toLocaleString()}
             </span>
           </div>
-        )}
+        )} */}
+
+
+        {/* ⭐ ENHANCED: Budget with Currency */}
+{event.proposed_amount && (
+  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+    <span className="text-sm text-gray-600 dark:text-gray-400">
+      Budget
+    </span>
+    <span className="font-bold text-lg text-purple-600 dark:text-purple-400">
+      {formatCurrency(event.proposed_amount, event.currency || 'NGN')}
+    </span>
+  </div>
+)}
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2 mt-auto">

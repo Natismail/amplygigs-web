@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 import { 
   Briefcase, 
   MapPin, 
@@ -340,7 +342,7 @@ export default function JobsPage() {
                   {job.salary_min && (
                     <div className="flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
-                      <span>₦{job.salary_min.toLocaleString()} - ₦{job.salary_max?.toLocaleString() || 'Open'} / {job.salary_type}</span>
+                      <span>  {formatCurrency(job.salary_min || 0, job.currency || 'NGN')}-   {formatCurrency(job.salary_max || 0, job.currency || 'NGN') || 'Open'} / {job.salary_type}</span>
                     </div>
                   )}
                   

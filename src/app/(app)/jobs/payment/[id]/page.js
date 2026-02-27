@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 import { 
   CreditCard, 
   CheckCircle, 
@@ -237,7 +239,7 @@ export default function JobPaymentPage() {
             <div className="flex justify-between py-2">
               <span className="text-gray-600 dark:text-gray-400">Salary Range:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                ₦{job.salary_min?.toLocaleString()} - ₦{job.salary_max?.toLocaleString() || 'Open'}
+                  {formatCurrency(job.salary_min || 0, job.currency || 'NGN')} - {formatCurrency(job.salary_max || 0, job.currency || 'NGN') || 'Open'}
               </span>
             </div>
           </div>

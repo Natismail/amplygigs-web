@@ -1,14 +1,16 @@
-// src/app/(app)/events/[id]/edit/page.js - EVENT EDIT PAGE
+// src/app/(app)/events/[id]/edit/page.js - UPGRADED WITH CATEGORIES & CURRENCY
 "use client";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import CategorySelector from "@/components/musician/CategorySelector"; // ⭐ NEW
+import CurrencySelector, { getCurrencyByCode } from "@/components/CurrencySelector"; // ⭐ NEW
 import Image from "next/image";
 import { 
   X, Save, Loader2, MapPin, Locate, Calendar, 
-  DollarSign, Users, Clock, FileText 
+  DollarSign, Users, Clock, FileText, Music 
 } from "lucide-react";
 
 export default function EventEditPage() {
@@ -25,6 +27,12 @@ export default function EventEditPage() {
     title: "",
     description: "",
     event_type: "",
+    
+    // ⭐ NEW: Categories
+    categories: [],
+    required_skills: [],
+    preferred_genres: [],
+    
     venue: "",
     city: "",
     country: "Nigeria",
@@ -34,7 +42,12 @@ export default function EventEditPage() {
     event_time: "",
     duration: "",
     expected_attendees: "",
+    
+    // ⭐ NEW: Currency
+    currency: "NGN",
+    country_code: "NG",
     proposed_amount: "",
+    
     requirements: "",
     status: "open",
   });
@@ -68,11 +81,27 @@ export default function EventEditPage() {
         return;
       }
 
+      // ⭐ ENHANCED: Parse categories from database
+      let categoriesArray = [];
+      if (data.category || (data.subcategories && data.subcategories.length > 0)) {
+        categoriesArray = [{
+          category: data.category || "Musicians",
+          subcategories: data.subcategories || [],
+          isPrimary: true
+        }];
+      }
+
       // Populate form
       setForm({
         title: data.title || "",
         description: data.description || "",
         event_type: data.event_type || "",
+        
+        // ⭐ NEW: Categories
+        categories: categoriesArray,
+        required_skills: data.required_skills || [],
+        preferred_genres: data.preferred_genres || [],
+        
         venue: data.venue || "",
         city: data.city || "",
         country: data.country || "Nigeria",
@@ -82,7 +111,12 @@ export default function EventEditPage() {
         event_time: data.event_date ? data.event_date.split('T')[1]?.substring(0, 5) : "",
         duration: data.duration || "",
         expected_attendees: data.expected_attendees || "",
+        
+        // ⭐ NEW: Currency
+        currency: data.currency || "NGN",
+        country_code: data.country_code || "NG",
         proposed_amount: data.proposed_amount || "",
+        
         requirements: data.requirements || "",
         status: data.status || "open",
       });
@@ -123,15 +157,15 @@ export default function EventEditPage() {
   const reverseGeocode = async (lat, lng) => {
     try {
       const response = await fetch(
-        `/api/geocode?lat=${lat}&lng=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
       );
       const data = await response.json();
       
-      if (data.city) {
+      if (data.address) {
         setForm(prev => ({
           ...prev,
-          city: data.city,
-          country: data.country || 'Nigeria'
+          city: data.address.city || data.address.town || data.address.state || '',
+          country: data.address.country || 'Nigeria'
         }));
       }
     } catch (err) {
@@ -156,10 +190,23 @@ export default function EventEditPage() {
         eventDateTime = `${form.event_date}T${form.event_time}:00`;
       }
 
+      // ⭐ NEW: Extract category data
+      const primaryCat = form.categories.find(c => c.isPrimary) || form.categories[0];
+      const allSubcategories = form.categories.reduce((acc, cat) => {
+        return [...acc, ...cat.subcategories];
+      }, []);
+
       const updateData = {
         title: form.title,
         description: form.description,
         event_type: form.event_type,
+        
+        // ⭐ NEW: Categories
+        category: primaryCat?.category || null,
+        subcategories: allSubcategories,
+        required_skills: form.required_skills,
+        preferred_genres: form.preferred_genres,
+        
         venue: form.venue,
         city: form.city,
         country: form.country,
@@ -168,7 +215,12 @@ export default function EventEditPage() {
         event_date: eventDateTime,
         duration: form.duration ? parseInt(form.duration) : null,
         expected_attendees: form.expected_attendees ? parseInt(form.expected_attendees) : null,
+        
+        // ⭐ NEW: Currency
+        currency: form.currency,
+        country_code: form.country_code,
         proposed_amount: form.proposed_amount ? parseFloat(form.proposed_amount) : null,
+        
         requirements: form.requirements,
         status: form.status,
         updated_at: new Date().toISOString(),
@@ -228,6 +280,8 @@ export default function EventEditPage() {
     );
   }
 
+  const currencySymbol = getCurrencyByCode(form.currency).symbol;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -243,7 +297,7 @@ export default function EventEditPage() {
             Edit Event
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Update event details and location
+            Update event details, categories, and budget
           </p>
         </div>
 
@@ -305,6 +359,29 @@ export default function EventEditPage() {
                   required
                 />
               </div>
+            </div>
+          </div>
+
+          {/* ⭐ NEW: Entertainment Categories */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Music className="w-5 h-5" />
+              Entertainment Type
+            </h2>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                What entertainment do you need?
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                Select categories to help musicians find your event
+              </p>
+              <CategorySelector
+                value={form.categories}
+                onChange={(categories) => setForm({ ...form, categories })}
+                error={null}
+                maxCategories={3}
+              />
             </div>
           </div>
 
@@ -426,19 +503,48 @@ export default function EventEditPage() {
                   className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white"
                 />
               </div>
+            </div>
+          </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Proposed Budget (₦)
+          {/* ⭐ NEW: Budget with Currency */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Budget
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <CurrencySelector
+                value={form.currency}
+                onChange={(currency) => setForm({ 
+                  ...form, 
+                  currency: currency.code,
+                  country_code: currency.countryCode 
+                })}
+                label="Budget Currency"
+                showPaymentProvider={true}
+              />
+              
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Proposed Budget
                 </label>
-                <input
-                  type="number"
-                  value={form.proposed_amount}
-                  onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
-                  min="0"
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white"
-                />
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+                    {currencySymbol}
+                  </span>
+                  <input
+                    type="number"
+                    value={form.proposed_amount}
+                    onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
+                    placeholder={`e.g., ${form.currency === 'NGN' ? '50000' : '100'}`}
+                    min="0"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This helps musicians provide appropriate quotes
+                </p>
               </div>
             </div>
           </div>

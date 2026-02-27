@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
+import CategorySelector from "@/components/musician/CategorySelector";
+import CurrencySelector, { CURRENCIES, getCurrencyByCode } from "@/components/CurrencySelector";
 import { X, ChevronLeft, ChevronRight, Upload, Check, MapPin, Locate } from "lucide-react";
 
 export default function PostEventForm({ onSuccess, onCancel }) {
@@ -16,10 +18,34 @@ export default function PostEventForm({ onSuccess, onCancel }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [gettingLocation, setGettingLocation] = useState(false);
 
+  // const [form, setForm] = useState({
+  //   title: "",
+  //   description: "",
+  //   event_type: "",
+  //   venue: "",
+  //   city: "",
+  //   country: "Nigeria",
+  //   latitude: null,
+  //   longitude: null,
+  //   event_date: "",
+  //   event_time: "",
+  //   duration: "",
+  //   expected_attendees: "",
+  //   proposed_amount: "",
+  //   requirements: "",
+  //   media_file: null,
+  // });
+
   const [form, setForm] = useState({
     title: "",
     description: "",
     event_type: "",
+
+    // ⭐ NEW: Categories
+    categories: [],
+    required_skills: [],
+    preferred_genres: [],
+
     venue: "",
     city: "",
     country: "Nigeria",
@@ -29,13 +55,18 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     event_time: "",
     duration: "",
     expected_attendees: "",
+
+    // ⭐ NEW: Currency
+    currency: "NGN",
+    country_code: "NG",
     proposed_amount: "",
+
     requirements: "",
     media_file: null,
   });
 
   const eventTypes = [
-    "Wedding", "Birthday", "Corporate Event", "Concert", 
+    "Wedding", "Birthday", "Corporate Event", "Concert",
     "Festival", "Club Night", "Private Party", "Other"
   ];
 
@@ -75,7 +106,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           longitude
         }));
         setGettingLocation(false);
-        
+
         // Optionally reverse geocode to get city name
         reverseGeocode(latitude, longitude);
       },
@@ -99,7 +130,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
       );
       const data = await response.json();
-      
+
       if (data.address) {
         setForm(prev => ({
           ...prev,
@@ -121,7 +152,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(venue)}&limit=1`
       );
       const data = await response.json();
-      
+
       if (data && data.length > 0) {
         const { lat, lon } = data[0];
         setForm(prev => ({
@@ -138,7 +169,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
   // ⭐ NEW: Debounced venue geocoding
   useEffect(() => {
     if (!form.venue) return;
-    
+
     const timer = setTimeout(() => {
       if (form.venue && !form.latitude) {
         geocodeVenue(form.venue);
@@ -150,7 +181,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
   const validateStep = (step) => {
     setError(null);
-    
+
     if (step === 1) {
       if (!form.title.trim()) {
         setError("Event title is required");
@@ -164,19 +195,24 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         setError("Please select an event type");
         return false;
       }
+      // ⭐ NEW: Validate categories
+      if (form.categories.length === 0) {
+        setError("Please select at least one entertainment type");
+        return false;
+      }
       return true;
     }
-    
+
     if (step === 2) {
       if (!form.event_date) {
         setError("Event date is required");
         return false;
       }
-      
+
       const selectedDate = new Date(form.event_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       if (selectedDate < today) {
         setError("Event date cannot be in the past");
         return false;
@@ -186,7 +222,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
       if (!form.latitude || !form.longitude) {
         console.warn("⚠️ No GPS coordinates provided for event");
       }
-      
+
       return true;
     }
 
@@ -197,7 +233,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
     if (!validateStep(currentStep)) {
       return;
     }
-    
+
     setError(null);
     setCurrentStep(prev => prev + 1);
   };
@@ -209,7 +245,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateStep(1) || !validateStep(2)) {
       setCurrentStep(1);
       return;
@@ -235,20 +271,27 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         ? parseFloat(form.proposed_amount)
         : null;
 
+      // ⭐ Extract category data
+      const primaryCat = form.categories.find(c => c.isPrimary) || form.categories[0];
+      const allSubcategories = form.categories.reduce((acc, cat) => {
+        return [...acc, ...cat.subcategories];
+      }, []);
+
+
       let mediaUrl = null;
-      
+
       if (form.media_file) {
         const file = form.media_file;
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
+
         const { error: uploadError } = await supabase.storage
           .from("posts")
-          .upload(fileName, file, { 
-            cacheControl: "3600", 
-            upsert: false 
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false
           });
-        
+
         if (uploadError) {
           console.error("Upload error:", uploadError);
           throw new Error("Failed to upload file. Make sure the 'posts' storage bucket exists.");
@@ -257,11 +300,32 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         const { data } = supabase.storage
           .from("posts")
           .getPublicUrl(fileName);
-        
+
         mediaUrl = data.publicUrl;
       }
 
       // ⭐ ENHANCED: Include GPS coordinates
+      // const { data: eventData, error: dbError } = await supabase
+      //   .from("events")
+      //   .insert([{
+      //     creator_id: user.id,
+      //     title: form.title,
+      //     description: form.description,
+      //     event_type: form.event_type,
+      //     venue: form.venue,
+      //     city: form.city,
+      //     country: form.country,
+      //     latitude: form.latitude,
+      //     longitude: form.longitude,
+      //     event_date: eventDateTime,
+      //     duration: form.duration ? parseInt(form.duration) : null,
+      //     expected_attendees: form.expected_attendees ? parseInt(form.expected_attendees) : null,
+      //     proposed_amount: proposedAmount,
+      //     requirements: form.requirements,
+      //     media_url: mediaUrl,
+      //     status: 'open',
+      //   }])
+
       const { data: eventData, error: dbError } = await supabase
         .from("events")
         .insert([{
@@ -269,6 +333,13 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           title: form.title,
           description: form.description,
           event_type: form.event_type,
+
+          // ⭐ NEW: Categories
+          category: primaryCat?.category || null,
+          subcategories: allSubcategories,
+          required_skills: form.required_skills,
+          preferred_genres: form.preferred_genres,
+
           venue: form.venue,
           city: form.city,
           country: form.country,
@@ -277,7 +348,12 @@ export default function PostEventForm({ onSuccess, onCancel }) {
           event_date: eventDateTime,
           duration: form.duration ? parseInt(form.duration) : null,
           expected_attendees: form.expected_attendees ? parseInt(form.expected_attendees) : null,
+
+          // ⭐ NEW: Currency
+          currency: form.currency,
+          country_code: form.country_code,
           proposed_amount: proposedAmount,
+
           requirements: form.requirements,
           media_url: mediaUrl,
           status: 'open',
@@ -294,7 +370,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
       });
 
       setSuccess(true);
-      
+
       setTimeout(() => {
         setSuccess(false);
         if (onSuccess) {
@@ -302,10 +378,31 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         }
       }, 2000);
 
+      // setForm({
+      //   title: "",
+      //   description: "",
+      //   event_type: "",
+      //   venue: "",
+      //   city: "",
+      //   country: "Nigeria",
+      //   latitude: null,
+      //   longitude: null,
+      //   event_date: "",
+      //   event_time: "",
+      //   duration: "",
+      //   expected_attendees: "",
+      //   proposed_amount: "",
+      //   requirements: "",
+      //   media_file: null,
+      // });
+
       setForm({
         title: "",
         description: "",
         event_type: "",
+        categories: [], // ⭐ NEW
+        required_skills: [], // ⭐ NEW
+        preferred_genres: [], // ⭐ NEW
         venue: "",
         city: "",
         country: "Nigeria",
@@ -315,6 +412,8 @@ export default function PostEventForm({ onSuccess, onCancel }) {
         event_time: "",
         duration: "",
         expected_attendees: "",
+        currency: "NGN", // ⭐ NEW
+        country_code: "NG", // ⭐ NEW
         proposed_amount: "",
         requirements: "",
         media_file: null,
@@ -348,9 +447,9 @@ export default function PostEventForm({ onSuccess, onCancel }) {
             <X className="h-6 w-6" />
           </button>
         </div>
-        
+
         <div className="h-2 bg-purple-800 rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-white transition-all duration-300"
             style={{ width: `${(currentStep / 3) * 100}%` }}
           />
@@ -367,7 +466,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
             </p>
           </div>
         )}
-        
+
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 rounded-xl p-4 mb-4">
             <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
@@ -425,6 +524,21 @@ export default function PostEventForm({ onSuccess, onCancel }) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {form.description.length}/500 characters
                 </p>
+              </div>
+              {/* ⭐ NEW: Entertainment Categories */}
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                  Entertainment Type Needed *
+                </label>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                  What type of entertainment are you looking for? This helps musicians find your event.
+                </p>
+                <CategorySelector
+                  value={form.categories}
+                  onChange={(categories) => setForm({ ...form, categories })}
+                  error={null}
+                  maxCategories={3}
+                />
               </div>
             </div>
           )}
@@ -548,7 +662,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
                 </div>
               </div>
 
-              <div>
+              {/* <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                   Proposed Budget (₦)
                 </label>
@@ -563,6 +677,37 @@ export default function PostEventForm({ onSuccess, onCancel }) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   This helps musicians provide appropriate quotes
                 </p>
+              </div> */}
+
+              {/* ⭐ ENHANCED: Budget with Currency Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <CurrencySelector
+                  value={form.currency}
+                  onChange={(currency) => setForm({
+                    ...form,
+                    currency: currency.code,
+                    country_code: currency.countryCode
+                  })}
+                  label="Budget Currency"
+                  showPaymentProvider={true}
+                />
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    Proposed Budget
+                  </label>
+                  <input
+                    type="number"
+                    value={form.proposed_amount}
+                    onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
+                    placeholder={`e.g., ${form.currency === 'NGN' ? '50000' : form.currency === 'USD' ? '100' : '80'}`}
+                    min="0"
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Musicians will see this as a guide
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -597,23 +742,23 @@ export default function PostEventForm({ onSuccess, onCancel }) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Add photos or videos of the venue (max 5MB)
                 </p>
-                
+
                 {mediaPreview && (
                   <div className="mt-4 relative">
                     {form.media_file?.type.startsWith("image") ? (
                       <div className="relative w-full h-48 rounded-xl overflow-hidden">
-                        <Image 
-                          src={mediaPreview} 
-                          alt="Preview" 
+                        <Image
+                          src={mediaPreview}
+                          alt="Preview"
                           fill
                           className="object-cover"
                         />
                       </div>
                     ) : (
-                      <video 
-                        src={mediaPreview} 
-                        controls 
-                        className="w-full h-48 rounded-xl" 
+                      <video
+                        src={mediaPreview}
+                        controls
+                        className="w-full h-48 rounded-xl"
                       />
                     )}
                     <button
@@ -646,7 +791,7 @@ export default function PostEventForm({ onSuccess, onCancel }) {
             Back
           </button>
         )}
-        
+
         {currentStep < 3 ? (
           <button
             type="button"

@@ -9,6 +9,9 @@ import {
   Briefcase, DollarSign, Calendar, MapPin, Clock
 } from "lucide-react";
 import CategorySelector from "@/components/musician/CategorySelector";
+import CurrencySelector from "@/components/CurrencySelector";
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 
 export default function PostJobForm({ onSuccess, onCancel }) {
   const { user } = useAuth();
@@ -33,11 +36,13 @@ export default function PostJobForm({ onSuccess, onCancel }) {
     required_skills: [],
     preferred_genres: [],
     
-    // Compensation
-    salary_type: "monthly",
-    salary_min: "",
-    salary_max: "",
-    benefits: [],
+     // Compensation
+  currency: "NGN", // ⭐ NEW
+  country_code: "NG", // ⭐ NEW
+  salary_type: "monthly",
+  salary_min: "",
+  salary_max: "",
+  benefits: [],
     
     // Location
     location: "",
@@ -244,7 +249,8 @@ export default function PostJobForm({ onSuccess, onCancel }) {
         salary_type: form.salary_type,
         salary_min: parseFloat(form.salary_min),
         salary_max: form.salary_max ? parseFloat(form.salary_max) : null,
-        currency: 'NGN',
+        currency: form.currency, // ⭐ CHANGED
+        country_code: form.country_code, // ⭐ NEW
         benefits: form.benefits,
         
         // Location
@@ -534,62 +540,85 @@ export default function PostJobForm({ onSuccess, onCancel }) {
             </div>
           )}
 
-          {/* STEP 3: Compensation & Schedule */}
-          {currentStep === 3 && (
-            <div className="space-y-5 animate-fadeIn">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <DollarSign className="w-6 h-6" />
-                Compensation & Schedule
-              </h3>
+{/* Step 3: Compensation & Schedule */}
+{currentStep === 3 && (
+  <div className="space-y-5 animate-fadeIn">
+    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <DollarSign className="w-6 h-6" />
+      Compensation & Schedule
+    </h3>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                  Salary Type
-                </label>
-                <select
-                  value={form.salary_type}
-                  onChange={(e) => setForm({ ...form, salary_type: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                >
-                  {salaryTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
+    {/* ⭐ NEW: Currency Selector */}
+    <CurrencySelector
+      value={form.currency}
+      onChange={(currency) => setForm({ 
+        ...form, 
+        currency: currency.code,
+        country_code: currency.countryCode 
+      })}
+      label="Salary Currency"
+      showPaymentProvider={false}
+    />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Minimum Salary (₦) *
-                  </label>
-                  <input
-                    type="number"
-                    value={form.salary_min}
-                    onChange={(e) => setForm({ ...form, salary_min: e.target.value })}
-                    placeholder="e.g., 80000"
-                    min="0"
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                    required
-                  />
-                </div>
+    <div>
+      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+        Salary Type
+      </label>
+      <select
+        value={form.salary_type}
+        onChange={(e) => setForm({ ...form, salary_type: e.target.value })}
+        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+      >
+        {salaryTypes.map(type => (
+          <option key={type.value} value={type.value}>{type.label}</option>
+        ))}
+      </select>
+    </div>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Maximum Salary (₦)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.salary_max}
-                    onChange={(e) => setForm({ ...form, salary_max: e.target.value })}
-                    placeholder="e.g., 120000"
-                    min="0"
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Optional - leave blank if flexible
-                  </p>
-                </div>
-              </div>
+    {/* ⭐ ENHANCED: Salary inputs with currency symbol */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+          Minimum Salary *
+        </label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+            {getCurrencyByCode(form.currency).symbol}
+          </span>
+          <input
+            type="number"
+            value={form.salary_min}
+            onChange={(e) => setForm({ ...form, salary_min: e.target.value })}
+            placeholder={`e.g., ${form.currency === 'NGN' ? '80000' : '1500'}`}
+            min="0"
+            className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+          Maximum Salary
+        </label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
+            {getCurrencyByCode(form.currency).symbol}
+          </span>
+          <input
+            type="number"
+            value={form.salary_max}
+            onChange={(e) => setForm({ ...form, salary_max: e.target.value })}
+            placeholder={`e.g., ${form.currency === 'NGN' ? '120000' : '2000'}`}
+            min="0"
+            className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base"
+          />
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Optional - leave blank if flexible
+        </p>
+      </div>
+    </div>
 
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300 flex items-center gap-2">

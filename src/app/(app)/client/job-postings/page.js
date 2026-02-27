@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
+import PostJobForm from "@/components/jobs/PostJobForm";
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 import { 
   Briefcase, 
   Loader, 
@@ -171,7 +174,9 @@ export default function MyJobPostingsPage() {
 
                     <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                       <DollarSign className="w-4 h-4" />
-                      <span>₦{job.salary_min?.toLocaleString()} - ₦{job.salary_max?.toLocaleString() || 'Open'}</span>
+<span className="font-bold text-2xl text-purple-600">
+  {formatCurrency(job.salary_min || 0, job.currency || 'NGN')}
+</span>
                     </div>
 
                     <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">

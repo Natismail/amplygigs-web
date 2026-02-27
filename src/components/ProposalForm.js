@@ -1,9 +1,10 @@
-// src/components/ProposalForm.js - FULLY OPTIMIZED
+// src/components/ProposalForm.js - WITH CURRENCY SUPPORT
 "use client";
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import CurrencySelector, { getCurrencyByCode } from "@/components/CurrencySelector";
 import { 
   Send, 
   Loader, 
@@ -13,6 +14,7 @@ import {
   Calendar,
   Clock,
   FileText,
+  MapPin,
   X
 } from "lucide-react";
 
@@ -23,6 +25,8 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
     message: "",
+    currency: "NGN", // ⭐ NEW
+    country_code: "NG", // ⭐ NEW
     proposed_amount: "",
     event_date: "",
     event_time: "",
@@ -79,6 +83,8 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
           client_id: user.id,
           musician_id: musicianId,
           message: form.message,
+          currency: form.currency, // ⭐ NEW
+          country_code: form.country_code, // ⭐ NEW
           proposed_amount: parseFloat(form.proposed_amount),
           event_date: eventDateTime,
           duration: form.duration ? parseInt(form.duration) : null,
@@ -94,6 +100,8 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
       // Reset form
       setForm({
         message: "",
+        currency: "NGN",
+        country_code: "NG",
         proposed_amount: "",
         event_date: "",
         event_time: "",
@@ -122,6 +130,8 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
       // Reset form
       setForm({
         message: "",
+        currency: "NGN",
+        country_code: "NG",
         proposed_amount: "",
         event_date: "",
         event_time: "",
@@ -132,6 +142,8 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
       setError(null);
     }
   };
+
+  const currencySymbol = getCurrencyByCode(form.currency).symbol;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-w-2xl mx-auto">
@@ -211,6 +223,7 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
               className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white resize-none text-base transition"
               rows={5}
               required
+              maxLength={500}
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {form.message.length}/500 characters
@@ -251,6 +264,7 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
           {/* Venue */}
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+              <MapPin className="w-4 h-4" />
               Venue / Location
             </label>
             <input
@@ -262,37 +276,57 @@ export default function ProposalForm({ musicianId, onSuccess, onCancel }) {
             />
           </div>
 
-          {/* Duration & Budget */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                <Clock className="w-4 h-4" />
-                Duration (hours)
-              </label>
-              <input
-                type="number"
-                value={form.duration}
-                onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                placeholder="e.g., 4"
-                min="1"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base transition"
-              />
-            </div>
+          {/* Duration */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+              <Clock className="w-4 h-4" />
+              Duration (hours)
+            </label>
+            <input
+              type="number"
+              value={form.duration}
+              onChange={(e) => setForm({ ...form, duration: e.target.value })}
+              placeholder="e.g., 4"
+              min="1"
+              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base transition"
+            />
+          </div>
 
+          {/* ⭐ NEW: Currency Selector + Budget */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CurrencySelector
+              value={form.currency}
+              onChange={(currency) => setForm({ 
+                ...form, 
+                currency: currency.code,
+                country_code: currency.countryCode 
+              })}
+              label="Budget Currency"
+              showPaymentProvider={true}
+            />
+            
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                 <DollarSign className="w-4 h-4" />
-                Proposed Budget (₦) *
+                Proposed Budget *
               </label>
-              <input
-                type="number"
-                value={form.proposed_amount}
-                onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
-                placeholder="e.g., 50000"
-                min="1"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base transition"
-                required
-              />
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold text-lg">
+                  {currencySymbol}
+                </span>
+                <input
+                  type="number"
+                  value={form.proposed_amount}
+                  onChange={(e) => setForm({ ...form, proposed_amount: e.target.value })}
+                  placeholder={`e.g., ${form.currency === 'NGN' ? '50000' : form.currency === 'USD' ? '100' : '80'}`}
+                  min="1"
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-purple-500 focus:ring-0 dark:bg-gray-700 dark:text-white text-base transition"
+                  required
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Your professional rate
+              </p>
             </div>
           </div>
 
