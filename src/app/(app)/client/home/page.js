@@ -24,7 +24,7 @@ import LoadingSpinner, {
 } from '@/components/LoadingSpinner';
 import EmptyState from "@/components/EmptyState";
 import PullToRefresh from '@/components/PullToRefresh';
-import { formatCurrency } from "@/components/CurrencySelector";
+import { formatCurrency, getCurrencyByCode } from "@/components/CurrencySelector";
 
 //import StreamingToggle from '@/components/streaming/StreamingToggle';
 
@@ -40,6 +40,13 @@ export default function ClientHome() {
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
+
+  const jobPostingFee = user?.country_code === 'NG' ? 10000 : 
+                      user?.country_code === 'US' ? 25 : 
+                      user?.country_code === 'GB' ? 20 : 10000;
+
+  const currency = getCurrencyByCode(user?.rate_currency || 'NGN');
+
 
   // ⭐ NEW: View state for musicians
   const [musicianView, setMusicianView] = useState(() => {
@@ -705,8 +712,8 @@ export default function ClientHome() {
               {/* Price Tag */}
               <div className="pt-3 sm:pt-4 border-t border-purple-200 dark:border-purple-800">
                 <span className="text-base sm:text-lg font-bold text-purple-600 dark:text-purple-400">
-                  ₦10,000 FEE →
-                </span>
+  {formatCurrency(jobPostingFee, user?.rate_currency || 'NGN')} FEE →
+</span>
               </div>
             </button>
           </div>

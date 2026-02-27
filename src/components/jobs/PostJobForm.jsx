@@ -19,6 +19,9 @@ export default function PostJobForm({ onSuccess, onCancel }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const jobPostingFee = user?.country_code === 'NG' ? 10000 : 
+                      user?.country_code === 'US' ? 25 : 
+                      user?.country_code === 'GB' ? 20 : 10000;  
 
   const [form, setForm] = useState({
     // Basic Info
@@ -109,6 +112,11 @@ export default function PostJobForm({ onSuccess, onCancel }) {
     { value: "live_stream", label: "Live Stream Audition" },
     { value: "hybrid", label: "Hybrid (In-person + Video)" }
   ];
+
+  
+const currency = getCurrencyByCode(user?.rate_currency || 'NGN');
+
+
 
   const validateStep = (step) => {
     setError(null);
@@ -357,8 +365,8 @@ export default function PostJobForm({ onSuccess, onCancel }) {
             <span className="text-2xl">💰</span>
             <div>
               <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
-                Job Posting Fee: ₦10,000
-              </h4>
+  Job Posting Fee: {formatCurrency(jobPostingFee, user?.rate_currency || 'NGN')}
+</h4>
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 Pay once to publish your job listing for 30 days. If hired through AmplyGigs, 
                 a 15% placement fee on first month's salary applies.

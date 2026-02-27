@@ -256,11 +256,11 @@ export default function BankAccountManager({ onAccountAdded }) {
                 disabled={loadingBanks}
               >
                 <option value="">-- Select Your Bank --</option>
-                {banks.map(bank => (
-                  <option key={bank.code} value={bank.code}>
-                    {bank.name}
-                  </option>
-                ))}
+{banks.map((bank, idx) => (
+  <option key={`bank-${bank.code}-${idx}`} value={bank.code}>
+    {bank.name}
+  </option>
+))}
               </select>
             )}
           </div>

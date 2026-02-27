@@ -17,6 +17,7 @@ export default function ClientBookingsPage() {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [refreshing, setRefreshing] = useState(false);
 
+  
   useEffect(() => {
     if (user && (!bookings || bookings.length === 0)) {
       fetchBookings();

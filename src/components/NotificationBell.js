@@ -308,7 +308,9 @@ export default function NotificationBell() {
 
         {/* ⭐ DESKTOP DROPDOWN */}
         {isOpen && !isMobile && (
-          <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+          <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden
+              onClick={(e) => e.stopPropagation()}
+            ">
             
             {/* Header */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -379,13 +381,24 @@ export default function NotificationBell() {
                     const isUnread = !notification.is_read && !notification.read;
                     
                     return (
-                      <div
-                        key={notification.id}
-                        className={`relative group ${
-                          isUnread ? 'bg-purple-50 dark:bg-purple-900/10' : ''
-                        } hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
+                      // <div
+                      //   key={notification.id}
+                      //   className={`relative group ${
+                      //     isUnread ? 'bg-purple-50 dark:bg-purple-900/10' : ''
+                      //   } hover:bg-gray-50 dark:hover:bg-gray-750 transition cursor-pointer`}
+                      //   onClick={() => handleNotificationClick(notification)}
+                      // >
+                      // Around line 650:
+<div
+  key={notification.id}
+  className={`border-b border-gray-200 dark:border-gray-800 ${
+    isUnread ? 'bg-purple-50 dark:bg-purple-900/10' : ''
+  } active:bg-gray-100 dark:active:bg-gray-800`}
+  onClick={(e) => {
+    e.stopPropagation();
+    handleNotificationClick(notification);
+  }}
+>
                         <div className="p-4">
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 text-2xl">

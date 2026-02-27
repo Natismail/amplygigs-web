@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { CheckCircle, Clock, DollarSign, MapPin, Calendar, User } from 'lucide-react';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 
 export default function MusicianBookingsPage() {
   const { user } = useAuth();
@@ -71,17 +73,19 @@ export default function MusicianBookingsPage() {
           <div className="flex px-4 gap-2 min-w-max pb-3">
             <button
               onClick={() => setActiveTab('requests')}
-              className={`min-h-[44px] px-5 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
+              className={`min-h-[44px] px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
                 activeTab === 'requests'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
               }`}
             >
+              
+
               Requests ({gigRequests.length})
             </button>
             <button
               onClick={() => setActiveTab('confirmed')}
-              className={`min-h-[44px] px-5 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
+              className={`min-h-[44px] px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
                 activeTab === 'confirmed'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -91,7 +95,7 @@ export default function MusicianBookingsPage() {
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`min-h-[44px] px-5 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
+              className={`min-h-[44px] px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition ${
                 activeTab === 'past'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -151,7 +155,9 @@ export default function MusicianBookingsPage() {
                       Offered Price
                     </span>
                     <span className="text-xl font-bold text-green-600">
-                      ₦{booking.amount?.toLocaleString() || '0'}
+                      {/* ₦{booking.amount?.toLocaleString() || '0'} */}
+                        {formatCurrency(booking.amount || 0, booking.currency || 'NGN')}
+
                     </span>
                   </div>
 
@@ -222,7 +228,7 @@ export default function MusicianBookingsPage() {
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                     <span className="text-sm text-gray-500">Amount</span>
                     <span className="text-xl font-bold text-green-600">
-                      ₦{booking.amount?.toLocaleString() || '0'}
+                        {formatCurrency(booking.amount || 0, booking.currency || 'NGN')}
                     </span>
                   </div>
 
@@ -289,7 +295,10 @@ export default function MusicianBookingsPage() {
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
                     <span className="text-sm text-gray-500">Earned</span>
                     <span className="text-xl font-bold text-gray-700 dark:text-gray-300">
-                      ₦{booking.escrow_amount?.toLocaleString() || booking.amount?.toLocaleString() || '0'}
+                      {/* ₦{booking.escrow_amount?.toLocaleString() || booking.amount?.toLocaleString() || '0'} */}
+                        {formatCurrency(booking.escrow_amount || 0, booking.currency || 'NGN')  || (booking.amount || 0, booking.currency || 'NGN')}
+
+
                     </span>
                   </div>
 

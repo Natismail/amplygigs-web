@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabaseClient';
 import LiveMap from '@/components/LiveMap';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Clock, Wallet, CreditCard } from 'lucide-react';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 
 export default function ClientBookingDetailPage() {
   const { user } = useAuth();
@@ -315,7 +317,9 @@ export default function ClientBookingDetailPage() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Booking Amount</span>
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                ₦{booking.amount?.toLocaleString() || 0}
+                {/* ₦{booking.amount?.toLocaleString() || 0} */}
+                {formatCurrency(booking.amount || 0, booking.currency || 'NGN')}
+                
               </span>
             </div>
             {booking.payment_status && (
@@ -330,8 +334,9 @@ export default function ClientBookingDetailPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600 dark:text-gray-400">In Escrow</span>
                 <span className="text-sm font-medium text-yellow-600">
-                  ₦{booking.escrow_amount.toLocaleString()}
-                </span>
+                  {/* ₦{booking.escrow_amount.toLocaleString()} */}
+                  {formatCurrency(escrow.amount || 0, escrow.currency || 'NGN')}
+                  </span>
               </div>
             )}
           </div>
@@ -443,6 +448,7 @@ export default function ClientBookingDetailPage() {
             </button>
           </div>
         )}
+
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">

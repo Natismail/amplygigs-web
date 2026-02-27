@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabaseClient';
 import LiveTracking from '@/components/LiveTracking';
 import Link from 'next/link';
 import { CheckCircle, Clock, Wallet, DollarSign, AlertCircle } from 'lucide-react';
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 
 export default function BookingDetailsPage() {
   const { user } = useAuth();
@@ -368,7 +370,9 @@ export default function BookingDetailsPage() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600 dark:text-gray-400">Offered Amount</span>
               <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                {currencySymbol}{(booking?.amount || 0).toLocaleString()}
+                {/* {currencySymbol}{(booking?.amount || 0).toLocaleString()} */}
+                {formatCurrency(booking?.amount || 0, booking?.currency || 'NGN')}
+
               </span>
             </div>
             
@@ -378,7 +382,8 @@ export default function BookingDetailsPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Your Earnings (after fees)</span>
                     <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {currencySymbol}{escrow.net_amount?.toLocaleString()}
+                      {/* {currencySymbol}{escrow.net_amount?.toLocaleString()} */}
+                     {formatCurrency(escrow?.net_amount || 0, escrow?.currency || 'NGN')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -395,7 +400,10 @@ export default function BookingDetailsPage() {
               </>
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-700">
-                You&apos;ll receive approximately <span className="font-semibold text-gray-900 dark:text-white">{currencySymbol}{((booking.amount || 0) * 0.825).toLocaleString()}</span> after platform fee (10%) and VAT (7.5%)
+                You&apos;ll receive approximately <span className="font-semibold text-gray-900 dark:text-white">
+                  {/* {currencySymbol}{((booking.amount || 0) * 0.825).toLocaleString()} */}
+                                    {formatCurrency((booking.amount || 0) * 0.825, booking.currency || 'NGN')}
+                  </span> after platform fee (10%) and VAT (7.5%)
               </p>
             )}
             

@@ -575,7 +575,8 @@ export default function ChatWindow({ conversation, onBack }) {
       )}
 
       {/* INPUT */}
-      <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg">
+      <div className="flex-shrink-0 p-1 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg
+       bottom-0 left-0 right-0 z-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg backdrop-blur-md">
         {mediaPreview && (
           <div className="mb-3 relative inline-block">
             <div className="relative">
@@ -653,14 +654,14 @@ export default function ChatWindow({ conversation, onBack }) {
           <button
             type="submit"
             disabled={(!messageText.trim() && !mediaFile) || sending || isRecording || amyIsThinking}
-            className="flex-shrink-0 p-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="flex-shrink-0 p-0 bg-purple-600 hover:bg-purple-700 text-white rounded-full transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             <Send className="w-5 h-5" />
           </button>
         </form>
 
         {isAmyChat && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0 text-center">
             💡 Amy can help you find musicians, book gigs, or create events
           </p>
         )}

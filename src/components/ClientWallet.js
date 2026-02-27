@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
+import { formatCurrency, getCurrencyByCode } from "@/components/CurrencySelector";
+
 
 export default function ClientWallet() {
   const { user } = useAuth();
@@ -125,7 +127,7 @@ export default function ClientWallet() {
     }
   };
 
-  const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
+  //const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
 
   if (loading) {
     return (
@@ -147,7 +149,8 @@ export default function ClientWallet() {
             <div>
               <p className="text-purple-100 text-sm">Wallet Balance</p>
               <p className="text-3xl font-bold">
-                {currencySymbol}{wallet?.balance?.toLocaleString() || '0.00'}
+                {formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')}
+
               </p>
             </div>
           </div>
@@ -164,15 +167,21 @@ export default function ClientWallet() {
         <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-purple-400/30">
           <div>
             <p className="text-purple-100 text-xs mb-1">Total Funded</p>
-            <p className="font-semibold">{currencySymbol}{wallet?.total_funded?.toLocaleString() || '0'}</p>
+            {/* <p className="font-semibold">{currencySymbol}{wallet?.total_funded?.toLocaleString() || '0'}</p> */}
+            <p className="font-semibold">{formatCurrency(wallet?.total_funded || 0, wallet?.currency || 'NGN')}</p>
+
           </div>
           <div>
             <p className="text-purple-100 text-xs mb-1">Total Spent</p>
-            <p className="font-semibold">{currencySymbol}{wallet?.total_spent?.toLocaleString() || '0'}</p>
+            {/* <p className="font-semibold">{currencySymbol}{wallet?.total_spent?.toLocaleString() || '0'}</p> */}
+            <p className="font-semibold">{formatCurrency(wallet?.total_spent || 0, wallet?.currency || 'NGN')}</p>
+
           </div>
           <div>
             <p className="text-purple-100 text-xs mb-1">In Escrow</p>
-            <p className="font-semibold">{currencySymbol}{wallet?.pending_payments?.toLocaleString() || '0'}</p>
+            {/* <p className="font-semibold">{currencySymbol}{wallet?.pending_payments?.toLocaleString() || '0'}</p> */}
+            <p className="font-semibold">{formatCurrency(wallet?.pending_payments || 0, wallet?.currency || 'NGN')}</p>
+
           </div>
         </div>
       </div>
@@ -283,7 +292,7 @@ export default function ClientWallet() {
               <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                 <p className="text-sm text-purple-800 dark:text-purple-200 mb-1">Current Balance</p>
                 <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  {currencySymbol}{wallet?.balance?.toLocaleString() || '0.00'}
+                  {formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')}
                 </p>
               </div>
 
@@ -314,15 +323,16 @@ export default function ClientWallet() {
 
               {/* Quick Amount Buttons */}
               <div className="grid grid-cols-4 gap-2">
-                {[1000, 5000, 10000, 20000].map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => setDepositAmount(amount.toString())}
-                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition"
-                  >
-                    {currencySymbol}{(amount / 1000).toFixed(0)}k
-                  </button>
-                ))}
+                // Quick amount buttons (around line 850):
+{[1000, 5000, 10000, 20000].map((amount) => (
+  <button
+    key={amount}
+    onClick={() => setDepositAmount(amount.toString())}
+    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition"
+  >
+    {getCurrencyByCode(wallet?.currency || 'NGN').symbol}{(amount / 1000).toFixed(0)}k
+  </button>
+))}
               </div>
 
               {/* Error Message */}

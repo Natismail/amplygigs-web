@@ -448,7 +448,10 @@ export default function NotificationPreferences() {
             type="checkbox"
             checked={prefs.quiet_hours_enabled}
             onChange={(e) => updateChannelPref('quiet_hours_enabled', e.target.checked)}
-            className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-600"
+            className="w-5 h-5 rounded cursor-pointer
+        border-gray-300 dark:border-gray-600
+        text-green-600 focus:ring-purple-500
+        checked:bg-green-600 checked:border-green-600"
           />
           <span className="font-medium text-gray-900 dark:text-white">
             Enable quiet hours

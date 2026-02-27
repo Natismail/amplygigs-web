@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import WithdrawalRequest from '@/components/WithdrawalRequest';
 import BankAccountManager from '@/components/BankAccountManager';
+import { formatCurrency, getCurrencyByCode } from "@/components/CurrencySelector";
 
 
 
@@ -143,7 +144,7 @@ export default function MusicianEarningsPage() {
             <p className="text-green-100 text-sm font-medium">Available Balance</p>
             <span className="text-2xl">💵</span>
           </div>
-          <p className="text-4xl font-bold">₦{wallet?.available_balance.toLocaleString() || 0}</p>
+          <p className="text-4xl font-bold">{formatCurrency(wallet?.available_balance || 0, wallet?.currency || 'NGN')}</p>
           <p className="text-green-100 text-xs mt-2">Ready to withdraw</p>
         </div>
 
@@ -152,7 +153,7 @@ export default function MusicianEarningsPage() {
             <p className="text-yellow-100 text-sm font-medium">Ledger Balance</p>
             <span className="text-2xl">⏳</span>
           </div>
-          <p className="text-4xl font-bold">₦{wallet?.ledger_balance.toLocaleString() || 0}</p>
+          <p className="text-4xl font-bold">{formatCurrency(wallet?.ledger_balance || 0, wallet?.currency || 'NGN')}</p>
           <p className="text-yellow-100 text-xs mt-2">Pending event completion</p>
         </div>
 
@@ -161,7 +162,7 @@ export default function MusicianEarningsPage() {
             <p className="text-purple-100 text-sm font-medium">Total Earnings</p>
             <span className="text-2xl">🎵</span>
           </div>
-          <p className="text-4xl font-bold">₦{wallet?.total_earnings.toLocaleString() || 0}</p>
+          <p className="text-4xl font-bold">{formatCurrency(wallet?.total_earnings || 0, wallet?.currency || 'NGN')}</p>
           <p className="text-purple-100 text-xs mt-2">All-time earnings</p>
         </div>
       </div>
@@ -250,8 +251,8 @@ export default function MusicianEarningsPage() {
                       <p className={`font-bold text-lg ${
                         tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-green-600'
                       }`}>
-                        {tx.transaction_type === 'withdrawal' ? '-' : '+'}₦{tx.net_amount.toLocaleString()}
-                      </p>
+{tx.transaction_type === 'withdrawal' ? '-' : '+'}
+{formatCurrency(tx.net_amount, wallet?.currency || 'NGN')}                      </p>
                       <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getStatusColor(tx.payment_status)}`}>
                         {tx.payment_status}
                       </span>
@@ -295,7 +296,9 @@ export default function MusicianEarningsPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg text-gray-900 dark:text-white">
-                        ₦{wd.net_amount.toLocaleString()}
+                        {/* ₦{wd.net_amount.toLocaleString()} */}
+                        {formatCurrency(wd.net_amount || 0, wd?.currency || 'NGN')}
+
                       </p>
                       <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getStatusColor(wd.status)}`}>
                         {wd.status}

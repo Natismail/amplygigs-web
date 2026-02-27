@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import Avatar from "./Avatar";
 import Logo from '@/components/Logo';
-import { Menu, Sun, Moon, MessageCircle, ArrowLeft, Sparkles } from "lucide-react";
+import { Menu, Sun, Moon, MessageCircle, ArrowLeft, ChevronLeft, Sparkles } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
@@ -119,7 +119,7 @@ export default function Navbar({ onMenuClick }) {
         <div className="flex items-center gap-0 sm:gap-1 min-w-0">
           <button
             onClick={onMenuClick}
-            className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+            className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[40px] flex items-center justify-center flex-shrink-0"
             aria-label="Open menu"
           >
             <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
@@ -128,11 +128,14 @@ export default function Navbar({ onMenuClick }) {
           {shouldShowBack && (
             <button
               onClick={handleBack}
-              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[44px] min-w-[30px] flex items-center justify-center flex-shrink-0"
+              className="p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition min-h-[48px] min-w-[30px] flex items-center justify-center flex-shrink-0"
               aria-label="Go back"
               title="Go back"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              {/* <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" /> */}
+              <ChevronLeft className="w-6 h-10 font-extrabold text-gray-700 dark:text-gray-300" />
+
+
             </button>
           )}
 

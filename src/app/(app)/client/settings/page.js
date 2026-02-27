@@ -1,4 +1,4 @@
-// src/app/(app)/client/settings/page.js
+// src/app/(app)/client/settings/page.js - COMPLETE FIX
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,6 +8,7 @@ import ProfilePictureUpload from "@/components/ProfilePictureUpload";
 import ProfileSyncButton from "@/components/ProfileSyncButton";
 import NotificationPreferences from "@/components/settings/NotificationPreferences";
 import { User, Mail, Phone, MapPin, RefreshCw, Wallet, Plus, ArrowUpRight, ArrowDownLeft, Bell } from "lucide-react";
+import { formatCurrency, getCurrencyByCode } from "@/components/CurrencySelector";
 
 export default function ClientSettingsPage() {
   const { user } = useAuth();
@@ -20,7 +21,6 @@ export default function ClientSettingsPage() {
   const [depositing, setDepositing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Check if user might need OAuth sync
   const needsSync = user?.first_name === 'User' || 
                     !user?.first_name || 
                     !user?.last_name ||
@@ -44,7 +44,6 @@ export default function ClientSettingsPage() {
       if (data && data.length > 0) {
         setWallet(data[0]);
       } else {
-        // Create wallet if doesn't exist
         await supabase.from('client_wallets').insert({ client_id: user.id });
         const { data: newData } = await supabase
           .rpc('get_client_wallet_balance', { p_client_id: user.id });
@@ -74,14 +73,16 @@ export default function ClientSettingsPage() {
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
+    const currency = wallet?.currency || 'NGN';
+    const minAmount = currency === 'NGN' ? 100 : currency === 'USD' ? 5 : currency === 'GBP' ? 5 : 100;
     
-    if (!amount || amount < 100) {
-      setError('Minimum deposit is ₦100');
+    if (!amount || amount < minAmount) {
+      setError(`Minimum deposit is ${formatCurrency(minAmount, currency)}`);
       return;
     }
 
     if (amount > 1000000) {
-      setError('Maximum deposit is ₦1,000,000');
+      setError(`Maximum deposit is ${formatCurrency(1000000, currency)}`);
       return;
     }
 
@@ -96,7 +97,8 @@ export default function ClientSettingsPage() {
           amount: amount,
           email: user.email,
           clientId: user.id,
-          countryCode: user.country_code || 'NG'
+          countryCode: user.country_code || 'NG',
+          currency: currency
         }),
       });
 
@@ -127,8 +129,6 @@ export default function ClientSettingsPage() {
         return <Wallet className="w-5 h-5 text-gray-600" />;
     }
   };
-
-  const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
 
   if (!user) {
     return (
@@ -196,7 +196,6 @@ export default function ClientSettingsPage() {
             {/* PROFILE TAB */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                {/* OAuth Sync Section */}
                 {needsSync && (
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
                     <div className="flex items-start gap-4">
@@ -221,7 +220,6 @@ export default function ClientSettingsPage() {
                   </div>
                 )}
 
-                {/* Profile Picture */}
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                     Profile Picture
@@ -229,7 +227,6 @@ export default function ClientSettingsPage() {
                   <ProfilePictureUpload />
                 </div>
 
-                {/* Personal Information */}
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                     Personal Information
@@ -282,7 +279,6 @@ export default function ClientSettingsPage() {
                   </div>
                 </div>
 
-                {/* Account Type */}
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                     Account Type
@@ -321,7 +317,7 @@ export default function ClientSettingsPage() {
                           <div>
                             <p className="text-purple-100 text-sm">Wallet Balance</p>
                             <p className="text-3xl font-bold">
-                              {currencySymbol}{wallet?.balance?.toLocaleString() || '0.00'}
+                              {formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')}
                             </p>
                           </div>
                         </div>
@@ -338,15 +334,21 @@ export default function ClientSettingsPage() {
                       <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-purple-400/30">
                         <div>
                           <p className="text-purple-100 text-xs mb-1">Total Funded</p>
-                          <p className="font-semibold">{currencySymbol}{wallet?.total_funded?.toLocaleString() || '0'}</p>
+                          <p className="font-semibold">
+                            {formatCurrency(wallet?.total_funded || 0, wallet?.currency || 'NGN')}
+                          </p>
                         </div>
                         <div>
                           <p className="text-purple-100 text-xs mb-1">Total Spent</p>
-                          <p className="font-semibold">{currencySymbol}{wallet?.total_spent?.toLocaleString() || '0'}</p>
+                          <p className="font-semibold">
+                            {formatCurrency(wallet?.total_spent || 0, wallet?.currency || 'NGN')}
+                          </p>
                         </div>
                         <div>
                           <p className="text-purple-100 text-xs mb-1">In Escrow</p>
-                          <p className="font-semibold">{currencySymbol}{wallet?.pending_payments?.toLocaleString() || '0'}</p>
+                          <p className="font-semibold">
+                            {formatCurrency(wallet?.pending_payments || 0, wallet?.currency || 'NGN')}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -413,10 +415,10 @@ export default function ClientSettingsPage() {
                                     txn.transaction_type === 'payment' ? 'text-red-600' : 'text-green-600'
                                   }`}>
                                     {txn.transaction_type === 'payment' ? '-' : '+'}
-                                    {currencySymbol}{txn.amount.toLocaleString()}
+                                    {formatCurrency(txn.amount, wallet?.currency || 'NGN')}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    Balance: {currencySymbol}{txn.balance_after.toLocaleString()}
+                                    Balance: {formatCurrency(txn.balance_after, wallet?.currency || 'NGN')}
                                   </p>
                                 </div>
                               </div>
@@ -429,13 +431,12 @@ export default function ClientSettingsPage() {
                 )}
               </div>
             )}
-          </div>
 
-          {/* NOTIFICATIONS TAB - NEW! */}
+            {/* NOTIFICATIONS TAB */}
             {activeTab === 'notifications' && (
               <NotificationPreferences />
             )}
-          
+          </div>
         </div>
 
         {/* Deposit Modal */}
@@ -463,7 +464,7 @@ export default function ClientSettingsPage() {
                 <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                   <p className="text-sm text-purple-800 dark:text-purple-200 mb-1">Current Balance</p>
                   <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                    {currencySymbol}{wallet?.balance?.toLocaleString() || '0.00'}
+                    {formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')}
                   </p>
                 </div>
 
@@ -474,7 +475,7 @@ export default function ClientSettingsPage() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">
-                      {currencySymbol}
+                      {getCurrencyByCode(wallet?.currency || 'NGN').symbol}
                     </span>
                     <input
                       type="number"
@@ -487,8 +488,8 @@ export default function ClientSettingsPage() {
                     />
                   </div>
                   <div className="flex justify-between mt-2 text-xs text-gray-500">
-                    <span>Min: {currencySymbol}100</span>
-                    <span>Max: {currencySymbol}1,000,000</span>
+                    <span>Min: {getCurrencyByCode(wallet?.currency || 'NGN').symbol}100</span>
+                    <span>Max: {getCurrencyByCode(wallet?.currency || 'NGN').symbol}1,000,000</span>
                   </div>
                 </div>
 
@@ -500,7 +501,7 @@ export default function ClientSettingsPage() {
                       onClick={() => setDepositAmount(amount.toString())}
                       className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition"
                     >
-                      {currencySymbol}{(amount / 1000).toFixed(0)}k
+                      {getCurrencyByCode(wallet?.currency || 'NGN').symbol}{(amount / 1000).toFixed(0)}k
                     </button>
                   ))}
                 </div>

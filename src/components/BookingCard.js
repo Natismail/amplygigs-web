@@ -15,6 +15,8 @@ import {
   XCircle
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+
 
 export default function BookingCard({
   booking,
@@ -166,6 +168,7 @@ export default function BookingCard({
           </div>
         </div>
 
+
         {/* Location */}
         {booking.event_location && (
           <div className="flex items-start gap-3 text-sm">
@@ -207,7 +210,7 @@ export default function BookingCard({
             <span className="text-sm">Amount</span>
           </div>
           <span className="font-bold text-xl text-gray-900 dark:text-white">
-            ₦{booking.amount?.toLocaleString() || "0"}
+                        {formatCurrency(booking.amount || 0, booking.currency || 'NGN')}
           </span>
         </div>
       </div>
