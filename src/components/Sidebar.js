@@ -371,6 +371,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Browse Jobs
               </NavLink>
               <NavLink href="/musician/applications" icon={FileText}>
+              {/* <NavLink href="/jobs/applications" icon={FileText}> */}
                 My Applications
               </NavLink>
               <NavLink href="/musician/my-events" icon={Music}>
