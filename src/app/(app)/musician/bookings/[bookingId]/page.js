@@ -10,6 +10,8 @@ import LiveTracking from '@/components/LiveTracking';
 import Link from 'next/link';
 import { CheckCircle, Clock, Wallet, DollarSign, AlertCircle } from 'lucide-react';
 import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+import VerificationGate, { VerificationBanner } from "@/components/VerificationGate";
+
 
 
 export default function BookingDetailsPage() {
@@ -502,6 +504,7 @@ export default function BookingDetailsPage() {
         {/* Action Buttons */}
         {booking.status === 'pending' && (
           <div className="space-y-3">
+            <VerificationGate actionLabel="confirm this booking">
             <button
               onClick={handleAcceptGig}
               disabled={actionLoading}
@@ -509,6 +512,8 @@ export default function BookingDetailsPage() {
             >
               {actionLoading ? 'Processing...' : '✓ Accept Gig'}
             </button>
+            </VerificationGate>
+
             <button
               onClick={handleDeclineGig}
               disabled={actionLoading}

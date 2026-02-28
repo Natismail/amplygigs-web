@@ -575,7 +575,7 @@ export default function ChatWindow({ conversation, onBack }) {
       )}
 
       {/* INPUT */}
-      <div className="flex-shrink-0 p-1 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg
+      <div className="flex-shrink-0 p-2 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg
        bottom-0 left-0 right-0 z-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-lg backdrop-blur-md">
         {mediaPreview && (
           <div className="mb-3 relative inline-block">

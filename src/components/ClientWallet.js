@@ -1,4 +1,4 @@
-// src/components/ClientWallet.js
+// src/components/ClientWallet.js - COMPLETE FIX
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,7 +6,6 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, RefreshCw } from 'lucide-react';
 import { formatCurrency, getCurrencyByCode } from "@/components/CurrencySelector";
-
 
 export default function ClientWallet() {
   const { user } = useAuth();
@@ -36,14 +35,12 @@ export default function ClientWallet() {
       if (data && data.length > 0) {
         setWallet(data[0]);
       } else {
-        // Create wallet if doesn't exist
         await supabase
           .from('client_wallets')
           .insert({ client_id: user.id })
           .select()
           .single();
         
-        // Fetch again
         const { data: newData } = await supabase
           .rpc('get_client_wallet_balance', { p_client_id: user.id });
         if (newData && newData.length > 0) {
@@ -72,14 +69,16 @@ export default function ClientWallet() {
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
+    const currency = wallet?.currency || 'NGN';
+    const minAmount = currency === 'NGN' ? 100 : 5;
     
-    if (!amount || amount < 100) {
-      setError('Minimum deposit is ₦100');
+    if (!amount || amount < minAmount) {
+      setError(`Minimum deposit is ${formatCurrency(minAmount, currency)}`);
       return;
     }
 
     if (amount > 1000000) {
-      setError('Maximum deposit is ₦1,000,000');
+      setError(`Maximum deposit is ${formatCurrency(1000000, currency)}`);
       return;
     }
 
@@ -94,14 +93,14 @@ export default function ClientWallet() {
           amount: amount,
           email: user.email,
           clientId: user.id,
-          countryCode: user.country_code || 'NG'
+          countryCode: user.country_code || 'NG',
+          currency: currency
         }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // Redirect to payment page
         window.location.href = result.paymentLink;
       } else {
         setError(result.error || 'Failed to initialize payment');
@@ -127,8 +126,6 @@ export default function ClientWallet() {
     }
   };
 
-  //const currencySymbol = wallet?.currency === 'NGN' ? '₦' : '$';
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -150,7 +147,6 @@ export default function ClientWallet() {
               <p className="text-purple-100 text-sm">Wallet Balance</p>
               <p className="text-3xl font-bold">
                 {formatCurrency(wallet?.balance || 0, wallet?.currency || 'NGN')}
-
               </p>
             </div>
           </div>
@@ -167,21 +163,21 @@ export default function ClientWallet() {
         <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-purple-400/30">
           <div>
             <p className="text-purple-100 text-xs mb-1">Total Funded</p>
-            {/* <p className="font-semibold">{currencySymbol}{wallet?.total_funded?.toLocaleString() || '0'}</p> */}
-            <p className="font-semibold">{formatCurrency(wallet?.total_funded || 0, wallet?.currency || 'NGN')}</p>
-
+            <p className="font-semibold">
+              {formatCurrency(wallet?.total_funded || 0, wallet?.currency || 'NGN')}
+            </p>
           </div>
           <div>
             <p className="text-purple-100 text-xs mb-1">Total Spent</p>
-            {/* <p className="font-semibold">{currencySymbol}{wallet?.total_spent?.toLocaleString() || '0'}</p> */}
-            <p className="font-semibold">{formatCurrency(wallet?.total_spent || 0, wallet?.currency || 'NGN')}</p>
-
+            <p className="font-semibold">
+              {formatCurrency(wallet?.total_spent || 0, wallet?.currency || 'NGN')}
+            </p>
           </div>
           <div>
             <p className="text-purple-100 text-xs mb-1">In Escrow</p>
-            {/* <p className="font-semibold">{currencySymbol}{wallet?.pending_payments?.toLocaleString() || '0'}</p> */}
-            <p className="font-semibold">{formatCurrency(wallet?.pending_payments || 0, wallet?.currency || 'NGN')}</p>
-
+            <p className="font-semibold">
+              {formatCurrency(wallet?.pending_payments || 0, wallet?.currency || 'NGN')}
+            </p>
           </div>
         </div>
       </div>
@@ -249,10 +245,10 @@ export default function ClientWallet() {
                       txn.transaction_type === 'payment' ? 'text-red-600' : 'text-green-600'
                     }`}>
                       {txn.transaction_type === 'payment' ? '-' : '+'}
-                      {currencySymbol}{txn.amount.toLocaleString()}
+                      {formatCurrency(txn.amount, wallet?.currency || 'NGN')}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Balance: {currencySymbol}{txn.balance_after.toLocaleString()}
+                      Balance: {formatCurrency(txn.balance_after, wallet?.currency || 'NGN')}
                     </p>
                   </div>
                 </div>
@@ -303,7 +299,7 @@ export default function ClientWallet() {
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">
-                    {currencySymbol}
+                    {getCurrencyByCode(wallet?.currency || 'NGN').symbol}
                   </span>
                   <input
                     type="number"
@@ -316,23 +312,22 @@ export default function ClientWallet() {
                   />
                 </div>
                 <div className="flex justify-between mt-2 text-xs text-gray-500">
-                  <span>Min: {currencySymbol}100</span>
-                  <span>Max: {currencySymbol}1,000,000</span>
+                  <span>Min: {getCurrencyByCode(wallet?.currency || 'NGN').symbol}100</span>
+                  <span>Max: {getCurrencyByCode(wallet?.currency || 'NGN').symbol}1,000,000</span>
                 </div>
               </div>
 
               {/* Quick Amount Buttons */}
               <div className="grid grid-cols-4 gap-2">
-                // Quick amount buttons (around line 850):
-{[1000, 5000, 10000, 20000].map((amount) => (
-  <button
-    key={amount}
-    onClick={() => setDepositAmount(amount.toString())}
-    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition"
-  >
-    {getCurrencyByCode(wallet?.currency || 'NGN').symbol}{(amount / 1000).toFixed(0)}k
-  </button>
-))}
+                {[1000, 5000, 10000, 20000].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setDepositAmount(amount.toString())}
+                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition"
+                  >
+                    {getCurrencyByCode(wallet?.currency || 'NGN').symbol}{(amount / 1000).toFixed(0)}k
+                  </button>
+                ))}
               </div>
 
               {/* Error Message */}
