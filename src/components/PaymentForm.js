@@ -239,14 +239,14 @@ export default function PaymentForm({ booking, onPaymentSuccess }) {
             </div>
 
             {/* VAT */}
-            {vatAmount > 0 && (
+            {/* {vatAmount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">VAT ({VAT_PERCENTAGE}%)</span>
                 <span className="font-medium text-red-600 dark:text-red-400">
                   -{currencySymbol}{vatAmount.toLocaleString()}
                 </span>
               </div>
-            )}
+            )} */}
 
             <div className="pt-3 border-t-2 border-blue-300 dark:border-blue-600">
               <div className="flex justify-between items-center mb-2">

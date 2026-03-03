@@ -405,7 +405,8 @@ export default function BookingDetailsPage() {
                 You&apos;ll receive approximately <span className="font-semibold text-gray-900 dark:text-white">
                   {/* {currencySymbol}{((booking.amount || 0) * 0.825).toLocaleString()} */}
                                     {formatCurrency((booking.amount || 0) * 0.825, booking.currency || 'NGN')}
-                  </span> after platform fee (10%) and VAT (7.5%)
+                  </span> after platform fee (10%) 
+                  {/* and VAT (7.5%) */}
               </p>
             )}
             

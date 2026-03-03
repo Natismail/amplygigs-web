@@ -12,156 +12,115 @@ import { Eye, EyeOff } from "lucide-react";
 import Logo, { LogoIconOnly, LogoWithText, LogoLight } from '@/components/Logo';
 
 
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
   const router = useRouter();
   const { user, signIn, loading: authLoading } = useAuth();
-  const [hasRedirected, setHasRedirected] = useState(false); // Add this state
-
-  // // Redirect if already logged in
-  // useEffect(() => {
-  //   if (!authLoading && user) {
-  //     handleRedirectAfterLogin(user);
-  //   }
-  // // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [user, authLoading, router]);
-
 
   // Redirect if already logged in
-useEffect(() => {
-  if (!authLoading && user && !hasRedirected) {
-    setHasRedirected(true); // Prevent multiple redirects
-    handleRedirectAfterLogin(user);
-  }
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [user, authLoading]);
+  useEffect(() => {
+    if (!authLoading && user) {
+      handleRedirectAfterLogin(user);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
   const handleRedirectAfterLogin = async (currentUser) => {
-    console.log('🔄 Redirecting user:', currentUser);
-    
     try {
-      // Fetch fresh user data to check role
       const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('role, is_admin, is_support')
-        .eq('id', currentUser.id)
+        .from("user_profiles")
+        .select("role, is_admin, is_support")
+        .eq("id", currentUser.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        router.push('/client/home'); // Default fallback
+      if (error || !profile) {
+        console.error("❌ Error fetching profile:", error);
+        router.replace("/client/home");
         return;
       }
 
-      console.log('👤 User profile:', profile);
+      // Normalize role — DB stores lowercase: 'admin', 'musician', 'client'
+      const role = (profile.role ?? "").toLowerCase();
 
-      // Redirect based on role
-      if (profile.is_admin || profile.role === 'ADMIN') {
-        console.log('👑 Redirecting to admin dashboard');
-        router.push('/admin/dashboard');
-      } else if (profile.is_support || profile.role === 'SUPPORT') {
-        console.log('🛠️ Redirecting to support dashboard');
-        router.push('/admin/dashboard');
-      } else if (profile.role === 'MUSICIAN') {
-        console.log('🎵 Redirecting to musician dashboard');
-        router.push('/musician/dashboard');
+      console.log("👤 Role:", role, "| is_admin:", profile.is_admin);
+
+      if (profile.is_admin || role === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (profile.is_support || role === "support") {
+        router.replace("/admin/dashboard");
+      } else if (role === "musician") {
+        router.replace("/musician/dashboard");
       } else {
-        console.log('👤 Redirecting to client home');
-        router.push('/client/home');
+        // 'client' or anything else
+        router.replace("/client/home");
       }
     } catch (err) {
-      console.error('Error in redirect logic:', err);
-      router.push('/client/home');
+      console.error("❌ Redirect error:", err);
+      router.replace("/client/home");
     }
   };
 
-  
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      console.log('🔐 Attempting login for:', email);
-      
-      // Use signIn from AuthContext if available, otherwise direct Supabase call
-      const result = signIn 
+      const result = signIn
         ? await signIn(email, password)
         : await supabase.auth.signInWithPassword({ email, password });
 
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
-      console.log('✅ Login successful');
-      // The useEffect will handle the redirect
+      if (result.error) throw new Error(result.error.message);
+      // useEffect handles redirect once user state updates
     } catch (err) {
-      console.error('❌ Login error:', err);
+      console.error("❌ Login error:", err);
       setError(err.message || "Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // const handleSocialLogin = async (provider) => {
-  //   try {
-  //     const { error } = await supabase.auth.signInWithOAuth({
-  //       provider,
-  //       options: { redirectTo: window.location.origin },
-  //     });
-      
-  //     if (error) throw error;
-  //   } catch (err) {
-  //     console.error('Social login error:', err);
-  //     setError("Social login failed. Please try again.");
-  //   }
-  // };
+  const handleSocialLogin = async (provider) => {
+    try {
+      const redirectUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : "https://amplygigs-web.vercel.app/auth/callback";
 
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: { access_type: "offline", prompt: "consent" },
+        },
+      });
 
+      if (error) throw error;
+    } catch (err) {
+      console.error("Social login error:", err);
+      setError("Social login failed. Please try again.");
+    }
+  };
 
-// Update only the handleSocialLogin function in your login page
-
-const handleSocialLogin = async (provider) => {
-  try {
-    const redirectUrl = typeof window !== 'undefined' 
-      ? `${window.location.origin}/auth/callback`
-      : 'https://amplygigs-web.vercel.app/auth/callback';
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { 
-        redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      },
-    });
-    
-    if (error) throw error;
-  } catch (err) {
-    console.error('Social login error:', err);
-    setError("Social login failed. Please try again.");
-  }
-};
-
-
-  // Show loading state while checking auth
+  // Show spinner while auth state resolves or redirect is in progress
   if (authLoading || user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="flex items-center justify-center min-h-screen bg-gray-950">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <div className="animate-spin rounded-full h-14 w-14 border-b-4 border-purple-600 mx-auto mb-4" />
+          <p className="text-gray-400 text-sm">Loading...</p>
         </div>
       </div>
     );
   }
 
+  
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-8 bg-cover bg-center bg-no-repeat bg-black/60"

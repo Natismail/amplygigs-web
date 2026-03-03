@@ -1,5 +1,4 @@
 // src/app/api/release-funds/route.js
-// RELEASE ESCROW FUNDS API - Updated to work with existing component
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -8,15 +7,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const CURRENCY_SYMBOLS = {
+  NGN: '₦', USD: '$', GBP: '£', EUR: '€',
+  GHS: '₵', KES: 'KSh', ZAR: 'R'
+};
+
+function formatCurrency(amount, currency = 'NGN') {
+  const symbol = CURRENCY_SYMBOLS[currency] || currency;
+  return `${symbol}${Number(amount).toLocaleString()}`;
+}
+
 export async function POST(req) {
   try {
     const { bookingId } = await req.json();
 
     if (!bookingId) {
-      return Response.json({ 
-        success: false,
-        error: 'Booking ID is required' 
-      }, { status: 400 });
+      return Response.json({ success: false, error: 'Booking ID is required' }, { status: 400 });
     }
 
     console.log('📤 Release request for booking:', bookingId);
@@ -26,7 +32,6 @@ export async function POST(req) {
       .from('bookings')
       .select(`
         *,
-        event:event_id(title),
         musician:musician_id(id, first_name, last_name, email),
         client:client_id(id, first_name, last_name, email)
       `)
@@ -35,83 +40,156 @@ export async function POST(req) {
 
     if (bookingError || !booking) {
       console.error('❌ Booking not found:', bookingError);
-      return Response.json({ 
-        success: false,
-        error: 'Booking not found' 
-      }, { status: 404 });
+      return Response.json({ success: false, error: 'Booking not found' }, { status: 404 });
     }
 
     // 2. Verify booking is completed or event date has passed
     const eventDate = new Date(booking.event_date);
     const now = new Date();
-    const isEventPassed = eventDate < now;
 
-    if (booking.status !== 'completed' && !isEventPassed) {
-      return Response.json({ 
+    if (booking.status !== 'completed' && eventDate >= now) {
+      return Response.json({
         success: false,
-        error: 'Event must be completed or date must have passed before releasing funds' 
+        error: 'Event must be completed or date must have passed before releasing funds'
       }, { status: 400 });
     }
 
     // 3. Check if funds already released
     if (booking.funds_released_at) {
-      return Response.json({ 
+      return Response.json({
         success: false,
-        error: 'Funds have already been released for this booking' 
+        error: 'Funds have already been released for this booking'
       }, { status: 400 });
     }
 
-    // 4. Find escrow transaction
+    // 4. Find escrow — broad search covering all pre-release statuses
+    //    status can be 'held' or 'pending', payment_status must be 'successful'
     const { data: escrow, error: escrowError } = await supabase
       .from('escrow_transactions')
       .select('*')
       .eq('booking_id', bookingId)
-      .eq('status', 'held')
-      .single();
+      .in('status', ['held', 'pending'])
+      .eq('payment_status', 'successful')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (escrowError || !escrow) {
-      console.error('❌ No escrow found:', escrowError);
-      return Response.json({ 
+    if (escrowError) {
+      console.error('❌ Escrow lookup error:', escrowError);
+      return Response.json({
         success: false,
-        error: 'No funds in escrow for this booking' 
-      }, { status: 404 });
-    }
-
-    console.log('💰 Found escrow:', {
-      id: escrow.id,
-      amount: escrow.net_amount,
-      musician: booking.musician?.first_name
-    });
-
-    // 5. Release funds using database function
-    // We use the client_id from the booking as the releaser
-    const { data: result, error: releaseError } = await supabase
-      .rpc('release_escrow_funds', {
-        p_escrow_id: escrow.id,
-        p_released_by: booking.client_id,
-        p_release_type: 'manual_client'
-      });
-
-    if (releaseError) {
-      console.error('❌ Release error:', releaseError);
-      return Response.json({ 
-        success: false,
-        error: 'Failed to release funds',
-        details: releaseError.message 
+        error: 'Error looking up escrow record',
+        details: escrowError.message
       }, { status: 500 });
     }
 
-    console.log('✅ Funds released successfully');
+    if (!escrow) {
+      // Check if any escrow exists at all — gives a better error message
+      const { data: anyEscrow } = await supabase
+        .from('escrow_transactions')
+        .select('id, status, payment_status, gross_amount, net_amount')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    // 6. Send notifications
-    await sendReleaseNotifications(escrow, booking);
+      if (anyEscrow) {
+        console.log('📋 Escrow found but not releasable:', anyEscrow.status, anyEscrow.payment_status);
 
-    // 7. Return success with updated booking data
+        if (anyEscrow.status === 'released') {
+          return Response.json({
+            success: false,
+            error: 'Funds have already been released for this booking'
+          }, { status: 400 });
+        }
+
+        return Response.json({
+          success: false,
+          error: `Cannot release — escrow status is "${anyEscrow.status}", payment status is "${anyEscrow.payment_status}". Payment may not have been completed.`
+        }, { status: 400 });
+      }
+
+      return Response.json({
+        success: false,
+        error: 'No payment record found for this booking. The client may not have completed payment yet.'
+      }, { status: 404 });
+    }
+
+    console.log('💰 Escrow found:', {
+      id: escrow.id,
+      status: escrow.status,
+      gross_amount: escrow.gross_amount,
+      net_amount: escrow.net_amount,
+      vat_amount: escrow.vat_amount,
+      currency: escrow.currency
+    });
+
+    // 5. Try release_escrow_funds RPC first, fall back to manual update
+    // DB function signature: release_escrow_funds(p_booking_id uuid) RETURNS boolean
+    let releaseSuccess = false;
+
+    try {
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('release_escrow_funds', {
+        p_booking_id: bookingId
+      });
+
+      if (rpcError) throw rpcError;
+      if (rpcResult === false) throw new Error('RPC returned false');
+      releaseSuccess = true;
+      console.log('✅ RPC release successful');
+
+    } catch (rpcErr) {
+      console.warn('⚠️ RPC unavailable, using manual release:', rpcErr.message);
+
+      // Manual release — update escrow record directly
+      const { error: updateErr } = await supabase
+        .from('escrow_transactions')
+        .update({
+          status: 'released',
+          released_at: new Date().toISOString(),
+          released_by: booking.client_id,
+          release_type: 'manual_client',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', escrow.id);
+
+      if (updateErr) {
+        console.error('❌ Manual escrow update failed:', updateErr);
+        return Response.json({
+          success: false,
+          error: 'Failed to release funds',
+          details: updateErr.message
+        }, { status: 500 });
+      }
+
+      // Mark booking funds as released
+      await supabase
+        .from('bookings')
+        .update({
+          funds_released_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      releaseSuccess = true;
+      console.log('✅ Manual release successful');
+    }
+
+    if (!releaseSuccess) {
+      return Response.json({ success: false, error: 'Failed to release funds' }, { status: 500 });
+    }
+
+    // 6. Non-blocking notifications
+    sendReleaseNotifications(escrow, booking).catch(err =>
+      console.warn('⚠️ Notification error (non-critical):', err.message)
+    );
+
+    // 7. Return success
     const { data: updatedBooking } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
 
     return Response.json({
       success: true,
@@ -124,53 +202,40 @@ export async function POST(req) {
 
   } catch (error) {
     console.error('❌ Release API error:', error);
-    return Response.json({ 
+    return Response.json({
       success: false,
-      error: 'Internal server error', 
-      details: error.message 
+      error: 'Internal server error',
+      details: error.message
     }, { status: 500 });
   }
 }
 
-// Send notifications to both parties
 async function sendReleaseNotifications(escrow, booking) {
-  try {
-    const currencySymbol = escrow.currency === 'NGN' ? '₦' : '$';
+  const currency = escrow.currency || booking.currency || 'NGN';
+  const netFormatted = formatCurrency(escrow.net_amount, currency);
+  const musicianName = `${booking.musician?.first_name || ''} ${booking.musician?.last_name || ''}`.trim();
+  const gigTitle = booking.event_type || 'the gig';
 
-    // Notify musician
-    await supabase.from('notifications').insert({
+  await Promise.allSettled([
+    supabase.from('notifications').insert({
       user_id: escrow.musician_id,
       type: 'funds_released',
       title: '🎉 Funds Released!',
-      message: `${currencySymbol}${escrow.net_amount.toLocaleString()} has been released and is now available for withdrawal. Great job on completing "${booking.event?.title || 'the gig'}"!`,
-      data: {
-        booking_id: booking.id,
-        escrow_id: escrow.id,
-        amount: escrow.net_amount,
-        currency: escrow.currency,
-        event_title: booking.event?.title
-      }
-    });
-
-    // Notify client
-    await supabase.from('notifications').insert({
+      message: `${netFormatted} has been released and is now available for withdrawal. Great job completing "${gigTitle}"!`,
+      data: { booking_id: booking.id, escrow_id: escrow.id, amount: escrow.net_amount, currency },
+      read: false,
+      is_read: false
+    }),
+    supabase.from('notifications').insert({
       user_id: escrow.client_id,
       type: 'release_confirmed',
       title: '✅ Payment Released',
-      message: `You've successfully released ${currencySymbol}${escrow.net_amount.toLocaleString()} to ${booking.musician?.first_name} ${booking.musician?.last_name}. Thank you for using AmplyGigs!`,
-      data: {
-        booking_id: booking.id,
-        escrow_id: escrow.id,
-        amount: escrow.net_amount,
-        currency: escrow.currency,
-        event_title: booking.event?.title,
-        musician_name: `${booking.musician?.first_name} ${booking.musician?.last_name}`
-      }
-    });
+      message: `You've successfully released ${netFormatted} to ${musicianName}. Thank you for using AmplyGigs!`,
+      data: { booking_id: booking.id, escrow_id: escrow.id, amount: escrow.net_amount, currency, musician_name: musicianName },
+      read: false,
+      is_read: false
+    })
+  ]);
 
-    console.log('✅ Release notifications sent');
-  } catch (error) {
-    console.error('⚠️ Notification error:', error);
-    // Don't throw - notifications are not critical
-  }
+  console.log('✅ Release notifications sent');
 }

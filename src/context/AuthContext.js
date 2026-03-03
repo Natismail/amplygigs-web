@@ -19,115 +19,85 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   
-  // ✅ Track if we've already loaded this user's profile
+
+
+    // Tracks which user id we've already loaded — prevents redundant fetches
   const loadedUserId = useRef(null);
 
-  // 🔍 DEBUG: Track component lifecycle
-  useEffect(() => {
-    console.log('🔐 AuthProvider MOUNTED');
-    return () => console.log('💀 AuthProvider UNMOUNTED');
-  }, []);
-
-  // 🔍 DEBUG: Tab visibility tracking
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      console.log('👁️ Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
-      console.log('👤 Current user:', user?.id);
-      console.log('📝 Current session:', !!session);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user, session]);
-
-  // Fetch user profile from database
+  // ── Fetch + merge profile from user_profiles ─────────────────────────────
   const fetchUserProfile = useCallback(async (supabaseUser) => {
     if (!supabaseUser) {
-      console.log('❌ No supabase user provided, clearing user state');
       setUser(null);
       loadedUserId.current = null;
       return;
     }
 
-    // ✅ CRITICAL FIX: Skip if we already have this user's profile
-    if (loadedUserId.current === supabaseUser.id && user) {
-      console.log('⏭️ Profile already loaded for user:', supabaseUser.id);
+    // Skip if we already loaded this user's profile
+    if (loadedUserId.current === supabaseUser.id) {
+      console.log('⏭️ Profile already loaded for:', supabaseUser.id);
       return;
     }
 
+    console.log('📥 Fetching profile for:', supabaseUser.id);
+
     try {
-      console.log('📥 Fetching profile for user:', supabaseUser.id);
-      
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('id', supabaseUser.id)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('⚠️ No profile found, creating new profile...');
-          
-          const { data: newProfile, error: insertError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              phone: supabaseUser.user_metadata?.phone || '',
-              first_name: supabaseUser.user_metadata?.first_name || '',
-              last_name: supabaseUser.user_metadata?.last_name || '',
-              role: supabaseUser.user_metadata?.role || 'CLIENT',
-              created_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
+      if (error && error.code === 'PGRST116') {
+        // No profile row yet — create it
+        console.log('⚠️ No profile found, creating...');
 
-          if (insertError) {
-            console.error('❌ Error creating profile:', insertError);
-            setUser({
-              ...supabaseUser,
-              role: 'CLIENT',
-              first_name: '',
-              last_name: '',
-            });
-          } else {
-            console.log('✅ Profile created successfully');
-            setUser({ ...supabaseUser, ...newProfile });
-            loadedUserId.current = supabaseUser.id;
-          }
+        const meta = supabaseUser.user_metadata ?? {};
+        const { data: newProfile, error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id:         supabaseUser.id,
+            email:      supabaseUser.email,
+            phone:      meta.phone      ?? '',
+            first_name: meta.first_name ?? meta.given_name  ?? '',
+            last_name:  meta.last_name  ?? meta.family_name ?? '',
+            // ⚠️ PRESERVE role from metadata — never default to CLIENT for OAuth
+            role:       meta.role ?? 'CLIENT',
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('❌ Profile insert error:', insertError);
+          // Merge with what we know — do NOT override role here
+          setUser({ ...supabaseUser });
         } else {
-          console.error('❌ Error fetching profile:', error);
-          setUser({
-            ...supabaseUser,
-            role: 'CLIENT',
-            first_name: '',
-            last_name: '',
-          });
+          console.log('✅ Profile created:', newProfile.role);
+          // ✅ Normalize role to lowercase before merging
+          setUser({ ...supabaseUser, ...newProfile, role: (newProfile.role ?? '').toLowerCase() });
+          loadedUserId.current = supabaseUser.id;
         }
+
+      } else if (error) {
+        console.error('❌ Profile fetch error:', error);
+        // Don't set a fake role — leave role undefined so pages query DB themselves
+        setUser({ ...supabaseUser });
+
       } else {
-        console.log('✅ Profile fetched successfully');
-        setUser({ ...supabaseUser, ...profile });
+        console.log('✅ Profile fetched, role:', profile.role);
+        // ✅ Always normalize role to lowercase so comparisons work everywhere
+        setUser({ ...supabaseUser, ...profile, role: (profile.role ?? '').toLowerCase() });
         loadedUserId.current = supabaseUser.id;
       }
     } catch (err) {
-      console.error('❌ Exception in fetchUserProfile:', err);
-      setUser({
-        ...supabaseUser,
-        role: 'CLIENT',
-        first_name: '',
-        last_name: '',
-      });
+      console.error('❌ fetchUserProfile exception:', err);
+      setUser({ ...supabaseUser });
     }
-  }, [user]);
+  }, []); // No dependencies — avoids infinite loops
 
-  // ✅ NEW: Refresh user profile (for profile picture updates, etc.)
+  // ── Refresh profile (call after profile picture / name updates) ───────────
   const refreshUser = useCallback(async () => {
-    if (!session?.user) {
-      console.log('❌ No session, cannot refresh user');
-      return;
-    }
-
-    console.log('🔄 Refreshing user profile...');
+    if (!session?.user) return;
+    console.log('🔄 Refreshing profile...');
 
     try {
       const { data: profile, error } = await supabase
@@ -136,95 +106,76 @@ export const AuthProvider = ({ children }) => {
         .eq('id', session.user.id)
         .single();
 
-      if (error) {
-        console.error('❌ Error refreshing profile:', error);
-        return;
-      }
+      if (error) { console.error('❌ Refresh error:', error); return; }
 
-      console.log('✅ Profile refreshed successfully');
-      setUser({ ...session.user, ...profile });
+      setUser({ ...session.user, ...profile, role: (profile.role ?? '').toLowerCase() });
+      console.log('✅ Profile refreshed');
     } catch (err) {
-      console.error('❌ Exception refreshing profile:', err);
+      console.error('❌ refreshUser exception:', err);
     }
   }, [session]);
 
+  // ── Auth state listener ───────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
-    const handleAuthStateChange = async (event, session) => {
+    const handleAuthStateChange = async (event, newSession) => {
       if (!mounted) return;
 
-      console.log('🔐 Auth state changed:', event || 'INITIAL', session ? 'Session exists' : 'No session');
-      
-      setSession(session);
+      console.log('🔐 Auth event:', event ?? 'INITIAL', newSession ? '(session)' : '(no session)');
+      setSession(newSession);
 
-      if (session?.user) {
-        // ✅ CRITICAL FIX: Only fetch profile if it's a new user
-        if (loadedUserId.current !== session.user.id) {
+      if (newSession?.user) {
+        if (loadedUserId.current !== newSession.user.id) {
           setLoading(true);
-          await fetchUserProfile(session.user);
-        } else {
-          console.log('⏭️ Skipping profile fetch - already loaded');
+          await fetchUserProfile(newSession.user);
         }
       } else {
-        console.log('🚫 No session, clearing user state');
         setUser(null);
         loadedUserId.current = null;
       }
 
-      if (mounted) {
-        setLoading(false);
-      }
+      if (mounted) setLoading(false);
     };
 
-    // Get initial session
+    // Load initial session
     supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+      .then(({ data: { session: initialSession }, error }) => {
         if (error) {
-          console.error('❌ Error getting session:', error);
-          setUser(null);
-          setSession(null);
-          loadedUserId.current = null;
+          console.error('❌ getSession error:', error);
           setLoading(false);
           return;
         }
-        handleAuthStateChange('INITIAL', session);
+        handleAuthStateChange('INITIAL', initialSession);
       })
-      .catch(err => {
-        console.error('❌ Exception getting session:', err);
-        setUser(null);
-        setSession(null);
-        loadedUserId.current = null;
+      .catch((err) => {
+        console.error('❌ getSession exception:', err);
         setLoading(false);
       });
 
-    // Set up the real-time listener for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth event:', event);
-      
-      // ✅ CRITICAL FIX: Ignore SIGNED_IN events when returning to tab
-      if (event === 'SIGNED_IN' && loadedUserId.current === session?.user?.id) {
-        console.log('⏭️ Already signed in, ignoring duplicate SIGNED_IN event');
-        setSession(session); // Update session but don't refetch profile
+    // Real-time auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // Ignore duplicate SIGNED_IN (e.g. tab re-focus)
+      if (event === 'SIGNED_IN' && loadedUserId.current === newSession?.user?.id) {
+        console.log('⏭️ Duplicate SIGNED_IN ignored');
+        setSession(newSession);
         return;
       }
-      
+
       if (event === 'SIGNED_OUT') {
-        console.log('👋 User signed out, clearing state');
         setUser(null);
         setSession(null);
         loadedUserId.current = null;
         setLoading(false);
         return;
       }
-      
+
       if (event === 'TOKEN_REFRESHED') {
-        console.log('🔄 Token refreshed, updating session only');
-        setSession(session);
+        setSession(newSession);
         return;
       }
-      
-      await handleAuthStateChange(event, session);
+
+      await handleAuthStateChange(event, newSession);
     });
 
     return () => {
@@ -232,6 +183,220 @@ export const AuthProvider = ({ children }) => {
       subscription.unsubscribe();
     };
   }, [fetchUserProfile]);
+
+  // // ✅ Track if we've already loaded this user's profile
+  // const loadedUserId = useRef(null);
+
+  // // 🔍 DEBUG: Track component lifecycle
+  // useEffect(() => {
+  //   console.log('🔐 AuthProvider MOUNTED');
+  //   return () => console.log('💀 AuthProvider UNMOUNTED');
+  // }, []);
+
+  // // 🔍 DEBUG: Tab visibility tracking
+  // useEffect(() => {
+  //   const handleVisibilityChange = () => {
+  //     console.log('👁️ Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
+  //     console.log('👤 Current user:', user?.id);
+  //     console.log('📝 Current session:', !!session);
+  //   };
+
+  //   document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  // }, [user, session]);
+
+  // // Fetch user profile from database
+  // const fetchUserProfile = useCallback(async (supabaseUser) => {
+  //   if (!supabaseUser) {
+  //     console.log('❌ No supabase user provided, clearing user state');
+  //     setUser(null);
+  //     loadedUserId.current = null;
+  //     return;
+  //   }
+
+  //   // ✅ CRITICAL FIX: Skip if we already have this user's profile
+  //   if (loadedUserId.current === supabaseUser.id && user) {
+  //     console.log('⏭️ Profile already loaded for user:', supabaseUser.id);
+  //     return;
+  //   }
+
+  //   try {
+  //     console.log('📥 Fetching profile for user:', supabaseUser.id);
+      
+  //     const { data: profile, error } = await supabase
+  //       .from('user_profiles')
+  //       .select('*')
+  //       .eq('id', supabaseUser.id)
+  //       .single();
+
+  //     if (error) {
+  //       if (error.code === 'PGRST116') {
+  //         console.log('⚠️ No profile found, creating new profile...');
+          
+  //         const { data: newProfile, error: insertError } = await supabase
+  //           .from('user_profiles')
+  //           .insert({
+  //             id: supabaseUser.id,
+  //             email: supabaseUser.email,
+  //             phone: supabaseUser.user_metadata?.phone || '',
+  //             first_name: supabaseUser.user_metadata?.first_name || '',
+  //             last_name: supabaseUser.user_metadata?.last_name || '',
+  //             role: supabaseUser.user_metadata?.role || 'CLIENT',
+  //             created_at: new Date().toISOString(),
+  //           })
+  //           .select()
+  //           .single();
+
+  //         if (insertError) {
+  //           console.error('❌ Error creating profile:', insertError);
+  //           setUser({
+  //             ...supabaseUser,
+  //             role: 'CLIENT',
+  //             first_name: '',
+  //             last_name: '',
+  //           });
+  //         } else {
+  //           console.log('✅ Profile created successfully');
+  //           setUser({ ...supabaseUser, ...newProfile });
+  //           loadedUserId.current = supabaseUser.id;
+  //         }
+  //       } else {
+  //         console.error('❌ Error fetching profile:', error);
+  //         setUser({
+  //           ...supabaseUser,
+  //           role: 'CLIENT',
+  //           first_name: '',
+  //           last_name: '',
+  //         });
+  //       }
+  //     } else {
+  //       console.log('✅ Profile fetched successfully');
+  //       setUser({ ...supabaseUser, ...profile });
+  //       loadedUserId.current = supabaseUser.id;
+  //     }
+  //   } catch (err) {
+  //     console.error('❌ Exception in fetchUserProfile:', err);
+  //     setUser({
+  //       ...supabaseUser,
+  //       role: 'CLIENT',
+  //       first_name: '',
+  //       last_name: '',
+  //     });
+  //   }
+  // }, [user]);
+
+  // // ✅ NEW: Refresh user profile (for profile picture updates, etc.)
+  // const refreshUser = useCallback(async () => {
+  //   if (!session?.user) {
+  //     console.log('❌ No session, cannot refresh user');
+  //     return;
+  //   }
+
+  //   console.log('🔄 Refreshing user profile...');
+
+  //   try {
+  //     const { data: profile, error } = await supabase
+  //       .from('user_profiles')
+  //       .select('*')
+  //       .eq('id', session.user.id)
+  //       .single();
+
+  //     if (error) {
+  //       console.error('❌ Error refreshing profile:', error);
+  //       return;
+  //     }
+
+  //     console.log('✅ Profile refreshed successfully');
+  //     setUser({ ...session.user, ...profile });
+  //   } catch (err) {
+  //     console.error('❌ Exception refreshing profile:', err);
+  //   }
+  // }, [session]);
+
+  // useEffect(() => {
+  //   let mounted = true;
+
+  //   const handleAuthStateChange = async (event, session) => {
+  //     if (!mounted) return;
+
+  //     console.log('🔐 Auth state changed:', event || 'INITIAL', session ? 'Session exists' : 'No session');
+      
+  //     setSession(session);
+
+  //     if (session?.user) {
+  //       // ✅ CRITICAL FIX: Only fetch profile if it's a new user
+  //       if (loadedUserId.current !== session.user.id) {
+  //         setLoading(true);
+  //         await fetchUserProfile(session.user);
+  //       } else {
+  //         console.log('⏭️ Skipping profile fetch - already loaded');
+  //       }
+  //     } else {
+  //       console.log('🚫 No session, clearing user state');
+  //       setUser(null);
+  //       loadedUserId.current = null;
+  //     }
+
+  //     if (mounted) {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   // Get initial session
+  //   supabase.auth.getSession()
+  //     .then(({ data: { session }, error }) => {
+  //       if (error) {
+  //         console.error('❌ Error getting session:', error);
+  //         setUser(null);
+  //         setSession(null);
+  //         loadedUserId.current = null;
+  //         setLoading(false);
+  //         return;
+  //       }
+  //       handleAuthStateChange('INITIAL', session);
+  //     })
+  //     .catch(err => {
+  //       console.error('❌ Exception getting session:', err);
+  //       setUser(null);
+  //       setSession(null);
+  //       loadedUserId.current = null;
+  //       setLoading(false);
+  //     });
+
+  //   // Set up the real-time listener for auth state changes
+  //   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+  //     console.log('🔄 Auth event:', event);
+      
+  //     // ✅ CRITICAL FIX: Ignore SIGNED_IN events when returning to tab
+  //     if (event === 'SIGNED_IN' && loadedUserId.current === session?.user?.id) {
+  //       console.log('⏭️ Already signed in, ignoring duplicate SIGNED_IN event');
+  //       setSession(session); // Update session but don't refetch profile
+  //       return;
+  //     }
+      
+  //     if (event === 'SIGNED_OUT') {
+  //       console.log('👋 User signed out, clearing state');
+  //       setUser(null);
+  //       setSession(null);
+  //       loadedUserId.current = null;
+  //       setLoading(false);
+  //       return;
+  //     }
+      
+  //     if (event === 'TOKEN_REFRESHED') {
+  //       console.log('🔄 Token refreshed, updating session only');
+  //       setSession(session);
+  //       return;
+  //     }
+      
+  //     await handleAuthStateChange(event, session);
+  //   });
+
+  //   return () => {
+  //     mounted = false;
+  //     subscription.unsubscribe();
+  //   };
+  // }, [fetchUserProfile]);
 
   const signIn = async (email, password) => {
     try {

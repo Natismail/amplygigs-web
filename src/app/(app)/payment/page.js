@@ -206,8 +206,9 @@ export default function PaymentPage() {
 // ⭐ SAFE CALCULATIONS:
   const bookingAmount = booking.amount || 0; // ⭐ Safe fallback
   const platformFee = bookingAmount * 0.10; // 10%
-  const vat = bookingAmount * 0.075; // 7.5%
-  const totalFees = platformFee + vat;
+  //const vat = bookingAmount * 0.075; // 7.5%
+  //const totalFees = platformFee + vat;
+  const totalFees = platformFee;
   const totalAmount = bookingAmount;
   const musicianReceives = bookingAmount - totalFees;
   const hasWallet = wallet && wallet.balance > 0;
@@ -290,9 +291,9 @@ export default function PaymentPage() {
                   <span>-{currencySymbol}{platformFee.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>VAT (7.5%):</span>
+                  {/* <span>VAT (7.5%):</span> */}
                   {/* ⭐ SAFE: vat already calculated safely */}
-                  <span>-{currencySymbol}{vat.toFixed(2)}</span>
+                  {/* <span>-{currencySymbol}{vat.toFixed(2)}</span> */}
                 </div>
                 <div className="flex justify-between pt-1 border-t border-blue-200 dark:border-blue-700 font-medium">
                   <span>Musician Receives:</span>

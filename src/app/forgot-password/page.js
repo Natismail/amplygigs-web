@@ -1,3 +1,5 @@
+//src/app/forgot-password/page.js
+
 "use client";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
