@@ -120,7 +120,7 @@ export default function LoginPage() {
     );
   }
 
-  
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-8 bg-cover bg-center bg-no-repeat bg-black/60"
@@ -133,16 +133,15 @@ export default function LoginPage() {
       {/* <div className="max-w-md w-full p-6 sm:p-8 bg-white dark:bg-gray-800 bg-opacity-95 dark:bg-opacity-95 rounded-2xl shadow-2xl"> */}
         
         <div className="max-w-sm w-full p-6 sm:p-6 bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-lg shadow-2xl">{/* Header */}
-        <div className="text-center justify-item-center mb-6 sm:mb-8">
+        <div className="text-center justify-item-center mb-6 sm:mb-8 ml-2 ">
           <div className=" flex flex-row">
-          {/* <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">🎵</div> */}
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-1 sm:mb-2 mt-4 px-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mb-1 sm:mb-2 mt-4 ml-4 sm:ml-2">
              Welcome Back!!!
              {/* 🎵 */}
           </h1>
           <Logo size="lg" showText={false} className="mt-2"/>
           </div>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 text-sm text-gray-500 dark:text-gray-400 mb-6 items-center mr-2">
             Sign in to AmplyGigs
           </p>
         </div>

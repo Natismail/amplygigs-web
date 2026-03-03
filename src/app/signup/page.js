@@ -148,16 +148,19 @@ export default function SignUpPage() {
           "linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)), url('/images/simon-weisser-phS37wg8cQg-unsplash.jpg')",
       }}
     >
-      <div className="max-w-sm w-full bg-white dark:bg-gray-800 bg-opacity-70 dark:bg-opacity-80 rounded-xl shadow-2xl p-6 sm:p-8">
+      <div className="max-w-sm w-full bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-xl shadow-2xl p-6 sm:p-8">
 
         {/* Header */}
-        <div className="flex items-center gap-2 mb-1 -mt-3">
+        <div className="ml-6">
+        <div className="flex items-center gap-0 mb-0 -mt-3">
           
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-4">🎵 Join AmplyGigs</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-4 sm:ml-2">
+            {/* 🎵 */}
+            Join AmplyGigs</h1>
                               <Logo size="lg" showText={false} className="mt-2"/>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 items-center px-2 -mt-4 ml-6">Create your account to get started</p>
-
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 items-center px-2 -mt-2 ml-4">Create your account to get started</p>
+</div>
         {/* Error */}
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 mb-5">
