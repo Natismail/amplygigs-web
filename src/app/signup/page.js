@@ -151,13 +151,13 @@ export default function SignUpPage() {
       <div className="max-w-sm w-full bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-xl shadow-2xl p-6 sm:p-8">
 
         {/* Header */}
-        <div className="ml-6">
+        <div className="ml-2">
         <div className="flex items-center gap-0 mb-0 -mt-3">
           
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-4 sm:ml-2">
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-2">
             {/* 🎵 */}
             Join AmplyGigs</h1>
-                              <Logo size="lg" showText={false} className="mt-2"/>
+                    <Logo size="lg" showText={false} className="mt-2"/>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 items-center px-2 -mt-2 ml-4">Create your account to get started</p>
 </div>

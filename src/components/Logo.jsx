@@ -180,7 +180,7 @@ export default function Logo({
   };
 
   const content = (
-    <div className={`flex items-center gap-1 flex-shrink-0 ${className}`}>
+    <div className={`flex items-center gap-0 flex-shrink-0 ${className}`}>
       <LogoIcon />
       {showText && (
         <span
