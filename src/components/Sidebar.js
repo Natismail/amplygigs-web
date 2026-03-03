@@ -23,11 +23,18 @@ export default function Sidebar({ isOpen, onClose }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  const userRole = user?.role;
-  const isAdmin = user?.is_admin || userRole === 'ADMIN';
-  const isSupport = user?.is_support || userRole === 'SUPPORT';
-  const isMusician = userRole === 'MUSICIAN';
-  const isClient = userRole === 'CLIENT';
+  //const userRole = user?.role;
+  // const isAdmin = user?.is_admin || userRole === 'ADMIN';
+  // const isSupport = user?.is_support || userRole === 'SUPPORT';
+  // const isMusician = userRole === 'MUSICIAN';
+  // const isClient = userRole === 'CLIENT';
+
+  // NEW — normalize first, everything downstream works
+const userRole   = (user?.role ?? '').toLowerCase();        // e.g. "musician"
+const isAdmin    = !!user?.is_admin || userRole === 'admin'; // ✅
+const isSupport = user?.is_support || userRole === 'support';
+const isMusician = userRole === 'musician';                  // ✅
+const isClient   = userRole === 'client';                    // ✅
 
   // ⭐ CRITICAL: Memoize fetch function
   const fetchUnreadCount = useCallback(async () => {
