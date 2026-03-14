@@ -1,193 +1,234 @@
 // src/app/api/cron/auto-release-escrow/route.js
 // AUTO-RELEASE ESCROW CRON JOB
-// Runs every hour to release funds for completed gigs (24h after completion)
+// FIXES:
+//   1. Supabase client created inside handler (not module-level)
+//   2. Wallet currency pulled from musician's rate_currency
+//   3. total_earned updated on each auto-release
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const PLATFORM_FEE_PERCENT = 0.10;
+const AUTO_RELEASE_HOURS   = 24;
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error(`Missing Supabase env vars`);
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
 
 export async function GET(req) {
+  // ── Auth guard ───────────────────────────────────────────────────────────
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let supabase;
   try {
-    // Verify cron secret to prevent unauthorized access
-    const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    supabase = getAdminClient();
+  } catch (err) {
+    return Response.json({ error: 'Server configuration error', details: err.message }, { status: 500 });
+  }
 
-    console.log('🔄 Starting auto-release escrow cron job...');
-    const startTime = Date.now();
+  const startTime      = Date.now();
+  const cutoffTime     = new Date(Date.now() - AUTO_RELEASE_HOURS * 60 * 60 * 1000).toISOString();
 
-    // Find bookings that are:
-    // 1. Status = 'completed' (musician marked complete)
-    // 2. marked_complete_at is more than 24 hours ago
-    // 3. Funds NOT yet released
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  console.log(`🔄 Auto-release cron started — cutoff: ${cutoffTime}`);
 
-    const { data: eligibleBookings, error: fetchError } = await supabase
-      .from('bookings')
-      .select(`
-        id,
-        marked_complete_at,
-        funds_released_at,
-        musician_id,
-        client_id,
-        amount,
-        event_date,
-        events:event_id(title)
-      `)
-      .eq('status', 'completed')
-      .is('funds_released_at', null)
-      .lt('marked_complete_at', twentyFourHoursAgo.toISOString());
+  // ── Find eligible bookings ───────────────────────────────────────────────
+  const { data: eligibleBookings, error: fetchError } = await supabase
+    .from('bookings')
+    .select(`
+      id, musician_id, client_id, amount, currency,
+      marked_complete_at, event_type,
+      musician:musician_id(id, first_name, last_name, rate_currency),
+      client:client_id(id, first_name, last_name),
+      events:event_id(title)
+    `)
+    .eq('status', 'completed')
+    .is('funds_released_at', null)
+    .eq('auto_released', false)
+    .lte('marked_complete_at', cutoffTime);
 
-    if (fetchError) {
-      console.error('❌ Error fetching eligible bookings:', fetchError);
-      return Response.json({ 
-        success: false, 
-        error: 'Failed to fetch bookings' 
-      }, { status: 500 });
-    }
+  if (fetchError) {
+    console.error('❌ Booking query failed:', fetchError);
+    return Response.json({ success: false, error: fetchError.message }, { status: 500 });
+  }
 
-    console.log(`📊 Found ${eligibleBookings?.length || 0} bookings eligible for auto-release`);
+  console.log(`📋 ${eligibleBookings?.length ?? 0} bookings eligible for auto-release`);
 
-    if (!eligibleBookings || eligibleBookings.length === 0) {
-      return Response.json({
-        success: true,
-        message: 'No bookings eligible for auto-release',
-        processed: 0,
-        duration: `${Date.now() - startTime}ms`
-      });
-    }
-
-    // Process each booking
-    const results = {
-      total: eligibleBookings.length,
-      successful: 0,
-      failed: 0,
-      errors: []
-    };
-
-    for (const booking of eligibleBookings) {
-      try {
-        console.log(`⏰ Auto-releasing booking ${booking.id}...`);
-
-        // Find escrow transaction
-        const { data: escrow, error: escrowError } = await supabase
-          .from('escrow_transactions')
-          .select('*')
-          .eq('booking_id', booking.id)
-          .eq('status', 'held')
-          .single();
-
-        if (escrowError || !escrow) {
-          console.warn(`⚠️ No escrow found for booking ${booking.id}`);
-          results.failed++;
-          results.errors.push({
-            booking_id: booking.id,
-            error: 'No escrow found'
-          });
-          continue;
-        }
-
-        // Release funds using database function
-        const { data: releaseResult, error: releaseError } = await supabase
-          .rpc('release_escrow_funds', {
-            p_escrow_id: escrow.id,
-            p_released_by: null, // System auto-release
-            p_release_type: 'auto_release'
-          });
-
-        if (releaseError) {
-          console.error(`❌ Failed to release booking ${booking.id}:`, releaseError);
-          results.failed++;
-          results.errors.push({
-            booking_id: booking.id,
-            error: releaseError.message
-          });
-          continue;
-        }
-
-        console.log(`✅ Auto-released booking ${booking.id}: ₦${escrow.net_amount}`);
-        results.successful++;
-
-        // Send auto-release notifications
-        await sendAutoReleaseNotifications(booking, escrow);
-
-      } catch (error) {
-        console.error(`❌ Error processing booking ${booking.id}:`, error);
-        results.failed++;
-        results.errors.push({
-          booking_id: booking.id,
-          error: error.message
-        });
-      }
-    }
-
-    const duration = Date.now() - startTime;
-    console.log(`✅ Auto-release cron completed: ${results.successful} released, ${results.failed} failed in ${duration}ms`);
-
+  if (!eligibleBookings?.length) {
     return Response.json({
       success: true,
-      message: 'Auto-release cron completed',
-      results,
-      duration: `${duration}ms`
+      message: 'No bookings eligible for auto-release',
+      processed: 0,
+      duration: `${Date.now() - startTime}ms`,
     });
-
-  } catch (error) {
-    console.error('❌ Auto-release cron error:', error);
-    return Response.json({
-      success: false,
-      error: 'Cron job failed',
-      details: error.message
-    }, { status: 500 });
   }
+
+  const results = { total: eligibleBookings.length, successful: 0, failed: 0, errors: [] };
+
+  for (const booking of eligibleBookings) {
+    try {
+      console.log(`⏰ Auto-releasing booking ${booking.id}...`);
+
+      // Currency: musician's rate_currency > booking.currency > 'NGN'
+      const currency =
+        booking.musician?.rate_currency ||
+        booking.currency ||
+        'NGN';
+
+      // Find escrow record
+      const { data: escrow } = await supabase
+        .from('escrow_transactions')
+        .select('*')
+        .eq('booking_id', booking.id)
+        .in('status', ['held', 'pending'])
+        .eq('payment_status', 'successful')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const grossAmount = escrow
+        ? Number(escrow.gross_amount ?? escrow.amount ?? booking.amount ?? 0)
+        : Number(booking.amount ?? 0);
+
+      if (!grossAmount || grossAmount <= 0) {
+        console.warn(`⚠️ Skipping booking ${booking.id} — zero amount`);
+        results.failed++;
+        results.errors.push({ booking_id: booking.id, error: 'Zero or missing amount' });
+        continue;
+      }
+
+      const platformFee = grossAmount * PLATFORM_FEE_PERCENT;
+      const netAmount   = grossAmount - platformFee;
+
+      // ── Try DB RPC first ───────────────────────────────────────────────
+      let success = false;
+      try {
+        const { data: rpcResult, error: rpcErr } = await supabase.rpc('release_escrow_funds', {
+          p_booking_id: booking.id,
+        });
+        if (rpcErr) throw rpcErr;
+        if (rpcResult === false) throw new Error('RPC returned false');
+        success = true;
+        console.log(`✅ RPC auto-released booking ${booking.id}`);
+
+      } catch (rpcErr) {
+        console.warn(`⚠️ RPC failed for ${booking.id}, using manual:`, rpcErr.message);
+
+        // Manual: update escrow
+        if (escrow) {
+          await supabase
+            .from('escrow_transactions')
+            .update({
+              status:       'released',
+              released_at:  new Date().toISOString(),
+              release_type: 'auto_24h',
+              updated_at:   new Date().toISOString(),
+            })
+            .eq('id', escrow.id);
+        }
+
+        // Manual: update wallet
+        const { data: wallet } = await supabase
+          .from('musician_wallets')
+          .select('id, ledger_balance, available_balance, total_earned')
+          .eq('musician_id', booking.musician_id)
+          .maybeSingle();
+
+        if (wallet) {
+          await supabase
+            .from('musician_wallets')
+            .update({
+              ledger_balance:    Math.max(0, Number(wallet.ledger_balance) - grossAmount),
+              available_balance: Number(wallet.available_balance) + netAmount,
+              total_earned:      Number(wallet.total_earned || 0) + netAmount,
+              currency,          // ← always sync to rate_currency
+              updated_at:        new Date().toISOString(),
+            })
+            .eq('id', wallet.id);
+        } else {
+          await supabase
+            .from('musician_wallets')
+            .insert({
+              musician_id:       booking.musician_id,
+              ledger_balance:    0,
+              available_balance: netAmount,
+              total_earned:      netAmount,
+              currency,
+              created_at:        new Date().toISOString(),
+              updated_at:        new Date().toISOString(),
+            });
+        }
+
+        success = true;
+      }
+
+      if (!success) {
+        results.failed++;
+        results.errors.push({ booking_id: booking.id, error: 'Release failed' });
+        continue;
+      }
+
+      // Mark booking auto-released
+      await supabase
+        .from('bookings')
+        .update({
+          funds_released_at: new Date().toISOString(),
+          auto_released:     true,
+          auto_released_at:  new Date().toISOString(),
+          payment_status:    'released',
+          updated_at:        new Date().toISOString(),
+        })
+        .eq('id', booking.id);
+
+      // Notify
+      const symbol = { NGN: '₦', USD: '$', GBP: '£', EUR: '€' }[currency] || currency;
+      await Promise.allSettled([
+        supabase.from('notifications').insert({
+          user_id:  booking.musician_id,
+          type:     'funds_auto_released',
+          title:    '💰 Funds Auto-Released',
+          message:  `${symbol}${netAmount.toLocaleString()} has been automatically released after 24 hours and is now in your wallet!`,
+          data:     { booking_id: booking.id, escrow_id: escrow?.id ?? null, net_amount: netAmount, currency, event_title: booking.events?.title },
+          read:     false,
+          is_read:  false,
+        }),
+        supabase.from('notifications').insert({
+          user_id:  booking.client_id,
+          type:     'auto_release_notification',
+          title:    '✅ Payment Auto-Released',
+          message:  `${symbol}${netAmount.toLocaleString()} was automatically released to the musician after 24 hours.`,
+          data:     { booking_id: booking.id, escrow_id: escrow?.id ?? null, amount: netAmount, currency, event_title: booking.events?.title },
+          read:     false,
+          is_read:  false,
+        }),
+      ]);
+
+      results.successful++;
+      console.log(`✅ Auto-released booking ${booking.id}: ${symbol}${netAmount} (${currency})`);
+
+    } catch (err) {
+      console.error(`❌ Error processing booking ${booking.id}:`, err.message);
+      results.failed++;
+      results.errors.push({ booking_id: booking.id, error: err.message });
+    }
+  }
+
+  const duration = Date.now() - startTime;
+  console.log(`🏁 Auto-release done: ${results.successful} released, ${results.failed} failed in ${duration}ms`);
+
+  return Response.json({
+    success:  true,
+    message:  'Auto-release cron completed',
+    results,
+    duration: `${duration}ms`,
+  });
 }
 
-// Send auto-release notifications
-async function sendAutoReleaseNotifications(booking, escrow) {
-  try {
-    const currencySymbol = escrow.currency === 'NGN' ? '₦' : '$';
-
-    // Notify musician
-    await supabase.from('notifications').insert({
-      user_id: booking.musician_id,
-      type: 'funds_auto_released',
-      title: '🎉 Funds Auto-Released!',
-      message: `${currencySymbol}${escrow.net_amount.toLocaleString()} has been automatically released after 24 hours and is now available for withdrawal!`,
-      data: {
-        booking_id: booking.id,
-        escrow_id: escrow.id,
-        amount: escrow.net_amount,
-        currency: escrow.currency,
-        release_type: 'auto',
-        event_title: booking.events?.title
-      }
-    });
-
-    // Notify client
-    await supabase.from('notifications').insert({
-      user_id: booking.client_id,
-      type: 'auto_release_notification',
-      title: '✅ Payment Auto-Released',
-      message: `${currencySymbol}${escrow.net_amount.toLocaleString()} was automatically released to the musician after 24 hours. Thank you for using AmplyGigs!`,
-      data: {
-        booking_id: booking.id,
-        escrow_id: escrow.id,
-        amount: escrow.net_amount,
-        currency: escrow.currency,
-        event_title: booking.events?.title
-      }
-    });
-
-    console.log(`✅ Auto-release notifications sent for booking ${booking.id}`);
-  } catch (error) {
-    console.error('⚠️ Notification error:', error);
-  }
-}
-
-// Also export POST for manual testing
+// Allow manual POST trigger for testing
 export async function POST(req) {
   return GET(req);
 }

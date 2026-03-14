@@ -1,3 +1,5 @@
+// src/lib/supabase/client.js
+
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
