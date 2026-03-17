@@ -1,7 +1,7 @@
 // src/components/RatingForm.js - FIXED
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Star, Loader, CheckCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -14,35 +14,42 @@ export default function RatingForm({ musicianId, onSuccess }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
+
+  const payload = {
+  musician_id: musicianId,
+  user_id: user.id,
+  rating,
+  comment: comment.trim() || null,
+};
+
+console.log("Submitting payload:", payload);  // ← add this
+
+
+ const isSubmittingRef = useRef(false); // ← add this ref
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // ← Hard guard using ref — catches even React re-render double fires
+    if (isSubmittingRef.current || rating === 0 || !user) return;
     
-    if (!user) {
-      setError("Please login to submit a rating");
-      return;
-    }
-
-    if (rating === 0) {
-      setError("Please select a rating");
-      return;
-    }
-
+    isSubmittingRef.current = true; // ← lock immediately
     setSubmitting(true);
     setError("");
 
     try {
-      // ⭐ SEND user_id IN THE REQUEST BODY
+      const payload = {
+        musician_id: musicianId,
+        user_id: user.id,
+        rating,
+        comment: comment.trim() || null,
+      };
+
       const res = await fetch("/api/ratings", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          musician_id: musicianId,
-          user_id: user.id, // ⭐ THIS WAS MISSING!
-          rating,
-          comment: comment.trim() || null,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -54,21 +61,19 @@ export default function RatingForm({ musicianId, onSuccess }) {
       setSuccess(true);
       setRating(0);
       setComment("");
-      
-      // Call onSuccess callback
       onSuccess?.();
+      setTimeout(() => setSuccess(false), 3000);
 
-      // Reset success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
     } catch (err) {
-      console.error('Rating submission error:', err);
+      console.error("Rating submission error:", err);
       setError(err.message);
     } finally {
+      isSubmittingRef.current = false; // ← unlock after done
       setSubmitting(false);
     }
   };
+
+  
 
   if (!user) {
     return (
@@ -170,20 +175,27 @@ export default function RatingForm({ musicianId, onSuccess }) {
       )}
 
       {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={submitting || rating === 0}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {submitting ? (
-          <>
-            <Loader className="w-5 h-5 animate-spin" />
-            Submitting...
-          </>
-        ) : (
-          "Submit Review"
-        )}
-      </button>
+            <button
+  type="submit"
+  disabled={submitting || rating === 0}
+  onClick={(e) => {
+    if (submitting || rating === 0) {
+      e.preventDefault(); // ← extra safety net
+    }
+  }}
+  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 
+             hover:bg-purple-700 text-white font-semibold rounded-lg transition 
+             disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  {submitting ? (
+    <>
+      <Loader className="w-5 h-5 animate-spin" />
+      Submitting...
+    </>
+  ) : (
+    "Submit Review"
+  )}
+</button>
     </form>
   );
 }

@@ -7,6 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY // Service Role key - more powerful
 );
 
+
 /* ===========================
    POST — Create rating
 =========================== */
@@ -116,24 +117,25 @@ export async function GET(req) {
       );
     }
 
+    
     // ✅ IMPROVEMENT: Better query with user details
     const { data, error } = await supabase
-      .from("ratings")
-      .select(`
-        id,
-        rating,
-        comment,
-        created_at,
-        user_id,
-        user_profiles!ratings_user_id_fkey (
-          first_name,
-          last_name,
-          display_name,
-          profile_picture_url
-        )
-      `)
-      .eq("musician_id", musician_id)
-      .order("created_at", { ascending: false });
+  .from("ratings")
+  .select(`
+    id,
+    rating,
+    comment,
+    created_at,
+    user_id,
+    reviewer:user_profiles!ratings_client_id_fkey (
+      first_name,
+      last_name,
+      display_name,
+      profile_picture_url
+    )
+  `)
+  .eq("musician_id", musician_id)
+  .order("created_at", { ascending: false });
 
     if (error) {
       console.error("GET error:", error);

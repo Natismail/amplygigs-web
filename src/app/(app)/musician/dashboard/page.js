@@ -231,7 +231,9 @@ export default function MusicianDashboard() {
           {/* ── Profile + Analytics ───────────────────────────────────────── */}
           <div className="space-y-4">
             <ProfileCard profile={profile} />
-            <AnalyticsCards stats={stats} />
+            {/* <AnalyticsCards stats={stats} /> */}
+            <AnalyticsCards stats={stats} currency={displayCurrency} />
+
           </div>
 
           {/* ── Quick Actions ─────────────────────────────────────────────── */}
@@ -400,8 +402,3 @@ export default function MusicianDashboard() {
 
 //   // ... rest of code
 // }
-
-
-
-
-

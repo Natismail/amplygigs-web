@@ -24,6 +24,62 @@ export const AuthProvider = ({ children }) => {
     // Tracks which user id we've already loaded — prevents redundant fetches
   const loadedUserId = useRef(null);
 
+
+
+  // ── Inactivity logout ─────────────────────────────────────────────────────
+const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutes
+const inactivityTimer = useRef(null);
+const WARNING_BEFORE  = 60 * 1000;          // warn 1 min before logout
+const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+const warningTimer = useRef(null);
+
+const resetInactivityTimer = useCallback(() => {
+  // Only run if user is logged in
+  if (!loadedUserId.current) return;
+
+  // Clear existing timers
+  clearTimeout(inactivityTimer.current);
+  clearTimeout(warningTimer.current);
+  setShowInactivityWarning(false);
+
+  // Set warning timer (fires 1 min before logout)
+  warningTimer.current = setTimeout(() => {
+    setShowInactivityWarning(true);
+  }, INACTIVITY_TIMEOUT - WARNING_BEFORE);
+
+  // Set logout timer
+  inactivityTimer.current = setTimeout(async () => {
+    console.log("⏱️ Inactivity timeout — signing out");
+    setShowInactivityWarning(false);
+    await signOut();
+    // Redirect to login
+    window.location.href = "/login?reason=inactivity";
+  }, INACTIVITY_TIMEOUT);
+}, []);  // signOut added below after it's defined
+
+// Attach activity listeners when user logs in, remove on logout
+useEffect(() => {
+  if (!user) {
+    clearTimeout(inactivityTimer.current);
+    clearTimeout(warningTimer.current);
+    setShowInactivityWarning(false);
+    return;
+  }
+
+  const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
+  events.forEach(e => window.addEventListener(e, resetInactivityTimer, { passive: true }));
+  
+  // Start the timer immediately on login
+  resetInactivityTimer();
+
+  return () => {
+    events.forEach(e => window.removeEventListener(e, resetInactivityTimer));
+    clearTimeout(inactivityTimer.current);
+    clearTimeout(warningTimer.current);
+  };
+}, [user, resetInactivityTimer]);
+
+
   // ── Fetch + merge profile from user_profiles ─────────────────────────────
   const fetchUserProfile = useCallback(async (supabaseUser) => {
     if (!supabaseUser) {
@@ -184,220 +240,8 @@ export const AuthProvider = ({ children }) => {
     };
   }, [fetchUserProfile]);
 
+
   // // ✅ Track if we've already loaded this user's profile
-  // const loadedUserId = useRef(null);
-
-  // // 🔍 DEBUG: Track component lifecycle
-  // useEffect(() => {
-  //   console.log('🔐 AuthProvider MOUNTED');
-  //   return () => console.log('💀 AuthProvider UNMOUNTED');
-  // }, []);
-
-  // // 🔍 DEBUG: Tab visibility tracking
-  // useEffect(() => {
-  //   const handleVisibilityChange = () => {
-  //     console.log('👁️ Tab visibility changed:', document.hidden ? 'HIDDEN' : 'VISIBLE');
-  //     console.log('👤 Current user:', user?.id);
-  //     console.log('📝 Current session:', !!session);
-  //   };
-
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-  //   return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  // }, [user, session]);
-
-  // // Fetch user profile from database
-  // const fetchUserProfile = useCallback(async (supabaseUser) => {
-  //   if (!supabaseUser) {
-  //     console.log('❌ No supabase user provided, clearing user state');
-  //     setUser(null);
-  //     loadedUserId.current = null;
-  //     return;
-  //   }
-
-  //   // ✅ CRITICAL FIX: Skip if we already have this user's profile
-  //   if (loadedUserId.current === supabaseUser.id && user) {
-  //     console.log('⏭️ Profile already loaded for user:', supabaseUser.id);
-  //     return;
-  //   }
-
-  //   try {
-  //     console.log('📥 Fetching profile for user:', supabaseUser.id);
-      
-  //     const { data: profile, error } = await supabase
-  //       .from('user_profiles')
-  //       .select('*')
-  //       .eq('id', supabaseUser.id)
-  //       .single();
-
-  //     if (error) {
-  //       if (error.code === 'PGRST116') {
-  //         console.log('⚠️ No profile found, creating new profile...');
-          
-  //         const { data: newProfile, error: insertError } = await supabase
-  //           .from('user_profiles')
-  //           .insert({
-  //             id: supabaseUser.id,
-  //             email: supabaseUser.email,
-  //             phone: supabaseUser.user_metadata?.phone || '',
-  //             first_name: supabaseUser.user_metadata?.first_name || '',
-  //             last_name: supabaseUser.user_metadata?.last_name || '',
-  //             role: supabaseUser.user_metadata?.role || 'CLIENT',
-  //             created_at: new Date().toISOString(),
-  //           })
-  //           .select()
-  //           .single();
-
-  //         if (insertError) {
-  //           console.error('❌ Error creating profile:', insertError);
-  //           setUser({
-  //             ...supabaseUser,
-  //             role: 'CLIENT',
-  //             first_name: '',
-  //             last_name: '',
-  //           });
-  //         } else {
-  //           console.log('✅ Profile created successfully');
-  //           setUser({ ...supabaseUser, ...newProfile });
-  //           loadedUserId.current = supabaseUser.id;
-  //         }
-  //       } else {
-  //         console.error('❌ Error fetching profile:', error);
-  //         setUser({
-  //           ...supabaseUser,
-  //           role: 'CLIENT',
-  //           first_name: '',
-  //           last_name: '',
-  //         });
-  //       }
-  //     } else {
-  //       console.log('✅ Profile fetched successfully');
-  //       setUser({ ...supabaseUser, ...profile });
-  //       loadedUserId.current = supabaseUser.id;
-  //     }
-  //   } catch (err) {
-  //     console.error('❌ Exception in fetchUserProfile:', err);
-  //     setUser({
-  //       ...supabaseUser,
-  //       role: 'CLIENT',
-  //       first_name: '',
-  //       last_name: '',
-  //     });
-  //   }
-  // }, [user]);
-
-  // // ✅ NEW: Refresh user profile (for profile picture updates, etc.)
-  // const refreshUser = useCallback(async () => {
-  //   if (!session?.user) {
-  //     console.log('❌ No session, cannot refresh user');
-  //     return;
-  //   }
-
-  //   console.log('🔄 Refreshing user profile...');
-
-  //   try {
-  //     const { data: profile, error } = await supabase
-  //       .from('user_profiles')
-  //       .select('*')
-  //       .eq('id', session.user.id)
-  //       .single();
-
-  //     if (error) {
-  //       console.error('❌ Error refreshing profile:', error);
-  //       return;
-  //     }
-
-  //     console.log('✅ Profile refreshed successfully');
-  //     setUser({ ...session.user, ...profile });
-  //   } catch (err) {
-  //     console.error('❌ Exception refreshing profile:', err);
-  //   }
-  // }, [session]);
-
-  // useEffect(() => {
-  //   let mounted = true;
-
-  //   const handleAuthStateChange = async (event, session) => {
-  //     if (!mounted) return;
-
-  //     console.log('🔐 Auth state changed:', event || 'INITIAL', session ? 'Session exists' : 'No session');
-      
-  //     setSession(session);
-
-  //     if (session?.user) {
-  //       // ✅ CRITICAL FIX: Only fetch profile if it's a new user
-  //       if (loadedUserId.current !== session.user.id) {
-  //         setLoading(true);
-  //         await fetchUserProfile(session.user);
-  //       } else {
-  //         console.log('⏭️ Skipping profile fetch - already loaded');
-  //       }
-  //     } else {
-  //       console.log('🚫 No session, clearing user state');
-  //       setUser(null);
-  //       loadedUserId.current = null;
-  //     }
-
-  //     if (mounted) {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   // Get initial session
-  //   supabase.auth.getSession()
-  //     .then(({ data: { session }, error }) => {
-  //       if (error) {
-  //         console.error('❌ Error getting session:', error);
-  //         setUser(null);
-  //         setSession(null);
-  //         loadedUserId.current = null;
-  //         setLoading(false);
-  //         return;
-  //       }
-  //       handleAuthStateChange('INITIAL', session);
-  //     })
-  //     .catch(err => {
-  //       console.error('❌ Exception getting session:', err);
-  //       setUser(null);
-  //       setSession(null);
-  //       loadedUserId.current = null;
-  //       setLoading(false);
-  //     });
-
-  //   // Set up the real-time listener for auth state changes
-  //   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-  //     console.log('🔄 Auth event:', event);
-      
-  //     // ✅ CRITICAL FIX: Ignore SIGNED_IN events when returning to tab
-  //     if (event === 'SIGNED_IN' && loadedUserId.current === session?.user?.id) {
-  //       console.log('⏭️ Already signed in, ignoring duplicate SIGNED_IN event');
-  //       setSession(session); // Update session but don't refetch profile
-  //       return;
-  //     }
-      
-  //     if (event === 'SIGNED_OUT') {
-  //       console.log('👋 User signed out, clearing state');
-  //       setUser(null);
-  //       setSession(null);
-  //       loadedUserId.current = null;
-  //       setLoading(false);
-  //       return;
-  //     }
-      
-  //     if (event === 'TOKEN_REFRESHED') {
-  //       console.log('🔄 Token refreshed, updating session only');
-  //       setSession(session);
-  //       return;
-  //     }
-      
-  //     await handleAuthStateChange(event, session);
-  //   });
-
-  //   return () => {
-  //     mounted = false;
-  //     subscription.unsubscribe();
-  //   };
-  // }, [fetchUserProfile]);
-
   const signIn = async (email, password) => {
     try {
       setLoading(true);
@@ -486,6 +330,12 @@ const cleanup = () => {
   loadedUserId.current = null;
 };
 
+// Add stayLoggedIn handler
+const stayLoggedIn = useCallback(() => {
+  setShowInactivityWarning(false);
+  resetInactivityTimer();
+}, [resetInactivityTimer]);
+
   const value = {
     user,
     session,
@@ -494,6 +344,8 @@ const cleanup = () => {
     signUp,
     signOut,
     refreshUser,  // ✅ Added refreshUser to context
+    showInactivityWarning,  // ← add
+    stayLoggedIn,           // ← add
   };
 
   return (

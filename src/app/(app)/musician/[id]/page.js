@@ -136,23 +136,25 @@ export default function MusicianProfilePage() {
         .eq("musician_id", id)
         .eq("status", "completed");
 
-      // Get ratings
-      const { data: ratingsData } = await supabase
-        .from("ratings")
-        .select(`
-          id,
-          rating,
-          comment,
-          created_at,
-          user_id,
-          user_profiles!ratings_user_id_fkey (
-            first_name,
-            last_name,
-            profile_picture_url
-          )
-        `)
-        .eq("musician_id", id)
-        .order("created_at", { ascending: false });
+      
+      // ✅ FIXED — correct FK name + display_name added
+const { data: ratingsData } = await supabase
+  .from("ratings")
+  .select(`
+    id,
+    rating,
+    comment,
+    created_at,
+    user_id,
+    reviewer:user_profiles!ratings_client_id_fkey (
+      first_name,
+      last_name,
+      display_name,
+      profile_picture_url
+    )
+  `)
+  .eq("musician_id", id)
+  .order("created_at", { ascending: false });
 
       setRatings(ratingsData || []);
       setStats({ completedGigs: bookingsCount || 0 });
@@ -627,55 +629,73 @@ export default function MusicianProfilePage() {
                 </p>
               ) : (
                 <div className="space-y-4">
+
                   {ratings.map((r) => (
-                    <div
-                      key={r.id}
-                      className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                          {r.user_profiles?.profile_picture_url ? (
-                            <Image
-                              src={r.user_profiles.profile_picture_url}
-                              alt={r.user_profiles?.first_name || "User"}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-white font-bold">
-                              {r.user_profiles?.first_name?.[0] || "U"}
-                            </div>
-                          )}
-                        </div>
+  <div
+    key={r.id}
+    className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+  >
+    <div className="flex items-start gap-3">
 
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {r.user_profiles?.first_name} {r.user_profiles?.last_name}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              {[...Array(5)].map((_, i) => (
-                                <FaStar
-                                  key={i}
-                                  className={`w-4 h-4 ${i < r.rating ? "text-yellow-400" : "text-gray-300 dark:text-gray-600"
-                                    }`}
-                                />
-                              ))}
-                            </div>
-                          </div>
+      {/* Avatar */}
+      <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+        {r.reviewer?.profile_picture_url ? (
+          <Image
+            src={r.reviewer.profile_picture_url}
+            alt={r.reviewer?.display_name || r.reviewer?.first_name || "User"}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-purple-500 dark:bg-purple-700 flex items-center justify-center text-white font-bold text-sm">
+            {(r.reviewer?.display_name?.[0] || r.reviewer?.first_name?.[0] || "U").toUpperCase()}
+          </div>
+        )}
+      </div>
 
-                          {r.comment && (
-                            <p className="text-gray-700 dark:text-gray-300 mb-2">{r.comment}</p>
-                          )}
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-2">
 
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(r.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {/* Name — display_name first, fallback to first+last, fallback to Anonymous */}
+          <p className="font-semibold text-gray-900 dark:text-white">
+            {r.reviewer?.display_name ||
+              `${r.reviewer?.first_name || ""} ${r.reviewer?.last_name || ""}`.trim() ||
+              "Anonymous"}
+          </p>
+
+          {/* Stars */}
+          <div className="flex items-center gap-1">
+            {[...Array(5)].map((_, i) => (
+              <FaStar
+                key={i}
+                className={`w-4 h-4 ${
+                  i < r.rating
+                    ? "text-yellow-400"
+                    : "text-gray-300 dark:text-gray-600"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Comment */}
+        {r.comment && (
+          <p className="text-gray-700 dark:text-gray-300 mb-2">{r.comment}</p>
+        )}
+
+        {/* Date */}
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {new Date(r.created_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </p>
+      </div>
+    </div>
+  </div>
+))}
+        </div>
               )}
             </section>
           </div>

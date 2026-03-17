@@ -151,10 +151,10 @@ export default function SignUpPage() {
       <div className="max-w-sm w-full bg-white dark:bg-gray-800 bg-opacity-80 dark:bg-opacity-80 rounded-xl shadow-2xl p-6 sm:p-8">
 
         {/* Header */}
-        <div className="ml-2">
+        <div className="ml-6">
         <div className="flex items-center gap-0 mb-0 -mt-3">
           
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-2">
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white items-center ml-4">
             {/* 🎵 */}
             Join AmplyGigs</h1>
                     <Logo size="lg" showText={false} className="mt-2"/>
@@ -227,7 +227,7 @@ export default function SignUpPage() {
                 value={form.role} onChange={update("role")}
                 className="w-full pl-9 pr-8 py-2.5 text-sm rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition appearance-none cursor-pointer"
               >
-                <option value="CLIENT">Client (Hire Musicians)</option>
+                <option value="CLIENT">Client (Hire Talents)</option>
                 {/* <option value="MUSICIAN">Musician (Find Gigs)</option> */}
               </select>
               <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
