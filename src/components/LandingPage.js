@@ -168,8 +168,8 @@ export default function LandingPage({ onNavigate }) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {features.map((feature, idx) => (
               <div key={idx} className="group p-6 relative bg-gray-50 dark:bg-gray-800/50 rounded-2xl hover:bg-white 
-dark:bg-gray-950/70 dark:hover:bg-gray-950/40 dark:border-gray-800/50 dark:hover:border-gray-600/50 dark:hover:shadow-2xl dark:hover:shadow-black/60 dark:hover:backdrop-blur-xl">
-                     <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+dark:bg-blue-950/30 dark:hover:bg-blue-950/15 dark:border-blue-800/30 dark:hover:border-blue-400/40 dark:hover:shadow-xl dark:hover:shadow-blue-900/30 dark:hover:backdrop-blur-md">
+                           <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
                  
                   <feature.icon className="w-6 h-6 text-white" />
                 </div>

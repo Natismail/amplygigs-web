@@ -863,6 +863,7 @@ export default function MusicianProfilePage() {
             </div>
           )}
 
+
           {/* SOCIAL MEDIA */}
           {activeTab === 'social' && (
             <div className="space-y-4 animate-fadeIn">
