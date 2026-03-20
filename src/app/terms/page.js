@@ -1,49 +1,52 @@
-//src/app/terms/page.js
+// src/app/terms/page.js
+//
+// ✅ NO "use client" — intentionally a Server Component.
+// Same reason as privacy/page.js — see that file for full explanation.
+// Google OAuth bot cannot execute JS, so "use client" pages appear empty to it.
 
-"use client";
-
+import Link from "next/link";
 import { Music, ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+
+export const metadata = {
+  title: "Terms of Service — AmplyGigs",
+  description: "Terms and conditions governing your use of the AmplyGigs platform.",
+};
 
 export default function TermsPage() {
-  const router = useRouter();
-
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
 
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <button
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition"
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Home
-          </button>
+          </Link>
           <div className="flex items-center gap-3 mb-4">
             <Music className="w-8 h-8" />
             <span className="text-2xl font-bold">AmplyGigs</span>
           </div>
-          <h1 className="text-4xl font-bold">Terms of Service</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold">Terms of Service</h1>
           <p className="text-purple-100 mt-2">Last updated: February 14, 2026</p>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="prose prose-purple dark:prose-invert max-w-none">
+        <div className="space-y-8">
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">1. Acceptance of Terms</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <Section title="1. Acceptance of Terms">
+            <p className="text-gray-600 dark:text-gray-400">
               By accessing and using AmplyGigs, you accept and agree to be bound by these Terms of Service.
               If you do not agree to these terms, please do not use our platform.
             </p>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">2. User Accounts</h2>
+          <Section title="2. User Accounts">
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li>You must be at least 18 years old to create an account</li>
               <li>You are responsible for maintaining the security of your account</li>
@@ -51,10 +54,9 @@ export default function TermsPage() {
               <li>One person or entity may maintain only one account</li>
               <li>You may not transfer your account to another party</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">3. For Musicians</h2>
+          <Section title="3. For Musicians">
             <p className="text-gray-600 dark:text-gray-400 mb-4">As a musician on AmplyGigs, you agree to:</p>
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li>Provide accurate information about your services, rates, and availability</li>
@@ -64,10 +66,9 @@ export default function TermsPage() {
               <li>Respect client privacy and confidentiality</li>
               <li>Not engage in discriminatory practices</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">4. For Clients</h2>
+          <Section title="4. For Clients">
             <p className="text-gray-600 dark:text-gray-400 mb-4">As a client on AmplyGigs, you agree to:</p>
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li>Provide accurate event details including date, time, location, and requirements</li>
@@ -76,10 +77,9 @@ export default function TermsPage() {
               <li>Treat musicians with respect and professionalism</li>
               <li>Not request services outside the agreed scope</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">5. Booking and Payments</h2>
+          <Section title="5. Booking and Payments">
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li>All bookings must be made through the AmplyGigs platform</li>
               <li>A platform service fee is charged on each completed booking and deducted from the musician&apos;s payout</li>
@@ -90,10 +90,9 @@ export default function TermsPage() {
               <li>Musicians are paid after successful event completion and fund release</li>
               <li>Disputes must be reported within 7 days of the event</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">6. Cancellation Policy</h2>
+          <Section title="6. Cancellation Policy">
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li><strong>30+ days before event:</strong> Full refund minus processing fees</li>
               <li><strong>14–29 days before event:</strong> 50% refund</li>
@@ -101,10 +100,9 @@ export default function TermsPage() {
               <li><strong>Less than 7 days:</strong> No refund</li>
               <li>Force majeure exceptions may apply</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">7. Prohibited Activities</h2>
+          <Section title="7. Prohibited Activities">
             <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
               <li>Circumventing the platform to avoid fees</li>
               <li>Posting false or misleading information</li>
@@ -113,19 +111,17 @@ export default function TermsPage() {
               <li>Attempting to hack or compromise platform security</li>
               <li>Creating multiple accounts to manipulate ratings</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">8. Intellectual Property</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <Section title="8. Intellectual Property">
+            <p className="text-gray-600 dark:text-gray-400">
               All content on AmplyGigs, including logos, designs, and software, is owned by AmplyGigs
               and protected by copyright laws. Users retain rights to their uploaded content but grant
               AmplyGigs a licence to display and promote it on the platform.
             </p>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">9. Limitation of Liability</h2>
+          <Section title="9. Limitation of Liability">
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               AmplyGigs acts as a platform connecting musicians and clients. We are not responsible for:
             </p>
@@ -136,43 +132,59 @@ export default function TermsPage() {
               <li>Indirect or consequential damages</li>
               <li>Force majeure events</li>
             </ul>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">10. Termination</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <Section title="10. Termination">
+            <p className="text-gray-600 dark:text-gray-400">
               We reserve the right to suspend or terminate accounts that violate these terms.
               Users may close their accounts at any time, subject to completing all pending obligations.
             </p>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">11. Governing Law</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <Section title="11. Governing Law">
+            <p className="text-gray-600 dark:text-gray-400">
               These terms are governed by the laws of the Federal Republic of Nigeria.
               Disputes will be resolved in Nigerian courts.
             </p>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">12. Changes to Terms</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <Section title="12. Changes to Terms">
+            <p className="text-gray-600 dark:text-gray-400">
               We may update these terms from time to time. Continued use of the platform after changes
               constitutes acceptance of the new terms.
             </p>
-          </section>
+          </Section>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">13. Contact Information</h2>
+          <Section title="13. Contact Information">
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
               <p className="text-gray-900 dark:text-white font-semibold mb-2">AmplyGigs Legal Team</p>
               <p className="text-gray-600 dark:text-gray-400">Email: legal@amplygigs.com</p>
               <p className="text-gray-600 dark:text-gray-400">Address: Lagos, Nigeria</p>
             </div>
-          </section>
+          </Section>
 
         </div>
       </div>
+
+      <footer className="border-t border-gray-200 dark:border-gray-800 py-8 px-4">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400">
+          <p>© 2026 AmplyGigs. All rights reserved.</p>
+          <div className="flex gap-6">
+            <Link href="/privacy" className="hover:text-purple-600 transition">Privacy Policy</Link>
+            <Link href="/terms"   className="text-purple-600 font-medium">Terms of Service</Link>
+            <Link href="/"        className="hover:text-purple-600 transition">Home</Link>
+          </div>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <section>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{title}</h2>
+      {children}
+    </section>
   );
 }
