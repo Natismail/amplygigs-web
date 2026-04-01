@@ -68,7 +68,7 @@ export async function DELETE(request, { params }) {
     // Verify ownership and check if any tickets sold
     const { data: tier } = await supabase
       .from("ticket_tiers")
-      .select("event_id, quantity_sold, musician_events(organizer_id)")
+      .select("event_id, sold_quantity, musician_events(organizer_id)")
       .eq("id", params.id)
       .single();
 
@@ -79,7 +79,7 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    if (tier.quantity_sold > 0) {
+    if (tier.sold_quantity > 0) {
       return NextResponse.json(
         { success: false, error: "Cannot delete tier with sold tickets" },
         { status: 400 }

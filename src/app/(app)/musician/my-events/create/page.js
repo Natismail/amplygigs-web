@@ -37,12 +37,22 @@ export default function CreateMusicianEventPage() {
       tier_name: "Regular",
       description: "",
       price: "",
-      quantity_available: "",
+      total_quantity: "",
       max_per_order: 10,
-      sale_start_date: "",
-      sale_end_date: "",
+      sales_start_date: "",
+      sales_end_date: "",
     },
   ]);
+
+  const toInt = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+  return parseInt(value);
+};
+
+const toFloat = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+  return parseFloat(value);
+};
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -55,14 +65,14 @@ export default function CreateMusicianEventPage() {
       const filePath = `event-covers/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("event-images")
+        .from("musician-events")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from("event-images").getPublicUrl(filePath);
+      } = supabase.storage.from("musician-events").getPublicUrl(filePath);
 
       setFormData({ ...formData, cover_image_url: publicUrl });
     } catch (error) {
@@ -79,10 +89,11 @@ export default function CreateMusicianEventPage() {
         tier_name: "",
         description: "",
         price: "",
-        quantity_available: "",
+        //total_quantity: "",
+        total_quantity:"",
         max_per_order: 10,
-        sale_start_date: "",
-        sale_end_date: "",
+        sales_start_date: "",
+        sales_end_date: "",
       },
     ]);
   };
@@ -108,38 +119,87 @@ export default function CreateMusicianEventPage() {
       if (!user) throw new Error("Not authenticated");
 
       // Calculate remaining capacity
+      // const totalTickets = ticketTiers.reduce(
+      //   (sum, tier) => sum + parseInt(tier.total_quantity || 0),
+      //   0
+      // );
       const totalTickets = ticketTiers.reduce(
-        (sum, tier) => sum + parseInt(tier.quantity_available || 0),
-        0
-      );
+  (sum, tier) => sum + (toInt(tier.total_quantity) || 0),
+  0
+);
 
       // Create event
+      // const { data: event, error: eventError } = await supabase
+      //   .from("musician_events")
+      //   .insert({
+      //     organizer_id: user.id,
+      //     ...formData,
+      //     //total_capacity: parseInt(formData.total_capacity) || totalTickets,
+      //     total_capacity: toInt(formData.total_capacity) ?? totalTickets,
+      //     remaining_capacity: totalTickets,
+      //     status: "draft",
+      //   })
       const { data: event, error: eventError } = await supabase
-        .from("musician_events")
-        .insert({
-          organizer_id: user.id,
-          ...formData,
-          total_capacity: parseInt(formData.total_capacity) || totalTickets,
-          remaining_capacity: totalTickets,
-          status: "draft",
-        })
+  .from("musician_events")
+  .insert({
+    organizer_id:       user.id,
+    // ── text fields (safe to spread as-is) ──────────────
+    title:              formData.title,
+    description:        formData.description,
+    category:           formData.category,
+    event_date:         formData.event_date,
+    doors_open_time:    formData.doors_open_time   || null,
+    event_end_time:     formData.event_end_time    || null,
+    venue_name:         formData.venue_name,
+    venue_address:      formData.venue_address,
+    city:               formData.city,
+    state:              formData.state,
+    cover_image_url:    formData.cover_image_url   || null,
+    refund_policy:      formData.refund_policy     || null,
+    terms_and_conditions: formData.terms_and_conditions || null,
+    // ── integer fields — MUST go through toInt(), never send "" ──
+    total_capacity:     toInt(formData.total_capacity) ?? totalTickets,
+    remaining_capacity: totalTickets,
+    age_restriction:    toInt(formData.age_restriction) ?? null,  // ✅ "" → null
+    // ──────────────────────────────────────────────────────────────
+    status: "draft",
+  })
         .select()
         .single();
 
       if (eventError) throw eventError;
 
       // Create ticket tiers
+      // const tiersToInsert = ticketTiers.map((tier) => ({
+      //   event_id: event.id,
+      //   tier_name: tier.tier_name,
+      //   description: tier.description,
+      //   //price: parseFloat(tier.price),
+      //   price: toFloat(tier.price),
+      //   //total_quantity: parseInt(tier.total_quantity),
+      //   total_quantity: toInt(tier.total_quantity),
+      //   sold_quantity: 0,
+      //   //max_per_order: tier.max_per_order,
+      //   max_per_order: toInt(tier.max_per_order) || 10,
+      //   sales_start_date: tier.sales_start_date || new Date().toISOString(),
+      //   sales_end_date: tier.sales_end_date || event.event_date,
+      // }));
       const tiersToInsert = ticketTiers.map((tier) => ({
-        event_id: event.id,
-        tier_name: tier.tier_name,
-        description: tier.description,
-        price: parseFloat(tier.price),
-        quantity_available: parseInt(tier.quantity_available),
-        quantity_sold: 0,
-        max_per_order: tier.max_per_order,
-        sale_start_date: tier.sale_start_date || new Date().toISOString(),
-        sale_end_date: tier.sale_end_date || event.event_date,
-      }));
+  event_id: event.id,
+
+  // ✅ FIXED NAMES
+  name: tier.tier_name,
+  description: tier.description,
+  price: toFloat(tier.price),
+
+  total_quantity: toInt(tier.total_quantity),
+  sold_quantity: 0,
+
+  max_per_order: toInt(tier.max_per_order) || 10,
+
+  sales_start_date: tier.sales_start_date || new Date().toISOString(),
+  sales_end_date: tier.sales_end_date || event.event_date,
+}));
 
       const { error: tiersError } = await supabase
         .from("ticket_tiers")
@@ -148,7 +208,7 @@ export default function CreateMusicianEventPage() {
       if (tiersError) throw tiersError;
 
       alert("Event created successfully! You can now publish it.");
-      router.push(`/musician/events/${event.id}`);
+      router.push(`/musician/my-events/${event.id}`);
     } catch (error) {
       console.error("Error creating event:", error);
       alert("Failed to create event: " + error.message);
@@ -476,11 +536,11 @@ export default function CreateMusicianEventPage() {
                       </label>
                       <input
                         type="number"
-                        value={tier.quantity_available}
+                        value={tier.total_quantity}
                         onChange={(e) =>
                           updateTicketTier(
                             index,
-                            "quantity_available",
+                            "total_quantity",
                             e.target.value
                           )
                         }
@@ -628,3 +688,4 @@ export default function CreateMusicianEventPage() {
     </div>
   );
 }
+

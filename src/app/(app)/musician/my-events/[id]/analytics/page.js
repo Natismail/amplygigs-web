@@ -275,9 +275,9 @@ export default function EventAnalyticsPage() {
 
           <div className="space-y-4">
             {event.ticket_tiers?.map((tier) => {
-              const revenue = tier.quantity_sold * tier.price;
+              const revenue = tier.sold_quantity * tier.price;
               const percentage =
-                (tier.quantity_sold / tier.quantity_available) * 100;
+                (tier.sold_quantity / tier.total_quantity) * 100;
 
               return (
                 <div key={tier.id} className="space-y-2">
@@ -287,7 +287,7 @@ export default function EventAnalyticsPage() {
                         {tier.tier_name}
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {tier.quantity_sold} / {tier.quantity_available} sold
+                        {tier.sold_quantity} / {tier.total_quantity} sold
                       </p>
                     </div>
                     <div className="text-right">

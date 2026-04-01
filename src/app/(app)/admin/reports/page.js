@@ -128,7 +128,7 @@ export default function AdminReportsPage() {
 
       const { data: liveEvents } = await supabase
         .from("musician_events")
-        .select("id, created_at, event_date, ticket_tiers(quantity_sold, price)");
+        .select("id, created_at, event_date, ticket_tiers(sold_quantity, price)");
 
       const totalEvents = (clientGigs?.length || 0) + (liveEvents?.length || 0);
       const upcomingEvents = [
@@ -141,7 +141,7 @@ export default function AdminReportsPage() {
         liveEvents?.reduce(
           (sum, e) =>
             sum +
-            (e.ticket_tiers?.reduce((tSum, t) => tSum + (t.quantity_sold || 0), 0) ||
+            (e.ticket_tiers?.reduce((tSum, t) => tSum + (t.sold_quantity || 0), 0) ||
               0),
           0
         ) || 0;
@@ -151,7 +151,7 @@ export default function AdminReportsPage() {
           (sum, e) =>
             sum +
             (e.ticket_tiers?.reduce(
-              (tSum, t) => tSum + (t.quantity_sold || 0) * (t.price || 0),
+              (tSum, t) => tSum + (t.sold_quantity || 0) * (t.price || 0),
               0
             ) || 0),
           0
@@ -165,7 +165,7 @@ export default function AdminReportsPage() {
         ?.map((e) => ({
           ...e,
           ticketsSold: e.ticket_tiers?.reduce(
-            (sum, t) => sum + (t.quantity_sold || 0),
+            (sum, t) => sum + (t.sold_quantity || 0),
             0
           ),
         }))

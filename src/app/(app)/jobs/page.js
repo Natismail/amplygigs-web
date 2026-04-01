@@ -145,17 +145,17 @@ export default function JobsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-16">
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition"
+            className="flex items-center gap-0 text-white/80 hover:text-white mb-0 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             Back
           </button>
           
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold mb-2">
             Music Jobs & Auditions
           </h1>
           <p className="text-xl text-purple-100">

@@ -219,7 +219,7 @@ export default function SignUpPage() {
           </div>
 
           {/* Role */}
-          <div>
+          {/* <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">I am a</label>
             <div className="relative">
               <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -228,13 +228,13 @@ export default function SignUpPage() {
                 className="w-full pl-9 pr-8 py-2.5 text-sm rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition appearance-none cursor-pointer"
               >
                 <option value="CLIENT">Client (Hire Talents)</option>
-                {/* <option value="MUSICIAN">Musician (Find Gigs)</option> */}
+                {/* <option value="MUSICIAN">Musician (Find Gigs)</option> *}
               </select>
               <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
-          </div>
+          </div> */}
 
           {/* Password */}
           <div>

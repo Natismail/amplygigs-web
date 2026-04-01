@@ -32,7 +32,7 @@ export async function POST(request) {
 
     for (const tier of tiers) {
       const quantity = selected_tiers[tier.id];
-      const available = tier.quantity_available - tier.quantity_sold;
+      const available = tier.total_quantity - tier.sold_quantity;
 
       if (quantity > available) {
         return NextResponse.json(

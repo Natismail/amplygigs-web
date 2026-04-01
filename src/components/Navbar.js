@@ -20,11 +20,11 @@ export default function Navbar({ onMenuClick }) {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [showAmy, setShowAmy] = useState(false);
 
-  const shouldShowBack = pathname !== '/' && 
-                         !pathname.startsWith('/login') && 
-                         !pathname.startsWith('/signup') &&
-                         !pathname.includes('/dashboard') &&
-                         !pathname.includes('/home');
+  const shouldShowBack = pathname !== '/' &&
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/signup') &&
+    !pathname.includes('/dashboard') &&
+    !pathname.includes('/home');
 
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.id) return;
@@ -37,7 +37,7 @@ export default function Navbar({ onMenuClick }) {
         .eq("read", false);
 
       if (error) throw error;
-      
+
       console.log('📊 Navbar unread count:', count);
       setUnreadMessages(count || 0);
     } catch (error) {
@@ -142,20 +142,20 @@ export default function Navbar({ onMenuClick }) {
           {/* ⭐ FIXED: Better mobile logo handling */}
           {/* Desktop: Icon + Text */}
           <div className="hidden sm:block">
-            <Logo 
-              size="lg" 
-              showText={true} 
-              href="/" 
+            <Logo
+              size="lg"
+              showText={true}
+              href="/"
               variant="default"
             />
           </div>
 
           {/* Mobile: Icon Only - SMALLER SIZE */}
           <div className="block sm:hidden">
-            <Logo 
-              size="sm" 
-              showText={false} 
-              href="/" 
+            <Logo
+              size="sm"
+              showText={false}
+              href="/"
               variant="default"
             />
           </div>
@@ -171,7 +171,7 @@ export default function Navbar({ onMenuClick }) {
             title="Ask Amy (AI Assistant)"
           >
             <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-pulse" />
-            
+
             {/* Pulsing dot indicator */}
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 rounded-full animate-pulse border-2 border-white dark:border-gray-900" />
           </button>
@@ -217,9 +217,9 @@ export default function Navbar({ onMenuClick }) {
                   {user.first_name} {user.last_name}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                  {user.role?.toLowerCase()}
+                  {user.primary_role || user.professional_title || user.role?.toLowerCase()}
                 </p>
-              </div>
+                </div>
             </div>
           )}
         </div>

@@ -39,12 +39,12 @@ export async function POST(request) {
       tier_name: tier.tier_name,
       description: tier.description,
       price: parseFloat(tier.price),
-      quantity_available: parseInt(tier.quantity_available),
-      quantity_sold: 0,
+      total_quantity: parseInt(tier.total_quantity),
+      sold_quantity: 0,
       max_per_order: tier.max_per_order || 10,
       tier_order: index,
-      sale_start_date: tier.sale_start_date || new Date().toISOString(),
-      sale_end_date: tier.sale_end_date,
+      sales_start_date: tier.sales_start_date || new Date().toISOString(),
+      sales_end_date: tier.sales_end_date,
     }));
 
     const { data, error } = await supabase

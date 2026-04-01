@@ -15,6 +15,7 @@ export const COMPLETION_SIGNALS = [
     hint:   "Upload a profile picture",
     tab:    null,
   },
+  
   {
     key:    "bio",
     label:  "Bio",

@@ -1,17 +1,21 @@
 // src/lib/supabase/server.js
+// FIX: Next.js 15 made cookies() async — must be awaited.
+// createClient() is now async, so every API route must do:
+//   const supabase = await createClient()
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export function createClient() {
-  const cookieStore = cookies();
+// ✅ async — required in Next.js 15 because cookies() is now a Promise
+export async function createClient() {
+  const cookieStore = await cookies(); // ← the one-line fix
 
   return createSupabaseClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -22,9 +26,9 @@ export function createClient() {
         },
         setItem: async (key, value) => {
           cookieStore.set(key, value, {
-            path: '/',
+            path:     '/',
             sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
+            secure:   process.env.NODE_ENV === 'production',
           });
         },
         removeItem: async (key) => {

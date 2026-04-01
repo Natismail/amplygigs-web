@@ -74,14 +74,14 @@ export async function POST(request) {
       // Update tier sold count
       const { data: tier } = await supabase
         .from("ticket_tiers")
-        .select("quantity_sold")
+        .select("sold_quantity")
         .eq("id", tier_id)
         .single();
 
       await supabase
         .from("ticket_tiers")
         .update({
-          quantity_sold: tier.quantity_sold + quantity,
+          sold_quantity: tier.sold_quantity + quantity,
         })
         .eq("id", tier_id);
 

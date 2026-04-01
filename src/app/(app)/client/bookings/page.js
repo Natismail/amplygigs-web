@@ -129,7 +129,7 @@ export default function ClientBookingsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-        <div className="px-4 py-4 flex items-center justify-between">
+        <div className="px-4 py-4 flex items-center justify-between dark:text-white">
           <h1 className="text-xl sm:text-2xl font-bold">
             My Bookings
           </h1>
@@ -156,8 +156,8 @@ export default function ClientBookingsPage() {
               onClick={() => setActiveTab(key)}
               className={`min-h-[44px] px-5 py-2 rounded-full text-sm font-medium transition ${
                 activeTab === key
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-800"
+                  ? "bg-blue-600 text-white dark:bg-blue-200 dark:text-gray-800"
+                  : "bg-gray-100 dark:bg-gray-800 dark:text-white"
               }`}
             >
               {label} ({count})
@@ -167,7 +167,7 @@ export default function ClientBookingsPage() {
       </div>
 
       {/* Content */}
-      <div className="px-4 py-4 space-y-4">
+      <div className="px-4 py-4 space-y-4 dark:text-white">
         {activeTab === "upcoming" &&
           renderBookings(upcomingBookings, {
             icon: "📅",

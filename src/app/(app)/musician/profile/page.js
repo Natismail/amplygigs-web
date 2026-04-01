@@ -291,63 +291,71 @@ export default function MusicianProfilePage() {
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setSuccess(false);
-    setError(null);
+  setSaving(true);
+  setSuccess(false);
+  setError(null);
 
-    try {
-      // Extract primary category and subcategories
-      const primaryCat = formData.categories.find(c => c.isPrimary) || formData.categories[0];
-      const allSubcategories = getAllSubcategoriesFlat(formData.categories);
+  try {
+    const primaryCat       = formData.categories.find(c => c.isPrimary) || formData.categories[0];
+    const allSubcategories = getAllSubcategoriesFlat(formData.categories);
 
-      const payload = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        display_name: formData.display_name,
-        bio: formData.bio,
-        phone: formData.phone,
-        location: formData.location,
+    // ── Auto-generate professional_title from primary category's subcategories
+    // e.g. ["Bass Guitar", "Keyboard"] → "Bass Guitar & Keyboard"
+    // e.g. [] → falls back to category name e.g. "Instrumentalist"
+    const primarySkills      = primaryCat?.subcategories || [];
+    const generatedTitle     = primarySkills.length > 0
+      ? primarySkills.slice(0, 2).join(" & ")
+      : primaryCat?.category || null;
 
-         
-  // ⭐ NEW: Location & Currency
-  country: formData.country,
-  country_code: formData.country_code,
-  rate_currency: formData.rate_currency,
-        
-        // NEW: Category fields
-        categories: formData.categories,
-        primary_category: primaryCat?.category || null,
-        subcategories: allSubcategories,
-        
-        // Keep genres for music styles
-        genres: formData.genres,
-        
-        experience_years: formData.experience_years ? parseInt(formData.experience_years, 10) : null,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
-        available: formData.availability === 'available',
-        gadget_specs: formData.gadget_specs,
-        youtube: formData.youtube,
-        instagram: formData.instagram,
-        twitter: formData.twitter,
-        tiktok: formData.tiktok,
-      };
+    const payload = {
+      first_name:         formData.first_name,
+      last_name:          formData.last_name,
+      display_name:       formData.display_name,
+      bio:                formData.bio,
+      phone:              formData.phone,
+      location:           formData.location,
 
-      const { error } = await supabase
-        .from('user_profiles')
-        .update(payload)
-        .eq('id', user.id);
+      // Location & Currency
+      country:            formData.country,
+      country_code:       formData.country_code,
+      rate_currency:      formData.rate_currency,
 
-      if (error) throw error;
+      // Category fields
+      categories:         formData.categories,
+      primary_category:   primaryCat?.category    || null,
+      primary_role:       primaryCat?.category    || null, // broad — for search/filter
+      professional_title: generatedTitle,                  // specific — for display
+      subcategories:      allSubcategories,
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
-      setError(err.message);
-      console.error('Save error:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
+      // Music styles
+      genres:             formData.genres,
+
+      experience_years:   formData.experience_years ? parseInt(formData.experience_years, 10) : null,
+      hourly_rate:        formData.hourly_rate      ? parseFloat(formData.hourly_rate)         : null,
+      available:          formData.availability === "available",
+      gadget_specs:       formData.gadget_specs,
+      youtube:            formData.youtube,
+      instagram:          formData.instagram,
+      twitter:            formData.twitter,
+      tiktok:             formData.tiktok,
+    };
+
+    const { error } = await supabase
+      .from("user_profiles")
+      .update(payload)
+      .eq("id", user.id);
+
+    if (error) throw error;
+
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+  } catch (err) {
+    setError(err.message);
+    console.error("Save error:", err);
+  } finally {
+    setSaving(false);
+  }
+};
 
   const tabs = [
     { id: 'basic', label: 'Basic', icon: User, emoji: '👤' },

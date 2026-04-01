@@ -1,3 +1,4 @@
+//src/components/musician/CategorySelector.jsx
 "use client";
 
 import { useState } from 'react';

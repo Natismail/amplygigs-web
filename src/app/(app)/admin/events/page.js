@@ -400,7 +400,7 @@ export default function AdminEventsPage() {
                               </span>
                               <p className="font-medium text-gray-900 dark:text-white">
                                 {event.ticket_tiers?.reduce(
-                                  (sum, t) => sum + (t.quantity_sold || 0),
+                                  (sum, t) => sum + (t.sold_quantity || 0),
                                   0
                                 ) || 0}
                               </p>
