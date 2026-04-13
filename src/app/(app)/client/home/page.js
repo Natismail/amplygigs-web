@@ -13,8 +13,8 @@ import SearchFilterBar from "@/components/SearchFilterBar";
 import ViewToggle from "@/components/ViewToggle"; // ⭐ NEW
 import CarouselView from "@/components/CarouselView"; // ⭐ NEW
 import { Plus, Calendar, Users, TrendingUp, MapPin, Eye, Trash2, RefreshCw, Briefcase, Music, Star } from "lucide-react";
-import LoadingSpinner, { 
-  LogoSpinner, 
+import LoadingSpinner, {
+  LogoSpinner,
   FullScreenLoading,
   SkeletonMusicianCard,
   SkeletonEventCard,
@@ -41,9 +41,9 @@ export default function ClientHome() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState(null);
 
-  const jobPostingFee = user?.country_code === 'NG' ? 10000 : 
-                      user?.country_code === 'US' ? 25 : 
-                      user?.country_code === 'GB' ? 20 : 10000;
+  const jobPostingFee = user?.country_code === 'NG' ? 10000 :
+    user?.country_code === 'US' ? 25 :
+      user?.country_code === 'GB' ? 20 : 10000;
 
   const currency = getCurrencyByCode(user?.rate_currency || 'NGN');
 
@@ -71,15 +71,18 @@ export default function ClientHome() {
   // ⭐ NEW: Mobile detection
   const [isMobile, setIsMobile] = useState(false);
 
+  // ✅ REPLACE WITH (matches SearchFilterBar exactly):
   const [filters, setFilters] = useState({
     search: "",
-    genres: [],
     location: "",
-    roles: [],
+    categories: [],   // was "roles" — SearchFilterBar sets this key
+    subcategories: [],   // was missing entirely
+    genres: [],
     availability: "",
     rating: 0,
     priceMin: "",
     priceMax: "",
+    verifiedOnly: false, // was missing entirely
   });
 
   // ⭐ NEW: Detect mobile on mount and resize
@@ -87,7 +90,7 @@ export default function ClientHome() {
     const checkMobile = () => {
       const mobile = window.innerWidth < 640;
       setIsMobile(mobile);
-      
+
       // Auto-switch to carousel on mobile if no saved preference
       if (mobile && !localStorage.getItem('clientMusicianView')) {
         setMusicianView('carousel');
@@ -118,14 +121,14 @@ export default function ClientHome() {
   // Fetch musicians
   useEffect(() => {
     if (!user) return;
-    fetchMusicians(); 
+    fetchMusicians();
   }, [user]);
 
   // Fetch client's events
   useEffect(() => {
     if (!user) return;
     fetchClientEvents();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchMusicians = async () => {
@@ -156,7 +159,7 @@ export default function ClientHome() {
 
     setEventsLoading(true);
     setEventsError(null);
-    
+
     try {
       console.log("🔍 Fetching events for user:", user.id);
 
@@ -171,25 +174,25 @@ export default function ClientHome() {
 
       if (error) {
         console.error("❌ Error fetching events:", error);
-        
+
         // Handle "no rows" gracefully - this is OK for new users
         if (error.code === 'PGRST116' || error.message?.includes('no rows')) {
           console.log('✅ No events yet (new user)');
           setClientEvents([]);
           return;
         }
-        
+
         throw error;
       }
 
       console.log("✅ Fetched events:", data);
-      
+
       // Add interested count to each event
       const eventsWithCount = (data || []).map(event => ({
         ...event,
         interested_count: event.event_interests?.length || 0
       }));
-      
+
       console.log("📊 Events with count:", eventsWithCount);
       setClientEvents(eventsWithCount);
     } catch (error) {
@@ -234,52 +237,67 @@ export default function ClientHome() {
   };
 
   // Apply filters
+  // ✅ REPLACE WITH:
   const filteredMusicians = musicians.filter((m) => {
+    // Search — name, display name, bio, primary role
     if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+      const q = filters.search.toLowerCase();
       const matches =
-        m.first_name?.toLowerCase().includes(searchLower) ||
-        m.last_name?.toLowerCase().includes(searchLower) ||
-        m.primary_role?.toLowerCase().includes(searchLower) ||
-        m.display_name?.toLowerCase().includes(searchLower);
+        m.first_name?.toLowerCase().includes(q) ||
+        m.last_name?.toLowerCase().includes(q) ||
+        m.display_name?.toLowerCase().includes(q) ||
+        m.primary_role?.toLowerCase().includes(q) ||
+        m.bio?.toLowerCase().includes(q);
       if (!matches) return false;
     }
 
-    if (filters.roles?.length > 0 && !filters.roles.includes(m.primary_role)) {
+    // Location
+    if (filters.location &&
+      !m.location?.toLowerCase().includes(filters.location.toLowerCase()) &&
+      !m.city?.toLowerCase().includes(filters.location.toLowerCase()))
       return false;
+
+    // ✅ Categories → maps to primary_role OR categories jsonb column
+    if (filters.categories?.length > 0) {
+      const mCats = Array.isArray(m.categories)
+        ? m.categories.map(c => (typeof c === "string" ? c : c?.category))
+        : [];
+      const matchesRole = filters.categories.includes(m.primary_role);
+      const matchesCat = filters.categories.some(c => mCats.includes(c));
+      if (!matchesRole && !matchesCat) return false;
     }
 
-    if (
-      filters.genres?.length > 0 &&
-      !filters.genres.some((g) => m.genres?.includes(g))
-    ) {
-      return false;
+    // ✅ Subcategories → maps to subcategories array column
+    if (filters.subcategories?.length > 0) {
+      const mSubs = Array.isArray(m.subcategories) ? m.subcategories : [];
+      if (!filters.subcategories.some(s => mSubs.includes(s))) return false;
     }
 
-    if (
-      filters.location &&
-      !m.location?.toLowerCase().includes(filters.location.toLowerCase())
-    ) {
-      return false;
+    // ✅ Genres — handle both JS array and JSON string from DB
+    if (filters.genres?.length > 0) {
+      const mGenres = Array.isArray(m.genres)
+        ? m.genres
+        : typeof m.genres === "string"
+          ? JSON.parse(m.genres || "[]")
+          : [];
+      if (!filters.genres.some(g => mGenres.includes(g))) return false;
     }
 
-    if (filters.availability === "available" && !m.available) {
-      return false;
-    }
-    if (filters.availability === "busy" && m.available) {
-      return false;
-    }
+    // Availability
+    if (filters.availability === "available" && !m.available) return false;
+    if (filters.availability === "busy" && m.available) return false;
 
-    if (filters.rating && (m.average_rating || 0) < filters.rating) {
-      return false;
-    }
+    // Rating
+    if (filters.rating > 0 && (m.average_rating || 0) < filters.rating) return false;
 
-    if (filters.priceMin && (m.hourly_rate || 0) < Number(filters.priceMin)) {
-      return false;
-    }
-    if (filters.priceMax && (m.hourly_rate || 0) > Number(filters.priceMax)) {
-      return false;
-    }
+    // Price
+    if (filters.priceMin && (m.hourly_rate || 0) < Number(filters.priceMin)) return false;
+    if (filters.priceMax && (m.hourly_rate || 0) > Number(filters.priceMax)) return false;
+
+    // ✅ KYC Verified — maps to is_verified boolean column
+    //if (filters.verifiedOnly && !m.is_verified) return false;
+    if (filters.verifiedOnly && !m.kyc_verified) return false;
+
 
     return true;
   });
@@ -324,11 +342,10 @@ export default function ClientHome() {
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <button
                 onClick={() => setActiveTab("find")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
-                  activeTab === "find"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${activeTab === "find"
                     ? "bg-purple-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 <Users className="w-4 h-4" />
                 Find Musicians
@@ -336,11 +353,10 @@ export default function ClientHome() {
 
               <button
                 onClick={() => setActiveTab("myEvents")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
-                  activeTab === "myEvents"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${activeTab === "myEvents"
                     ? "bg-purple-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 <Calendar className="w-4 h-4" />
                 My Events
@@ -377,10 +393,10 @@ export default function ClientHome() {
                     resultsCount={filteredMusicians.length}
                   />
                 </div>
-                
+
                 {/* ⭐ NEW: View Toggle */}
-                <ViewToggle 
-                  view={musicianView} 
+                <ViewToggle
+                  view={musicianView}
                   onChange={setMusicianView}
                   isMobile={isMobile}
                 />
@@ -401,15 +417,11 @@ export default function ClientHome() {
                       ? "No musicians available at the moment. Check back later!"
                       : "No musicians match your filters. Try adjusting your search criteria."
                   }
+                  // REPLACE WITH (matches new state shape):
                   action={() => setFilters({
-                    search: "",
-                    genres: [],
-                    location: "",
-                    roles: [],
-                    availability: "",
-                    rating: 0,
-                    priceMin: "",
-                    priceMax: "",
+                    search: "", location: "", categories: [], subcategories: [],
+                    genres: [], availability: "", rating: 0,
+                    priceMin: "", priceMax: "", verifiedOnly: false,
                   })}
                   actionLabel="Clear Filters"
                 />
@@ -475,9 +487,11 @@ export default function ClientHome() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-lg text-purple-600 dark:text-purple-400">
-                              ₦{musician.hourly_rate?.toLocaleString() || 'TBD'}
-                            </p>
+                            {musician.hourly_rate && (
+                                        <div className="font-semibold text-purple-600 dark:text-purple-400">
+                                          {formatCurrency(musician.hourly_rate, musician.rate_currency || 'NGN')}/hr
+                                        </div>
+                                      )}
                             <p className="text-xs text-gray-500 dark:text-gray-400">per hour</p>
                           </div>
                         </div>
@@ -504,8 +518,8 @@ export default function ClientHome() {
                 <div className="flex items-center gap-3">
                   {/* ⭐ NEW: View Toggle for Events */}
                   {clientEvents.length > 0 && (
-                    <ViewToggle 
-                      view={eventView} 
+                    <ViewToggle
+                      view={eventView}
                       onChange={setEventView}
                       isMobile={isMobile}
                     />
@@ -565,10 +579,10 @@ export default function ClientHome() {
                         items={clientEvents}
                         itemWidth={300}
                         renderItem={(event) => (
-                          <EventCard 
-                            event={event} 
-                            onDelete={handleDeleteEvent} 
-                            onView={() => router.push(`/events/${event.id}`)} 
+                          <EventCard
+                            event={event}
+                            onDelete={handleDeleteEvent}
+                            onView={() => router.push(`/events/${event.id}`)}
                           />
                         )}
                       />
@@ -579,11 +593,11 @@ export default function ClientHome() {
                   {eventView === 'grid' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {clientEvents.map((event) => (
-                        <EventCard 
-                          key={event.id} 
-                          event={event} 
-                          onDelete={handleDeleteEvent} 
-                          onView={() => router.push(`/events/${event.id}`)} 
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          onDelete={handleDeleteEvent}
+                          onView={() => router.push(`/events/${event.id}`)}
                         />
                       ))}
                     </div>
@@ -595,174 +609,174 @@ export default function ClientHome() {
         </div>
 
 
-{/* Post Modal with Type Selection - MOBILE RESPONSIVE */}
-{showPostForm && (
-  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-    <div className="w-full max-w-4xl my-4 sm:my-8">
-      {!postingType ? (
-        // Type Selection Screen - RESPONSIVE
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full p-4 sm:p-8">
-          <div className="text-center mb-4 sm:mb-8">
-            <h2 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
-              What would you like to post?
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Choose the type of opportunity you're offering
-            </p>
-          </div>
+        {/* Post Modal with Type Selection - MOBILE RESPONSIVE */}
+        {showPostForm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+            <div className="w-full max-w-4xl my-4 sm:my-8">
+              {!postingType ? (
+                // Type Selection Screen - RESPONSIVE
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full p-4 sm:p-8">
+                  <div className="text-center mb-4 sm:mb-8">
+                    <h2 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                      What would you like to post?
+                    </h2>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                      Choose the type of opportunity you're offering
+                    </p>
+                  </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {/* Quick Gig Card - MOBILE OPTIMIZED */}
-            <button
-              onClick={() => handlePostTypeSelect('event')}
-              className="group relative p-4 sm:p-8 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-xl sm:rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
-            >
-              {/* Icon - Responsive positioning */}
-              <div className="absolute top-3 right-3 sm:top-6 sm:right-6">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center group-hover:scale-110 transition">
-                  <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="pr-16 sm:pr-20">
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
-                  Quick Gig / Event
-                </h3>
-                <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
-                  One-time performance or event
-                </p>
-              </div>
-              
-              {/* Features List - Responsive sizing */}
-              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Single event (wedding, party, corporate)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Musicians send you price proposals</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Pay per event through platform</span>
-                </li>
-                <li className="flex items-start gap-2 hidden sm:flex">
-                  <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Best for: Parties, weddings, one-off shows</span>
-                </li>
-              </ul>
-              
-              {/* Price Tag */}
-              <div className="pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
-                  FREE TO POST →
-                </span>
-              </div>
-            </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    {/* Quick Gig Card - MOBILE OPTIMIZED */}
+                    <button
+                      onClick={() => handlePostTypeSelect('event')}
+                      className="group relative p-4 sm:p-8 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-xl sm:rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
+                    >
+                      {/* Icon - Responsive positioning */}
+                      <div className="absolute top-3 right-3 sm:top-6 sm:right-6">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center group-hover:scale-110 transition">
+                          <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+                        </div>
+                      </div>
 
-            {/* Job/Audition Card - MOBILE OPTIMIZED */}
-            <button
-              onClick={() => handlePostTypeSelect('job')}
-              className="group relative p-4 sm:p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-xl sm:rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
-            >
-              {/* Icon - Responsive positioning */}
-              <div className="absolute top-3 right-3 sm:top-6 sm:right-6">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition">
-                  <Briefcase className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="pr-16 sm:pr-20">
-                <div className="flex items-center gap-2 mb-2 sm:mb-3 flex-wrap">
-                  <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
-                    Job / Audition
-                  </h3>
-                  <span className="px-2 py-0.5 sm:py-1 bg-purple-600 text-white text-[10px] sm:text-xs font-bold rounded-full">
-                    NEW
-                  </span>
-                </div>
-                <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
-                  Long-term position or recurring work
-                </p>
-              </div>
-              
-              {/* Features List - Responsive sizing */}
-              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">
-                <li className="flex items-start gap-2">
-                  <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Monthly/permanent employment</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Musicians apply with portfolio/CV</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Hold auditions, interview candidates</span>
-                </li>
-                <li className="flex items-start gap-2 hidden sm:flex">
-                  <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
-                  <span>Best for: Church positions, venue residents</span>
-                </li>
-              </ul>
-              
-              {/* Price Tag */}
-              <div className="pt-3 sm:pt-4 border-t border-purple-200 dark:border-purple-800">
-                <span className="text-base sm:text-lg font-bold text-purple-600 dark:text-purple-400">
-  {formatCurrency(jobPostingFee, user?.rate_currency || 'NGN')} FEE →
-</span>
-              </div>
-            </button>
-          </div>
+                      {/* Content */}
+                      <div className="pr-16 sm:pr-20">
+                        <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                          Quick Gig / Event
+                        </h3>
+                        <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
+                          One-time performance or event
+                        </p>
+                      </div>
 
-          {/* Cancel Button - Responsive */}
-          <div className="mt-4 sm:mt-6 text-center">
-            <button
-              onClick={() => setShowPostForm(false)}
-              className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium transition"
-            >
-              Cancel
-            </button>
+                      {/* Features List - Responsive sizing */}
+                      <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Single event (wedding, party, corporate)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Musicians send you price proposals</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Pay per event through platform</span>
+                        </li>
+                        <li className="flex items-start gap-2 hidden sm:flex">
+                          <span className="text-green-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Best for: Parties, weddings, one-off shows</span>
+                        </li>
+                      </ul>
+
+                      {/* Price Tag */}
+                      <div className="pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
+                          FREE TO POST →
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Job/Audition Card - MOBILE OPTIMIZED */}
+                    <button
+                      onClick={() => handlePostTypeSelect('job')}
+                      className="group relative p-4 sm:p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-xl sm:rounded-2xl hover:border-purple-500 hover:shadow-2xl transition text-left"
+                    >
+                      {/* Icon - Responsive positioning */}
+                      <div className="absolute top-3 right-3 sm:top-6 sm:right-6">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition">
+                          <Briefcase className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="pr-16 sm:pr-20">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3 flex-wrap">
+                          <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                            Job / Audition
+                          </h3>
+                          <span className="px-2 py-0.5 sm:py-1 bg-purple-600 text-white text-[10px] sm:text-xs font-bold rounded-full">
+                            NEW
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-base text-gray-600 dark:text-gray-400 mb-3 sm:mb-6">
+                          Long-term position or recurring work
+                        </p>
+                      </div>
+
+                      {/* Features List - Responsive sizing */}
+                      <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-4 sm:mb-6">
+                        <li className="flex items-start gap-2">
+                          <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Monthly/permanent employment</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Musicians apply with portfolio/CV</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Hold auditions, interview candidates</span>
+                        </li>
+                        <li className="flex items-start gap-2 hidden sm:flex">
+                          <span className="text-purple-600 flex-shrink-0 mt-0.5">✓</span>
+                          <span>Best for: Church positions, venue residents</span>
+                        </li>
+                      </ul>
+
+                      {/* Price Tag */}
+                      <div className="pt-3 sm:pt-4 border-t border-purple-200 dark:border-purple-800">
+                        <span className="text-base sm:text-lg font-bold text-purple-600 dark:text-purple-400">
+                          {formatCurrency(jobPostingFee, user?.rate_currency || 'NGN')} FEE →
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Cancel Button - Responsive */}
+                  <div className="mt-4 sm:mt-6 text-center">
+                    <button
+                      onClick={() => setShowPostForm(false)}
+                      className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : postingType === 'event' ? (
+                // Event Form - Wrapped in responsive container
+                <div className="max-h-[90vh] overflow-y-auto">
+                  <PostEventForm
+                    onSuccess={(eventData) => {
+                      console.log("✅ Event posted:", eventData);
+                      setShowPostForm(false);
+                      setPostingType(null);
+                      fetchClientEvents();
+                      alert("✅ Event posted successfully!");
+                      setActiveTab("myEvents");
+                    }}
+                    onCancel={() => {
+                      setShowPostForm(false);
+                      setPostingType(null);
+                    }}
+                  />
+                </div>
+              ) : (
+                // Job Form - Wrapped in responsive container
+                <div className="max-h-[90vh] overflow-y-auto">
+                  <PostJobForm
+                    onSuccess={() => {
+                      setShowPostForm(false);
+                      setPostingType(null);
+                    }}
+                    onCancel={() => {
+                      setShowPostForm(false);
+                      setPostingType(null);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ) : postingType === 'event' ? (
-        // Event Form - Wrapped in responsive container
-        <div className="max-h-[90vh] overflow-y-auto">
-          <PostEventForm
-            onSuccess={(eventData) => {
-              console.log("✅ Event posted:", eventData);
-              setShowPostForm(false);
-              setPostingType(null);
-              fetchClientEvents();
-              alert("✅ Event posted successfully!");
-              setActiveTab("myEvents");
-            }}
-            onCancel={() => {
-              setShowPostForm(false);
-              setPostingType(null);
-            }}
-          />
-        </div>
-      ) : (
-        // Job Form - Wrapped in responsive container
-        <div className="max-h-[90vh] overflow-y-auto">
-          <PostJobForm
-            onSuccess={() => {
-              setShowPostForm(false);
-              setPostingType(null);
-            }}
-            onCancel={() => {
-              setShowPostForm(false);
-              setPostingType(null);
-            }}
-          />
-        </div>
-      )}
-    </div>
-  </div>
         )}
       </div>
     </PullToRefresh>
@@ -782,7 +796,7 @@ function EventCard({ event, onDelete, onView }) {
             fill
             className="object-cover"
           />
-          
+
           {/* ⭐ NEW: Interested Badge on Image */}
           {event.interested_count > 0 && (
             <div className="absolute top-3 right-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold text-gray-900 dark:text-white flex items-center gap-1">
@@ -799,7 +813,7 @@ function EventCard({ event, onDelete, onView }) {
             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 line-clamp-1">
               {event.title}
             </h3>
-            
+
             {/* ⭐ ENHANCED: Category Badges */}
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               {event.event_type && (
@@ -808,14 +822,14 @@ function EventCard({ event, onDelete, onView }) {
                   {event.event_type}
                 </span>
               )}
-              
+
               {event.category && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
                   <Music className="w-3 h-3" />
                   {event.category}
                 </span>
               )}
-              
+
               {event.subcategories && event.subcategories.length > 0 && (
                 <span className="inline-block px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium">
                   {event.subcategories[0]}
@@ -880,16 +894,15 @@ function EventCard({ event, onDelete, onView }) {
 
         {/* ⭐ NEW: Status Indicator */}
         <div className="flex items-center justify-between text-xs">
-          <span className={`px-2 py-1 rounded-full font-medium ${
-            event.status === 'open' 
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' 
+          <span className={`px-2 py-1 rounded-full font-medium ${event.status === 'open'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
               : event.status === 'closed'
-              ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-          }`}>
+                ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+            }`}>
             {event.status === 'open' ? '🟢 Open' : event.status === 'closed' ? '⚫ Closed' : '🔴 Cancelled'}
           </span>
-          
+
           {event.interested_count > 0 && (
             <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
               <Eye className="w-3 h-3" />

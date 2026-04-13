@@ -160,6 +160,13 @@ export default function MusicianDashboard() {
                 </div>
               )}
 
+<div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+  profile?.kyc_verified
+    ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+    : "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400"
+}`}>
+  {profile?.kyc_verified ? "✓ KYC Verified" : "⏳ KYC Pending"}
+</div>
               {/* Pending */}
               {isPending && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-xl p-4 shadow">
@@ -227,6 +234,7 @@ export default function MusicianDashboard() {
               )}
             </>
           )}
+
 
           {/* ── Profile + Analytics ───────────────────────────────────────── */}
           <div className="space-y-4">

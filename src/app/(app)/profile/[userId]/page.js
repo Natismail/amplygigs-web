@@ -467,6 +467,7 @@ export default function PublicProfilePage() {
                           {/* <ZoomIn className="w-6 h-6 sm:w-7 sm:h-7 text-white opacity-0 group-hover:opacity-100 transition drop-shadow-lg" /> */}
                         </div>
                       )}
+                      {/* Email verified — existing blue badge */}
                       {profile.is_verified && (
                         <div className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 bg-blue-500 text-white rounded-full p-1 sm:p-1.5 z-10">
                           <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -474,6 +475,14 @@ export default function PublicProfilePage() {
                           </svg>
                         </div>
                       )}
+                      {/* KYC verified — new green shield */}
+{profile.kyc_verified && (
+  <div className="absolute bottom-1 left-1 bg-green-500 text-white rounded-full p-1 z-10" title="KYC Verified — Identity Confirmed">
+    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+    </svg>
+  </div>
+)}
                     </div>
 
                     {/* Action buttons — push down on mobile to avoid avatar overlap */}

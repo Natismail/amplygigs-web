@@ -76,6 +76,7 @@ export default function MusicianCard({ musician }) {
       onClick={handleCardClick}
       className="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300 cursor-pointer"
     >
+      
       {/* Image Section */}
       <div className="relative h-48 sm:h-56 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20">
         {profile_picture_url ? (
@@ -86,14 +87,24 @@ export default function MusicianCard({ musician }) {
             className="object-cover group-hover:scale-105 transition-transform duration-300"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
+          
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Music className="w-16 h-16 text-purple-300 dark:text-purple-700" />
+            
           </div>
+          
         )}
 
         {/* Availability Badge */}
         <div className="absolute top-3 left-3">
+          {/* Verified Badge */}
+                                {/* {musician.kyc_verified && (
+                                  <div className="absolute top-4 right-4 mt-2 flex bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                                    <Star className="w-3 h-3 fill-white" />
+                                    KYC 
+                                  </div>
+                                )} */}
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
             available 
               ? 'bg-green-500/90 text-white'
@@ -111,7 +122,9 @@ export default function MusicianCard({ musician }) {
               </>
             )}
           </span>
+          
         </div>
+        
 
         {/* Top Rated Badge */}
         {average_rating >= 4.5 && (
@@ -122,6 +135,8 @@ export default function MusicianCard({ musician }) {
             </span>
           </div>
         )}
+
+        
 
         {/* ⭐ NEW: Country Flag Badge */}
         {countryInfo && (
@@ -134,6 +149,7 @@ export default function MusicianCard({ musician }) {
 
         {/* Overlay Gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
       </div>
 
       {/* Content Section */}
@@ -142,11 +158,15 @@ export default function MusicianCard({ musician }) {
         <div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
             {displayName}
+            
           </h3>
+          
           <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
             <Music className="w-3.5 h-3.5" />
             {primary_role || 'Musician'}
+            
           </p>
+          
         </div>
 
         {/* Stats Row */}
@@ -176,6 +196,7 @@ export default function MusicianCard({ musician }) {
               <span className="text-xs">followers</span>
             </div>
           )}
+          
         </div>
 
         {/* ⭐ ENHANCED: Location & Rate with Currency */}
@@ -246,12 +267,15 @@ export default function MusicianCard({ musician }) {
   </div>
 ) : null}
 
+
+
         {/* Bio */}
         {bio && (
           <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
             {bio}
           </p>
         )}
+        
 
         {/* Social Links */}
         {(youtube || instagram || twitter || tiktok) && (

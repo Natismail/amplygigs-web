@@ -541,21 +541,32 @@ export default function ExplorePage() {
                           Featured
                         </div>
                       )}
+                      
 
                       {/* Verified Badge */}
-                      {musician.is_verified && (
+                      {musician.kyc_verified && (
                         <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
                           <Star className="w-3 h-3 fill-white" />
-                          Verified
+                          KYC Verified
                         </div>
                       )}
                     </div>
+                    
 
                     {/* Content */}
                     <div className="p-6">
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-purple-600 transition">
                         {musician.display_name || `${musician.first_name} ${musician.last_name}`}
+                        {/* {musician.kyc_verified && (
+  <span
+    title="KYC Verified"
+    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-[10px] font-semibold"
+  >
+    ✓ KYC
+  </span>
+)} */}
                       </h3>
+                      
 
                       {/* Role */}
                       {(musician.professional_title || musician.primary_role) && (

@@ -38,6 +38,7 @@ import {
   Send,
   X,
   Globe,
+  Star,
 } from "lucide-react";
 
 export default function MusicianProfilePage() {
@@ -46,6 +47,7 @@ export default function MusicianProfilePage() {
   const { user, loading: authLoading } = useAuth();
   const { getOrCreateConversation } = useSocial();
 
+  const [profile, setProfile] = useState(null);
   const [musician, setMusician] = useState(null);
   const [ratings, setRatings] = useState([]);
   const [stats, setStats] = useState(null);
@@ -80,6 +82,7 @@ export default function MusicianProfilePage() {
     role,
     available,
     profile_picture_url,
+    kyc_verified,
     gadget_specs,
     average_rating,
     hourly_rate,
@@ -291,6 +294,14 @@ const { data: ratingsData } = await supabase
                     <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-sm font-medium">
                       {/* Click to zoom */}
                     </span>
+                    {/* Verified Badge */}
+                                              {musician.kyc_verified && (
+                        <div className="absolute bottom-3 -mt-6 right-1 sm:bottom-3 sm:right-3 bg-green-500 text-white rounded-full p-1 sm:p-3 z-20">
+                          <svg className="w-4 h-4 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
+                          </svg>
+                        </div>
+                      )}
                   </div>
                 </>
               ) : (
@@ -298,6 +309,7 @@ const { data: ratingsData } = await supabase
                   {displayName?.[0]?.toUpperCase()}
                 </div>
               )}
+              
             </div>
 
             {/* Info */}
@@ -338,6 +350,7 @@ const { data: ratingsData } = await supabase
                   ))}
                 </div>
               )}
+              
 
               {/* Stats */}
               <div className="flex flex-wrap gap-6 mb-6">
@@ -355,7 +368,9 @@ const { data: ratingsData } = await supabase
                     {musician.average_rating?.toFixed(1) || "N/A"}
                   </div>
                   <div className="text-sm text-white/80">Rating</div>
+                  
                 </div>
+                
               </div>
 
               {/* Action Buttons */}
@@ -377,7 +392,13 @@ const { data: ratingsData } = await supabase
                     <Send className="w-5 h-5" />
                     Send Proposal
                   </button>
-
+{/* Verified Badge */}
+                                              {musician.kyc_verified && (
+                                                <div className="absolute top-4 right-4 mt-2 flex bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                                                  <Star className="w-3 h-3 fill-white" />
+                                                  KYC 
+                                                </div>
+                                              )}
                   <button
                     onClick={handleFollow}
                     className={`flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition ${isFollowing
@@ -392,6 +413,7 @@ const { data: ratingsData } = await supabase
                     <Share2 className="w-5 h-5" />
                   </button>
                 </div>
+                
               )}
 
               {/* Availability & Rate */}
@@ -408,6 +430,7 @@ const { data: ratingsData } = await supabase
   <span className="px-4 py-2 bg-white/20 backdrop-blur rounded-lg font-medium">
     {formatCurrency(musician.hourly_rate, musician.rate_currency || 'NGN')}/hr
   </span>
+  
 )}
               </div>
             </div>
