@@ -10,6 +10,8 @@ import LiveMap from '@/components/LiveMap';
 import Link from 'next/link';
 import { CheckCircle, XCircle, Clock, Wallet, CreditCard } from 'lucide-react';
 import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+import CallButton from "@/components/calls/CallButton";
+
 
 
 export default function ClientBookingDetailPage() {
@@ -341,6 +343,40 @@ export default function ClientBookingDetailPage() {
             )}
           </div>
         </div>
+
+        {/* Virtual Audition & Call — only for confirmed/pending bookings*/}
+{(booking.status === "confirmed" || booking.status === "pending") && booking.musician_id && (
+  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+      🎬 Connect with Musician
+    </h3>
+    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      Talk to your musician before the event. Virtual auditions let you
+      see and hear them perform live before the big day.
+    </p>
+    <div className="flex flex-col sm:flex-row gap-3">
+      <CallButton
+        targetUserId={booking.musician_id}
+        targetName={`${booking.musician?.first_name || ""} ${booking.musician?.last_name || ""}`.trim()}
+        callType="voice"
+        bookingId={booking.id}
+        variant="button"
+        className="flex-1 justify-center"
+      />
+      <CallButton
+        targetUserId={booking.musician_id}
+        targetName={`${booking.musician?.first_name || ""} ${booking.musician?.last_name || ""}`.trim()}
+        callType="audition"
+        bookingId={booking.id}
+        variant="full"
+        className="flex-1"
+      />
+    </div>
+  </div>
+)}
+
+
+
 
         {/* Musician Info */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">

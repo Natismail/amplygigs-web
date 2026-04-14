@@ -1,3 +1,4 @@
+// src/components/social/ChatWindow.js
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -9,13 +10,14 @@ import Avatar from '@/components/Avatar';
 import { useMarkMessagesRead } from '@/hooks/useMarkMessagesRead';
 import { aiClient } from '@/lib/ai/client';
 import VoiceMessagePlayer from './VoiceMessagePlayer';
+import CallButton from "@/components/calls/CallButton";
+
 
 const AMY_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 export default function ChatWindow({ conversation, onBack }) {
   const { user } = useAuth();
   const { messages, fetchMessages, sendMessage, subscribeToMessages } = useSocial();
-
   const [messageText, setMessageText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
@@ -359,56 +361,71 @@ export default function ChatWindow({ conversation, onBack }) {
     <div className="h-full w-full flex flex-col bg-white dark:bg-gray-900">
 
       {/* HEADER */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
-        <button
-          onClick={onBack}
-          className="lg:hidden -ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors active:scale-95"
-          aria-label="Back"
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-        </button>
-
-        {/* ✅ Special Amy Avatar */}
-        {isAmyChat ? (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-        ) : (
-          <Avatar
-            user={conversation.otherUser}
-            size="sm"
-            className="flex-shrink-0"
-          />
-        )}
-
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-gray-900 dark:text-white truncate">
-            {isAmyChat ? (
-              <span className="flex items-center gap-2">
-                Amy - AI Assistant
-                <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full">
-                  Online
-                </span>
-              </span>
-            ) : (
-              `${conversation.otherUser?.first_name} ${conversation.otherUser?.last_name}`
-            )}
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {isAmyChat
-              ? 'Your AI assistant • Powered by OpenAI'
-              : conversation.otherUser?.role?.toLowerCase() || 'User'}
-          </p>
-        </div>
-
-        {/* Amy Thinking Indicator */}
-        {amyIsThinking && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/20 rounded-full">
-            <Loader2 className="w-4 h-4 text-purple-600 dark:text-purple-400 animate-spin" />
-            <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">Thinking...</span>
-          </div>
-        )}
-      </div>
+      
+<div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
+  <button
+    onClick={onBack}
+    className="lg:hidden -ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors active:scale-95"
+    aria-label="Back"
+  >
+    <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+  </button>
+ 
+  {isAmyChat ? (
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
+      <Sparkles className="w-5 h-5 text-white" />
+    </div>
+  ) : (
+    <Avatar user={conversation.otherUser} size="sm" className="flex-shrink-0" />
+  )}
+ 
+  <div className="flex-1 min-w-0">
+    <h2 className="font-semibold text-gray-900 dark:text-white truncate">
+      {isAmyChat ? (
+        <span className="flex items-center gap-2">
+          Amy - AI Assistant
+          <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full">
+            Online
+          </span>
+        </span>
+      ) : (
+        `${conversation.otherUser?.first_name} ${conversation.otherUser?.last_name}`
+      )}
+    </h2>
+    <p className="text-xs text-gray-500 dark:text-gray-400">
+      {isAmyChat
+        ? "Your AI assistant • Powered by OpenAI"
+        : conversation.otherUser?.role?.toLowerCase() || "User"}
+    </p>
+  </div>
+ 
+  {/* // ✅ NEW: Call buttons — only for non-Amy conversations */}
+  {!isAmyChat && conversation.otherUser?.id && (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      <CallButton
+        targetUserId={conversation.otherUser.id}
+        targetName={`${conversation.otherUser?.first_name || ""} ${conversation.otherUser?.last_name || ""}`.trim()}
+        callType="voice"
+        variant="icon"
+        title="Voice call"
+      />
+      <CallButton
+        targetUserId={conversation.otherUser.id}
+        targetName={`${conversation.otherUser?.first_name || ""} ${conversation.otherUser?.last_name || ""}`.trim()}
+        callType="video"
+        variant="icon"
+        title="Video call"
+      />
+    </div>
+  )}
+ 
+  {amyIsThinking && (
+    <div className="flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/20 rounded-full">
+      <Loader2 className="w-4 h-4 text-purple-600 dark:text-purple-400 animate-spin" />
+      <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">Thinking...</span>
+    </div>
+  )}
+</div>
 
       {/* MESSAGES */}
       <div

@@ -1,3 +1,5 @@
+// src/components/social/ConversationList.js
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -16,6 +18,7 @@ export default function ConversationList({ onSelectConversation, selectedConvers
   useEffect(() => {
     fetchConversations();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // ✅ Separate Amy conversation from regular conversations
   const amyConversation = conversations.find(

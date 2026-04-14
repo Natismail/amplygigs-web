@@ -9,7 +9,9 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import GlobalPullToRefresh from "@/components/GlobalPullToRefresh";
 //import GlobalMusicPlayer from '@/components/streaming/GlobalMusicPlayer';
-import GlobalAmyAssistant from '@/components/ai/GlobalAmyAssistant';
+//import GlobalAmyAssistant from '@/components/ai/GlobalAmyAssistant';
+import IncomingCallListener from "@/components/calls/IncomingCallListener";
+
 
 export default function AppLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -54,6 +56,7 @@ export default function AppLayout({ children }) {
             {children}
             {/* <GlobalMusicPlayer /> */}
             {/* <GlobalAmyAssistant /> */}
+             <IncomingCallListener /> 
           </GlobalPullToRefresh>
         </main>
       </div>

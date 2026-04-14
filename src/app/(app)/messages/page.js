@@ -48,6 +48,8 @@ export default function MessagesPage() {
           </div>
         </div>
 
+
+
         {/* CHAT WINDOW */}
         <div 
           className={`${
