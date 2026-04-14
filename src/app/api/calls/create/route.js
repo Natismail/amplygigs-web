@@ -1,21 +1,47 @@
 // src/app/api/calls/create/route.js
-// Creates a LiveKit room + Supabase call record + notifies recipient
-
 import { NextResponse } from "next/server";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
-const livekitUrl    = process.env.LIVEKIT_URL;
-const apiKey        = process.env.LIVEKIT_API_KEY;
-const apiSecret     = process.env.LIVEKIT_API_SECRET;
+const livekitUrl = process.env.LIVEKIT_URL;
+const apiKey     = process.env.LIVEKIT_API_KEY;
+const apiSecret  = process.env.LIVEKIT_API_SECRET;
+
+
+// ✅ Auth helper — reads Bearer token, NOT cookies and attaches it to Supabase
+async function getUserFromRequest(request) {
+  const authHeader = request.headers.get("authorization") || "";
+  const accessToken = authHeader.replace("Bearer ", "").trim();
+
+  if (!accessToken) {
+    return { user: null, supabase: null };
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return { user: error ? null : user, supabase };
+}
 
 export async function POST(request) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await getUserFromRequest(request);
 
-    // Auth check
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user) {
+    if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -24,7 +50,6 @@ export async function POST(request) {
     if (!participant_id) {
       return NextResponse.json({ success: false, error: "participant_id required" }, { status: 400 });
     }
-
     if (participant_id === user.id) {
       return NextResponse.json({ success: false, error: "Cannot call yourself" }, { status: 400 });
     }
@@ -47,56 +72,63 @@ export async function POST(request) {
       .eq("id", user.id)
       .single();
 
-    // Create unique room name
-    const callId          = crypto.randomUUID();
-    const roomName        = `amplygigs-${callId}`;
-    const callLabel       = call_type === "audition" ? "Virtual Audition" : call_type === "video" ? "Video Call" : "Voice Call";
+    // Unique room name
+    const callId    = crypto.randomUUID();
+    const roomName  = `amplygigs-${callId}`;
+    const callLabel = call_type === "audition"
+      ? "Virtual Audition"
+      : call_type === "video"
+      ? "Video Call"
+      : "Voice Call";
 
-    // Create LiveKit room via RoomServiceClient
+    // Create LiveKit room
     if (livekitUrl && apiKey && apiSecret) {
       try {
         const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret);
         await roomService.createRoom({
-          name:                    roomName,
-          emptyTimeout:            300,      // auto-delete after 5 min empty
-          maxParticipants:         10,
-          metadata:                JSON.stringify({ call_type, booking_id }),
+          name:            roomName,
+          emptyTimeout:    300,
+          maxParticipants: 10,
+          metadata:        JSON.stringify({ call_type, booking_id }),
         });
       } catch (lkErr) {
-        console.error("LiveKit room creation error:", lkErr);
-        // Continue — room will be created on first participant join if not pre-created
+        console.warn("LiveKit room pre-create warning:", lkErr.message);
+        // Non-fatal — room is created on first join if this fails
       }
     }
 
     // Generate token for initiator
-    const initiatorToken = await generateToken(roomName, user.id, `${initiator?.first_name} ${initiator?.last_name}`, call_type);
+    const initiatorToken = await generateToken(
+      roomName, user.id,
+      `${initiator?.first_name || ""} ${initiator?.last_name || ""}`.trim()
+    );
 
-    // Create call record in Supabase
+    // Save call record
     const { data: call, error: callErr } = await supabase
       .from("calls")
       .insert({
-        id:                 callId,
-        livekit_room_name:  roomName,
-        initiator_id:       user.id,
+        id:                callId,
+        livekit_room_name: roomName,
+        initiator_id:      user.id,
         participant_id,
         booking_id,
         call_type,
-        status:             "ringing",
+        status:            "ringing",
       })
       .select()
       .single();
 
     if (callErr) throw callErr;
 
-    // Notify recipient via Supabase Realtime broadcast
+    // Notify recipient via Supabase Realtime
     await supabase.channel(`incoming-calls:${participant_id}`).send({
       type:    "broadcast",
       event:   "incoming_call",
       payload: {
-        call_id:        callId,
-        room_name:      roomName,
+        call_id:    callId,
+        room_name:  roomName,
         call_type,
-        call_label:     callLabel,
+        call_label: callLabel,
         booking_id,
         initiator: {
           id:         user.id,
@@ -107,10 +139,10 @@ export async function POST(request) {
     });
 
     return NextResponse.json({
-      success:    true,
-      call_id:    callId,
-      room_name:  roomName,
-      token:      initiatorToken,
+      success:     true,
+      call_id:     callId,
+      room_name:   roomName,
+      token:       initiatorToken,
       call_type,
       participant: {
         id:         participant.id,
@@ -125,10 +157,8 @@ export async function POST(request) {
   }
 }
 
-async function generateToken(roomName, userId, displayName, callType) {
-  if (!apiKey || !apiSecret) {
-    throw new Error("LiveKit credentials not configured");
-  }
+async function generateToken(roomName, userId, displayName) {
+  if (!apiKey || !apiSecret) throw new Error("LiveKit credentials not configured");
 
   const at = new AccessToken(apiKey, apiSecret, {
     identity: userId,
@@ -137,15 +167,12 @@ async function generateToken(roomName, userId, displayName, callType) {
   });
 
   at.addGrant({
-    roomJoin:         true,
-    room:             roomName,
-    canPublish:       true,
-    canSubscribe:     true,
-    // Audition: participant (viewer/client) can't publish video by default
-    // — they override this client-side if needed
-    canPublishData:   true,
+    roomJoin:       true,
+    room:           roomName,
+    canPublish:     true,
+    canSubscribe:   true,
+    canPublishData: true,
   });
 
   return await at.toJwt();
 }
-

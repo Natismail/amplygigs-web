@@ -89,12 +89,11 @@ const nextConfig = {
               https://nominatim.openstreetmap.org
               https://tile.openstreetmap.org
               https://api.openstreetmap.org`,
-              "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com",
+              "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com https://*.livekit.cloud",
               "frame-src https://js.paystack.co https://js.stripe.com https://checkout.stripe.com https://checkout.paystack.com",
               "font-src 'self' data:",
             ].join('; ').replace(/\s+/g, ' '),
 }
-
         ],
       },
       {

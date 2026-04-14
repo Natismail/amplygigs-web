@@ -39,6 +39,9 @@ export async function middleware(req) {
     "https://api.paystack.co",
     "https://api.stripe.com",
     "https://nominatim.openstreetmap.org",
+    // ✅ LiveKit Cloud
+    "https://*.livekit.cloud",
+    "wss://*.livekit.cloud",
   ];
 
   // ✅ ADD: Allow localhost in development
@@ -61,7 +64,7 @@ export async function middleware(req) {
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
       `connect-src ${connectSources.join(' ')}`, // ✅ FIXED: Use dynamic connect sources
-      "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com",
+      "media-src 'self' blob: data: https://*.supabase.co https://*.jamendo.com https://prod-1.storage.jamendo.com https://prod-2.storage.jamendo.com https://*.livekit.cloud",
       "frame-src https://js.paystack.co https://js.stripe.com https://checkout.stripe.com",
       "frame-ancestors 'none'",
     ].join('; ')
