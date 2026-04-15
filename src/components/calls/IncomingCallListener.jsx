@@ -1,60 +1,68 @@
 // src/components/calls/IncomingCallListener.jsx
-// Add this ONCE to your root layout — it listens for incoming calls
-// and shows IncomingCallModal + handles accept/decline globally
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import IncomingCallModal from "./IncomingCallModal";
 import CallModal from "./CallModal";
 
+// ✅ Helper — always gets a fresh token from localStorage session
+async function getAuthHeader() {
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || "";
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type":  "application/json",
+  };
+}
+
 export default function IncomingCallListener() {
   const { user } = useAuth();
 
-  const [incomingCall, setIncomingCall]   = useState(null);  // call payload from Realtime
-  const [activeCall,   setActiveCall]     = useState(null);  // { roomName, token, callType, participantName }
-  const [joiningCall,  setJoiningCall]    = useState(false);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCall,   setActiveCall]   = useState(null);
+  const [joiningCall,  setJoiningCall]  = useState(false);
 
-  // ── Subscribe to incoming calls for this user ─────────────────────────────
+  // ── Subscribe to incoming call events for this user ───────────────────────
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
+    const supabase = createClient();
+    const channel  = supabase
       .channel(`incoming-calls:${user.id}`)
       .on("broadcast", { event: "incoming_call" }, ({ payload }) => {
         console.log("📞 Incoming call:", payload);
         setIncomingCall(payload);
       })
       .on("broadcast", { event: "call_ended" }, ({ payload }) => {
-        // Other party ended the call while we're in it
         if (activeCall?.roomName === payload.room_name) {
           setActiveCall(null);
         }
       })
       .on("broadcast", { event: "call_declined" }, ({ payload }) => {
-        // Recipient declined our outgoing call
         if (activeCall?.roomName === payload.room_name) {
           setActiveCall(null);
-          // Small notification could go here
         }
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [user?.id, activeCall?.roomName]);
 
-  // ── Accept incoming call ─────────────────────────────────────────────────
+  // ── Accept ────────────────────────────────────────────────────────────────
   const handleAccept = useCallback(async () => {
     if (!incomingCall || joiningCall) return;
     setJoiningCall(true);
 
     try {
-      const res = await fetch(`/api/calls/join/${incomingCall.room_name}`, {
+      // ✅ Get fresh Bearer token before the fetch
+      const headers = await getAuthHeader();
+
+      const res  = await fetch(`/api/calls/join/${incomingCall.room_name}`, {
         method: "POST",
+        headers,
       });
       const data = await res.json();
 
@@ -75,28 +83,37 @@ export default function IncomingCallListener() {
     }
   }, [incomingCall, joiningCall]);
 
-  // ── Decline incoming call ────────────────────────────────────────────────
-  const handleDecline = useCallback(async (reason = "declined") => {
+  // ── Decline ───────────────────────────────────────────────────────────────
+  const handleDecline = useCallback(async () => {
     if (!incomingCall) return;
+    const roomName = incomingCall.room_name;
     setIncomingCall(null);
 
     try {
-      await fetch(`/api/calls/end/${incomingCall.room_name}`, {
+      // ✅ Bearer token on decline too
+      const headers = await getAuthHeader();
+      await fetch(`/api/calls/end/${roomName}`, {
         method: "DELETE",
+        headers,
       });
     } catch (err) {
       console.warn("Decline error:", err);
     }
   }, [incomingCall]);
 
-  // ── End active call ──────────────────────────────────────────────────────
+  // ── End active call ───────────────────────────────────────────────────────
   const handleEndCall = useCallback(async () => {
     if (!activeCall) return;
     const roomName = activeCall.roomName;
     setActiveCall(null);
 
     try {
-      await fetch(`/api/calls/end/${roomName}`, { method: "POST" });
+      // ✅ Bearer token on end too
+      const headers = await getAuthHeader();
+      await fetch(`/api/calls/end/${roomName}`, {
+        method: "POST",
+        headers,
+      });
     } catch (err) {
       console.warn("End call error:", err);
     }
@@ -104,14 +121,11 @@ export default function IncomingCallListener() {
 
   return (
     <>
-      {/* Incoming call modal — shown when someone calls you */}
       <IncomingCallModal
         call={incomingCall}
         onAccept={handleAccept}
         onDecline={handleDecline}
       />
-
-      {/* Active call UI — shown when in a call */}
       <CallModal
         isOpen={!!activeCall}
         roomName={activeCall?.roomName}

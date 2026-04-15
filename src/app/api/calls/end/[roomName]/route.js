@@ -7,17 +7,24 @@ const livekitUrl = process.env.LIVEKIT_URL;
 const apiKey     = process.env.LIVEKIT_API_KEY;
 const apiSecret  = process.env.LIVEKIT_API_SECRET;
 
+// ✅ Same pattern that fixed create/route.js
 async function getUserFromRequest(request) {
   const authHeader  = request.headers.get("authorization") || "";
   const accessToken = authHeader.replace("Bearer ", "").trim();
+
   if (!accessToken) return { user: null, supabase: null };
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    }
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  const { data: { user }, error } = await supabase.auth.getUser();
   return { user: error ? null : user, supabase };
 }
 
@@ -69,7 +76,7 @@ export async function POST(request, { params }) {
       }
     }
 
-    // Notify the other party
+    // Notify other party
     const otherUserId = user.id === call.initiator_id ? call.participant_id : call.initiator_id;
     await supabase.channel(`incoming-calls:${otherUserId}`).send({
       type:    "broadcast",

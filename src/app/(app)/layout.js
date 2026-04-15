@@ -56,7 +56,6 @@ export default function AppLayout({ children }) {
             {children}
             {/* <GlobalMusicPlayer /> */}
             {/* <GlobalAmyAssistant /> */}
-             <IncomingCallListener /> 
           </GlobalPullToRefresh>
         </main>
       </div>
@@ -73,6 +72,7 @@ export default function AppLayout({ children }) {
           {children}
           {/* <GlobalMusicPlayer /> */}
            {/* <GlobalAmyAssistant /> */}
+                        <IncomingCallListener /> 
         </GlobalPullToRefresh>
       </main>
     </div>
