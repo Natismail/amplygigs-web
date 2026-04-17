@@ -7,40 +7,38 @@ const livekitUrl = process.env.LIVEKIT_URL;
 const apiKey     = process.env.LIVEKIT_API_KEY;
 const apiSecret  = process.env.LIVEKIT_API_SECRET;
 
+// ── Two Supabase clients ───────────────────────────────────────────────────
+// authClient  — validates the user's JWT (anon key, token injected via headers)
+// adminClient — reads/writes DB bypassing RLS (service role key)
 
-// ✅ Auth helper — reads Bearer token, NOT cookies and attaches it to Supabase
-async function getUserFromRequest(request) {
-  const authHeader = request.headers.get("authorization") || "";
-  const accessToken = authHeader.replace("Bearer ", "").trim();
-
-  if (!accessToken) {
-    return { user: null, supabase: null };
-  }
-
-  const supabase = createClient(
+function makeAuthClient(accessToken) {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth:   { persistSession: false, autoRefreshToken: false },
     }
   );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  return { user: error ? null : user, supabase };
 }
 
+const adminClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
+
+async function getUser(request) {
+  const token = (request.headers.get("authorization") || "").replace("Bearer ", "").trim();
+  if (!token) return null;
+  const { data: { user }, error } = await makeAuthClient(token).auth.getUser();
+  return error ? null : user;
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
-    const { user, supabase } = await getUserFromRequest(request);
-
+    const user = await getUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -54,10 +52,10 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: "Cannot call yourself" }, { status: 400 });
     }
 
-    // Verify participant exists
-    const { data: participant, error: partErr } = await supabase
+    // Verify participant exists (admin — no RLS interference)
+    const { data: participant, error: partErr } = await adminClient
       .from("user_profiles")
-      .select("id, first_name, last_name, role")
+      .select("id, first_name, last_name")
       .eq("id", participant_id)
       .single();
 
@@ -65,35 +63,26 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: "Participant not found" }, { status: 404 });
     }
 
-    // Get initiator profile
-    const { data: initiator } = await supabase
+    // Get initiator name
+    const { data: initiator } = await adminClient
       .from("user_profiles")
-      .select("id, first_name, last_name")
+      .select("first_name, last_name")
       .eq("id", user.id)
       .single();
 
-    // Unique room name
-    const callId    = crypto.randomUUID();
-    const roomName  = `amplygigs-${callId}`;
-    const callLabel = call_type === "audition"
-      ? "Virtual Audition"
-      : call_type === "video"
-      ? "Video Call"
-      : "Voice Call";
+    const callId   = crypto.randomUUID();
+    const roomName = `amplygigs-${callId}`;
+    const callLabel = call_type === "audition" ? "Virtual Audition"
+                    : call_type === "video"    ? "Video Call"
+                    :                            "Voice Call";
 
-    // Create LiveKit room
+    // Pre-create LiveKit room
     if (livekitUrl && apiKey && apiSecret) {
       try {
-        const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret);
-        await roomService.createRoom({
-          name:            roomName,
-          emptyTimeout:    300,
-          maxParticipants: 10,
-          metadata:        JSON.stringify({ call_type, booking_id }),
-        });
-      } catch (lkErr) {
-        console.warn("LiveKit room pre-create warning:", lkErr.message);
-        // Non-fatal — room is created on first join if this fails
+        const svc = new RoomServiceClient(livekitUrl, apiKey, apiSecret);
+        await svc.createRoom({ name: roomName, emptyTimeout: 300, maxParticipants: 10 });
+      } catch (e) {
+        console.warn("LiveKit pre-create (non-fatal):", e.message);
       }
     }
 
@@ -103,8 +92,8 @@ export async function POST(request) {
       `${initiator?.first_name || ""} ${initiator?.last_name || ""}`.trim()
     );
 
-    // Save call record
-    const { data: call, error: callErr } = await supabase
+    // Save call record (admin — bypasses RLS)
+    const { data: call, error: callErr } = await adminClient
       .from("calls")
       .insert({
         id:                callId,
@@ -120,8 +109,8 @@ export async function POST(request) {
 
     if (callErr) throw callErr;
 
-    // Notify recipient via Supabase Realtime
-    await supabase.channel(`incoming-calls:${participant_id}`).send({
+    // Notify recipient via Realtime
+    await adminClient.channel(`incoming-calls:${participant_id}`).send({
       type:    "broadcast",
       event:   "incoming_call",
       payload: {
@@ -159,20 +148,9 @@ export async function POST(request) {
 
 async function generateToken(roomName, userId, displayName) {
   if (!apiKey || !apiSecret) throw new Error("LiveKit credentials not configured");
-
-  const at = new AccessToken(apiKey, apiSecret, {
-    identity: userId,
-    name:     displayName,
-    ttl:      "2h",
-  });
-
-  at.addGrant({
-    roomJoin:       true,
-    room:           roomName,
-    canPublish:     true,
-    canSubscribe:   true,
-    canPublishData: true,
-  });
-
+  const at = new AccessToken(apiKey, apiSecret, { identity: userId, name: displayName, ttl: "2h" });
+  at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true, canPublishData: true });
   return await at.toJwt();
 }
+
+

@@ -7,38 +7,42 @@ const livekitUrl = process.env.LIVEKIT_URL;
 const apiKey     = process.env.LIVEKIT_API_KEY;
 const apiSecret  = process.env.LIVEKIT_API_SECRET;
 
-// ✅ Same pattern that fixed create/route.js
-async function getUserFromRequest(request) {
-  const authHeader  = request.headers.get("authorization") || "";
-  const accessToken = authHeader.replace("Bearer ", "").trim();
-
-  if (!accessToken) return { user: null, supabase: null };
-
-  const supabase = createClient(
+function makeAuthClient(accessToken) {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
-      global: {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth:   { persistSession: false, autoRefreshToken: false },
     }
   );
+}
 
-  const { data: { user }, error } = await supabase.auth.getUser();
-  return { user: error ? null : user, supabase };
+const adminClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
+
+async function getUser(request) {
+  const token = (request.headers.get("authorization") || "").replace("Bearer ", "").trim();
+  if (!token) return null;
+  const { data: { user }, error } = await makeAuthClient(token).auth.getUser();
+  return error ? null : user;
 }
 
 // POST — end an active call
-export async function POST(request, { params }) {
+export async function POST(request, context) {
+  // ✅ Next.js 15 — await params
+  const { roomName } = await context.params;
+
   try {
-    const { user, supabase } = await getUserFromRequest(request);
+    const user = await getUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { roomName } = params;
-
-    const { data: call, error: callErr } = await supabase
+    const { data: call, error: callErr } = await adminClient
       .from("calls")
       .select("*")
       .eq("livekit_room_name", roomName)
@@ -56,7 +60,7 @@ export async function POST(request, { params }) {
     const answeredAt   = call.answered_at ? new Date(call.answered_at) : null;
     const durationSecs = answeredAt ? Math.round((endedAt - answeredAt) / 1000) : 0;
 
-    await supabase
+    await adminClient
       .from("calls")
       .update({
         status:           "ended",
@@ -69,16 +73,16 @@ export async function POST(request, { params }) {
     // Delete LiveKit room
     if (livekitUrl && apiKey && apiSecret) {
       try {
-        const roomService = new RoomServiceClient(livekitUrl, apiKey, apiSecret);
-        await roomService.deleteRoom(roomName);
-      } catch (lkErr) {
-        console.warn("LiveKit room deletion warning:", lkErr.message);
+        const svc = new RoomServiceClient(livekitUrl, apiKey, apiSecret);
+        await svc.deleteRoom(roomName);
+      } catch (e) {
+        console.warn("LiveKit room deletion (non-fatal):", e.message);
       }
     }
 
     // Notify other party
     const otherUserId = user.id === call.initiator_id ? call.participant_id : call.initiator_id;
-    await supabase.channel(`incoming-calls:${otherUserId}`).send({
+    await adminClient.channel(`incoming-calls:${otherUserId}`).send({
       type:    "broadcast",
       event:   "call_ended",
       payload: { room_name: roomName, duration_seconds: durationSecs },
@@ -93,16 +97,17 @@ export async function POST(request, { params }) {
 }
 
 // DELETE — decline an incoming call
-export async function DELETE(request, { params }) {
+export async function DELETE(request, context) {
+  // ✅ Next.js 15 — await params
+  const { roomName } = await context.params;
+
   try {
-    const { user, supabase } = await getUserFromRequest(request);
+    const user = await getUser(request);
     if (!user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { roomName } = params;
-
-    const { data: call } = await supabase
+    const { data: call } = await adminClient
       .from("calls")
       .select("initiator_id, participant_id")
       .eq("livekit_room_name", roomName)
@@ -112,13 +117,12 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, error: "Call not found" }, { status: 404 });
     }
 
-    await supabase
+    await adminClient
       .from("calls")
       .update({ status: "declined", ended_at: new Date().toISOString() })
       .eq("livekit_room_name", roomName);
 
-    // Notify initiator
-    await supabase.channel(`incoming-calls:${call.initiator_id}`).send({
+    await adminClient.channel(`incoming-calls:${call.initiator_id}`).send({
       type:    "broadcast",
       event:   "call_declined",
       payload: { room_name: roomName },
@@ -130,3 +134,5 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+

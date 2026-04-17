@@ -1,4 +1,118 @@
-// src/components/calls/CallModal.jsx
+// // src/components/calls/CallModal.jsx
+
+
+
+
+// // High-quality custom LiveKit Call UI (Refactored)
+// // Includes:
+// // - Custom video grid
+// // - Bottom control bar (mic, cam, screen share, chat-ready)
+// // - Clean light/dark support
+
+// "use client";
+
+// import {
+//   LiveKitRoom,
+//   useTracks,
+//   VideoTrack,
+//   useParticipants,
+//   RoomAudioRenderer,
+// } from "@livekit/components-react";
+// import { Track } from "livekit-client";
+// import { useState, useCallback } from "react";
+// import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor } from "lucide-react";
+
+// const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+// // ─────────────────────────────────────────────
+// // Video Grid
+// // ─────────────────────────────────────────────
+// function VideoGrid() {
+//   const tracks = useTracks([Track.Source.Camera]);
+
+//   return (
+//     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 h-full">
+//       {tracks.map((track) => (
+//         <div key={track.publication.trackSid} className="bg-black rounded-2xl overflow-hidden relative">
+//           <VideoTrack trackRef={track} className="w-full h-full object-cover" />
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
+
+// // ─────────────────────────────────────────────
+// // Controls Bar
+// // ─────────────────────────────────────────────
+// function Controls({ onEnd }) {
+//   const [micOn, setMicOn] = useState(true);
+//   const [camOn, setCamOn] = useState(true);
+
+//   return (
+//     <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 p-4 bg-black/60 backdrop-blur">
+//       <button
+//         onClick={() => setMicOn(!micOn)}
+//         className="p-3 rounded-full bg-white/10 hover:bg-white/20"
+//       >
+//         {micOn ? <Mic /> : <MicOff />}
+//       </button>
+
+//       <button
+//         onClick={() => setCamOn(!camOn)}
+//         className="p-3 rounded-full bg-white/10 hover:bg-white/20"
+//       >
+//         {camOn ? <Video /> : <VideoOff />}
+//       </button>
+
+//       <button className="p-3 rounded-full bg-white/10 hover:bg-white/20">
+//         <Monitor />
+//       </button>
+
+//       <button
+//         onClick={onEnd}
+//         className="p-3 rounded-full bg-red-500 hover:bg-red-600 text-white"
+//       >
+//         <PhoneOff />
+//       </button>
+//     </div>
+//   );
+// }
+
+// // ─────────────────────────────────────────────
+// // Main Modal
+// // ─────────────────────────────────────────────
+// export default function CallModal({ isOpen, token, roomName, onEnd }) {
+//   const handleDisconnect = useCallback(() => {
+//     onEnd?.();
+//   }, [onEnd]);
+
+//   if (!isOpen || !token) return null;
+
+//   return (
+//     <div className="fixed inset-0 z-50 bg-black">
+//       <LiveKitRoom
+//         serverUrl={LIVEKIT_URL}
+//         token={token}
+//         connect
+//         video
+//         audio
+//         onDisconnected={handleDisconnect}
+//         className="h-full w-full relative"
+//       >
+//         <RoomAudioRenderer />
+//         <VideoGrid />
+//         <Controls onEnd={onEnd} />
+//       </LiveKitRoom>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
 // Full-screen call UI using LiveKit React components
 // Handles voice, video, and virtual audition modes
 
@@ -168,7 +282,18 @@ export default function CallModal({
           participantName={participantName}
           onEnd={onEnd}
         />
+
+        <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onEnd}
+          className="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-500 backdrop-blur rounded-full text-white text-sm font-medium transition"
+        >
+          <PhoneOff className="w-4 h-4" />
+          End Call
+        </button>
+      </div>
       </LiveKitRoom>
+      
     </div>
   );
 }
