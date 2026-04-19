@@ -7,6 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { CheckCircle, Clock, DollarSign, MapPin, Calendar, User } from 'lucide-react';
 import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
+import CallButton from "@/components/calls/CallButton";
+
 
 
 export default function MusicianBookingsPage() {

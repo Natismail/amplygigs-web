@@ -77,3 +77,4 @@ export default function CallHeader({ callType, participantName }) {
     </div>
   );
 }
+

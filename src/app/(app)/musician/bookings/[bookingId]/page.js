@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { CheckCircle, Clock, Wallet, DollarSign, AlertCircle } from 'lucide-react';
 import { getCurrencyByCode, formatCurrency } from "@/components/CurrencySelector";
 import VerificationGate, { VerificationBanner } from "@/components/VerificationGate";
+import CallButton from "@/components/calls/CallButton";
+
 
 
 
@@ -425,6 +427,8 @@ export default function BookingDetailsPage() {
           </div>
         </div>
 
+        
+
         {/* Client Info */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
@@ -457,6 +461,35 @@ export default function BookingDetailsPage() {
             </div>
           </div>
         </div>
+
+        {booking.status === "confirmed" && booking.client_id && (
+  <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 text-gray-900 dark:text-white">
+      📞 Contact Client
+    </h3>
+    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      Confirm event details, discuss requirements, or do a quick check-in before the gig.
+    </p>
+    <div className="flex flex-col sm:flex-row gap-3">
+      <CallButton
+        targetUserId={booking.client_id}
+        targetName={`${booking.client?.first_name || ""} ${booking.client?.last_name || ""}`.trim()}
+        callType="voice"
+        bookingId={booking.id}
+        variant="button"
+        className="flex-1 justify-center"
+      />
+      <CallButton
+        targetUserId={booking.client_id}
+        targetName={`${booking.client?.first_name || ""} ${booking.client?.last_name || ""}`.trim()}
+        callType="video"
+        bookingId={booking.id}
+        variant="full"
+        className="flex-1"
+      />
+    </div>
+  </div>
+)}
 
         {/* Event Details */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">

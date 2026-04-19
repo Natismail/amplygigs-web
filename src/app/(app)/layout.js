@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { CallProvider } from "@/context/CallContext";
 import { useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
@@ -53,10 +54,13 @@ export default function AppLayout({ children }) {
         {/* Messages gets full remaining height */}
         <main className="flex-1 relative overflow-hidden">
           <GlobalPullToRefresh>
-            {children}
+             <CallProvider>
+                {children}
+                 <IncomingCallListener /> 
+            </CallProvider>
+
             {/* <GlobalMusicPlayer /> */}
             {/* <GlobalAmyAssistant /> */}
-                                    <IncomingCallListener /> 
           </GlobalPullToRefresh>
         </main>
       </div>
@@ -70,10 +74,14 @@ export default function AppLayout({ children }) {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="transition-all duration-300">
         <GlobalPullToRefresh>
+                    <CallProvider>
+
           {children}
+                                  <IncomingCallListener /> 
+                    </CallProvider>
+
           {/* <GlobalMusicPlayer /> */}
            {/* <GlobalAmyAssistant /> */}
-                        <IncomingCallListener /> 
         </GlobalPullToRefresh>
       </main>
     </div>
